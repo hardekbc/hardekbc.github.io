@@ -1,0 +1,19 @@
+{% include base_path %}
+
+{% if post.id %}
+  {% assign title = post.title | markdownify | remove: "<p>" | remove: "</p>" %}
+{% else %}
+  {% assign title = post.title %}
+{% endif %}
+
+<div class="{{ include.type | default: "list" }}__item">
+  <article class="archive__item" itemscope itemtype="http://schema.org/CreativeWork">
+    <h3 class="archive__item-title" itemprop="headline">
+      <a href="http://hardekbc.github.io/files/{{ post.path | replace:'_publications/','' | replace:'.md','.pdf'}}">{{ title }}</a>
+    </h3>
+    {% if post.awards %}
+    <i><b><span style="color:chocolate;">{{ post.awards }}</span></b></i><br/>
+    {% endif %}
+    <b>{{ post.authors }}</b>, {{ post.venue }}, {{ post.year }}
+  </article>
+</div>
