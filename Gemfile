@@ -25,3 +25,6 @@ group :jekyll_plugins do
   gem 'jekyll-sitemap'
   gem 'hawkins'
 end
+
+# work-around because webrick isn't bundled in Ruby 3.0
+gem "webrick"
