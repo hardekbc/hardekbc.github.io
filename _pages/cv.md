@@ -11,7 +11,8 @@ redirect_from:
 
 ## Work Experience
 
-| 2018--now  | Associate Professor, UC Santa Barbara Computer Science Dept. |
+| 2022--now  | Professor, UC Santa Barbara Computer Science Dept. |
+| 2018--2022 | Associate Professor, UC Santa Barbara Computer Science Dept. |
 | --:        | :-- |
 | 2016--2017 | Visiting Researcher, Google Inc. |
 | 2015--2016 | Associate Professor, UC Santa Barbara Computer Science Dept. |
@@ -129,6 +130,7 @@ Berkeley Churchill
 | Dates | Position |
 | --: | --- |
 | 2020--now | Undergraduate Vice Chair |
+| 2022--now | Computer Engineering Program Coordinator |
 | 2020--2021 | Undergraduate Advisor |
 | 2019 | Undergraduate Vice Chair |
 | 2015--2016 | Computer Engineering Program Associate Director |
@@ -149,15 +151,15 @@ Berkeley Churchill
 
 | Dates | Committee |
 | --: | --- |
-| 2021--2022 | LSOE Faculty Recruiting Committee |
+| 2021--2023 | LSOE Faculty Recruiting Committee |
+| 2020--2023 | Undergraduate Affairs Committee |
+| 2019--now | College of Creative Studies: Computing, Program Committee |
 | 2021 | College of Creative Studies Merit/Promotion Personnel Committee |
 | 2020--2022 | Phelps Covid-19 Building Committee |
 | 2020 | College of Creative Studies Merit/Promotion Personnel Committee |
-| 2020--now | Undergraduate Affairs Committee |
 | 2020 | Undergraduate Curriculum Committee |
 | 2020 | Curriculum Assessment Task Force |
 | 2019 | Undergraduate Affairs Committee
-| 2019--now | College of Creative Studies: Computing, Program Committee |
 | 2019 | LSOE Faculty Recruiting Committee |
 | 2018--2019 | Undergraduate Affairs Committee |
 | 2015--2016 | Computer Engineering Recruiting Committee |
@@ -167,4 +169,4 @@ Berkeley Churchill
 | 2009--2011 | Undergraduate Curriculum Committee |
 
 ---
-Last Updated: July 2022
+Last Updated: September 2022
