@@ -12,8 +12,8 @@ redirect_from:
 ## Work Experience
 
 | 2022--now  | Professor, UC Santa Barbara Computer Science Dept. |
-| 2018--2022 | Associate Professor, UC Santa Barbara Computer Science Dept. |
 | --:        | :-- |
+| 2018--2022 | Associate Professor, UC Santa Barbara Computer Science Dept. |
 | 2016--2017 | Visiting Researcher, Google Inc. |
 | 2015--2016 | Associate Professor, UC Santa Barbara Computer Science Dept. |
 | 2009--2015 | Assistant Professor, UC Santa Barbara Computer Science Dept. |
