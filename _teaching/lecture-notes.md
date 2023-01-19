@@ -220,15 +220,15 @@
     + example program (just doing things by eye, no specific algorithm):
 
     ```
-    [1] x := input(0, 100) <-- x is top
-    [2] if (x > 0) {       <-- x is pos
-    [3]   y := x * x;      <-- y is pos
-    [4]   z := 1/y;        <-- z is top (because could be 0)
-    [5] }
-    [6] else {             <-- x is 0
-    [7]   y := x - x;      <-- y is 0
-    [8]   z := 1/y         <-- division by 0
-    [9] }
+    int x := input(0, 100); <-- x is top
+    if (x > 0) {            <-- x is pos
+      y := x * x;           <-- y is pos
+      z := 1 / y;           <-- z is top (because could be 0)
+    }
+    else {                  <-- x is 0
+      y := x - x;           <-- y is 0
+      z := 1 / y;           <-- division by 0
+    }
     ```
 
 - now let's get a little bit more in-depth (though still high-level)
@@ -243,8 +243,14 @@
 
   ```
   int x = input(), y = 0, z = 0;
-  if (x) { x = 3; y = 2; } else { x = 2; y = 3; }
-  z = x+y;
+  if (x != 0) {
+    x = 3;
+    y = 2;
+  } else {
+    x = 2;
+    y = 3;
+  }
+  z = x + y;
   return z;
   ```
 
@@ -273,10 +279,10 @@
 
   ```
   int x = input(), y = input(), z = input();
-  while (z) {
-    x = x+1;
-    y = y+2;
-    z = x/y;
+  while (z != 0) {
+    x = x + 1;
+    y = y + 2;
+    z = x / y;
   }
   return x;
   ```
@@ -304,12 +310,12 @@
 
   ```
   int x = input(), y = input(), z = input();
-  while (z) {
+  while (z != 0) {
     while (y <= x) {
-      y = y+2;
-      z = x/y;
+      y = y + 2;
+      z = x / y;
     }
-    x = x+1;
+    x = x + 1;
   }
   return x;
   ```
@@ -513,7 +519,7 @@
       z = z + 1;
     }
     z = y + z;
-    return z
+    return z;
   ```
 
   CFG (draw):
@@ -540,8 +546,10 @@
 
   ```
   int x = 0, y = input(), z = input();
-  if (y) { x = 1; } else { x = 2; }
-  if (z) { x = x + x; } else { x = x - x; }
+  if (y != 0) { x = 1; }
+  else { x = 2; }
+  if (z != 0) { x = x + x; }
+  else { x = x - x; }
   x = x + x;
   return x;
   ```
