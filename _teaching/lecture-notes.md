@@ -149,7 +149,7 @@
 
 - [show example: analysis-impl/convert/testdata/test9.{c, nossa.ll, nossa.ir}
 
-- i have written some basic infrastructure for this IR in C++: a parser to read IR programs from text files and a data structure to hold them; i will post this on slack before the next class
+- i have written some basic infrastructure for this IR in C++: a parser to read IR programs from text files and a data structure to hold them
 
     + you can use my pre-written infrastructure if you want, but you do not have to (personally i think C++ is terrible and would prefer not to use it)
 
@@ -159,14 +159,24 @@
 
         + whatever language you use has to be something that i can install in the autograder docker image
 
+- [go over 260-public codebase]
+
 - your task this week (not an official assignment, but highly recommended):
 
     + if you're going to use my code, then familiarize yourself with it and be sure that you can build the code and use it
 
     + if you're going to use something else, go ahead and implement the needed infrastructure now---don't wait for the first assignment. since this isn't an official assignment, as many people as want can work together and share the needed code
 
-# dataflow analysis (DFA)
+# basics of dataflow analysis (DFA)
 ## intro
+
+- we'll begin with the high-level idea of DFA, hand-wavy and without low-level details, just enough to give you some intuition about how it works. then we'll define some specific analyses in detail (the ones you'll implement for homework), and finally we'll go through the math behind DFA that makes it all work (i.e., guarantee it's computable).
+
+    + we'll also limit ourselves for now to intraprocedural analysis (i.e., one function at a time) and treat function calls and pointers conservatively (i.e., we won't try to track information about them at all). treating pointers conservatively also means treating structs conservatively, since structs can only be accessed via pointers.
+
+    + so this means: a single function, only tracking integer values and variables.
+
+    + we'll lift these restrictions later and show how we can deal with each of these language features using DFA.
 
 - a bit of history: kildall and original motivation to replace ad-hoc error-prone compiler analyses and optimizations with a general framework
 
@@ -207,7 +217,7 @@
         + bottom + X = X
         + top + X = X (where X is not bottom)
 
-    + example program:
+    + example program (just doing things by eye, no specific algorithm):
 
     ```
     [1] x := input(0, 100) <-- x is top
@@ -221,17 +231,45 @@
     [9] }
     ```
 
+- now let's get a little bit more in-depth (though still high-level)
+
 ## control-flow graph (CFG)
 
 - DFA was originally defined for flowchart-style programs with explicit and obvious control-flow. thus, it is based on the idea of a 'control-flow graph' (CFG, which is confusing if you're also talking about grammars). a CFG is just a representation of a program's possible execution paths.
 
-- [define CFG using examples; talk about basic blocks]
+- [define CFG using examples; talk about basic blocks---a block will always begin with a label that can be jumped to and end in a terminator instruction (ret, jump, branch)]
+
+- EXAMPLE 1
 
   ```
-  int x = input(), y, z;
+  int x = input(), y = 0, z = 0;
   if (x) { x = 3; y = 2; } else { x = 2; y = 3; }
   z = x+y;
+  return z;
   ```
+
+  CFG (draw):
+
+  ```
+  bb1: x:int = $call input()
+       y:int = $copy 0
+       z:int = $copy 0
+       tmp:int = $cmp neq x:int 0
+       $branch tmp:int bb2 bb3
+
+  bb2: x:int = $copy 3
+       y:int = $copy 2
+       $jump bb4
+
+  bb3: x:int = $copy 2
+       y:int = $copy 3
+       $jump bb4
+
+  bb4: z:int = $arith add x:int y:int
+       $ret z:int
+  ```
+
+- EXAMPLE 2
 
   ```
   int x = input(), y = input(), z = input();
@@ -240,33 +278,88 @@
     y = y+2;
     z = x/y;
   }
+  return x;
   ```
+
+  CFG (draw):
+
+  ```
+  bb1: x:int = $call input()
+       y:int = $call input()
+       z:int = $call input()
+       $jump bb2
+
+  bb2: tmp:int = $cmp neq z:int 0
+       $branch tmp:int bb3 bb4
+
+  bb3: x:int = $arith add x:int 1
+       y:int = $arith add y:int 2
+       z:int = $arith div x:int y:int
+       $jump bb2
+
+  bb4: $ret x:int
+  ```
+
+- EXAMPLE 3
 
   ```
   int x = input(), y = input(), z = input();
   while (z) {
-    x = x+1;
     while (y <= x) {
       y = y+2;
       z = x/y;
     }
+    x = x+1;
   }
+  return x;
   ```
 
+  CFG (draw):
+
+  ```
+  bb1: x:int = $call input()
+       y:int = $call input()
+       z:int = $call input()
+       $jump bb2
+
+  bb2: tmp1:int = $cmp neq z:int 0
+       $branch tmp1:int bb3 bb6
+
+  bb3: tmp2:int = $cmp lte y:int x:int
+       $branch tmp2:int bb4 bb5
+
+  bb4: y:int = $arith add y:int 2
+       z:int = $arith div x:int y:int
+       $jump bb3
+
+  bb5: x:int = $arith add x:int 1
+       $jump bb2
+
+  bb6: $ret x:int
+  ```
+
+- the usual assumption is that for each function there is a single entry basic block and a single exit basic block
+
+    + if this isn't true (e.g., there are multiple return instructions) it's easy to massage the CFG to make it true (e.g., replace all the return instructions with jumps to a new basic block that contains a single return instruction).
+
 - show IR example: analysis-impl/convert/testdata/test1.c, test1.nossa.ir; maybe show C program first and ask students to draw CFG, then show IR version
+
+- notice that call instructions are not terminator instructions (they can appear in the middle of a basic block)
+
+    + remember we're focusing for now on _intraprocedural analysis_, i.e., analyzing each function independently (and hence we make conservative assumptions about what calls can do); later on we'll look at _interprocedural analysis_ where the analysis crosses function boundaries.
+
+    + while a call instruction does jump control flow, that control flow will always jump right back and so the central invariant of a basic block remains true: all instructions will be executed
 
 ## abstract domains
 
 - naive approach to analysis: execute program on all possible inputs---obviously not tractable
 
-- we'll look at a simple overview of how dataflow analysis works, without diving into a lot of mathematical details (we'll get to the mathematical details soon enough)
-
 - the main source of undecidability is infinite domains (e.g., the integer domain). this gives us an infinite space of behaviors. thus, we need to constrain the domain to be finite. at the same time, we need to over-approximate the actual behaviors. this means our finite 'abstract' domain must over-approximate the infinite 'concrete' domain. how?
 
 - the usual method is to partition the infinite domain into a finite number of partitions. examples for the integer domain:
 
-    + parity
-    + signedness
+    + parity: N^e, N^o
+    + signedness: N^+, 0, N^-
     + [draw these domains out, but not the full lattice just the integer partitions]
 
 - note that the precision of the answer that we get from the analysis is bounded by the precision of the abstract domain we use. also note that different abstract domains can be non-comparable in terms of precision (as are parity and signedness).
@@ -281,6 +374,12 @@
 
     + [draw the full lattices for parity and signedness]
 
+- notice that these different sets are related via subset, with more precise abstract values being subsets of less precise abstract values.
+
+    + [show this for parity and signedness lattices]
+
+    + sometimes we'll need to "merge" abstract values in order to find the most precise value that over-approximates the input values---we'll define this operation more precisely later, but in general it just means find the smallest superset that contains both inputs.
+
 - we also need a way to map concrete values into the corresponding abstract values, and it can be useful mathematically to have the reverse mapping too:
 
     + alpha: Int -> Int#
@@ -292,15 +391,69 @@
 
 - later we'll see how we can relax the requirement for finite abstract domains while still remaining decidable. it will require some math to guarantee it will work correctly; we'll have to formalize this informal notion of abstract domain and give it some restrictions.
 
-- this was a really high-level overview; we'll see exact details soon
+- in general we need to define abstract domains for every kind of concrete value that we're interested in (integers, pointers, etc).
 
 ## abstract transfer functions
 
-- now that we're operating on abstract values instead of concrete values, we need to know how concrete operators map to abstract operators. when we see, e.g., ```x + y``` in a program, we're no longer operating on integers but on partitions of integers. the abstract versions of concrete operations are often called 'abstract transfer functions'.
+- now that we're operating on abstract values instead of concrete values, we need to know how concrete operators map to abstract operators. when we see, e.g., `x + y` in a program, we're no longer operating on integers but on partitions of integers. the abstract versions of concrete operations are often called 'abstract transfer functions'.
 
-- give abstract transfer functions for both example domains used above (maybe show how they change depending on how we deal with ambiguous values). do so for all the arithmetic and comparison operators (with class help).
+- give abstract transfer functions for both example domains used above. do so for some other the arithmetic and comparison operators (with class help).
 
-- note: again we're being hand-wavy; soon we'll need to formalize this notion of transfer function and give some restrictions to make sure they'll work properly.
+- parity
+
+    + addition
+
+    ```
+        B | E | O | T
+      +--------------
+    B | B   B   B   B
+    E | B   E   O   T
+    O | B   O   E   T
+    T | B   T   T   T
+    ```
+
+    + less-than (assume result of comparison is either 0 [false] or 1 [true])
+
+    ```
+        B | E | O | T
+      +--------------
+    B | B   B   B   B
+    E | B   T   T   T
+    O | B   T   T   T
+    T | B   T   T   T
+    ```
+
+- signedness
+
+    + addition
+
+    ```
+        B | + | 0 | - | T
+      +------------------
+    B | B   B   B   B   B
+    + | B   +   +   T   T
+    0 | B   +   0   -   T
+    - | B   T   -   -   T
+    T | B   T   T   T   T
+    ```
+
+    + less-than (assume result of comparison is either 0 [false] or 1 [true])
+
+    ```
+        B | + | 0 | - | T
+      +------------------
+    B | B   B   B   B   B
+    + | B   T   0   0   T
+    0 | B   +   0   0   T
+    - | B   +   +   T   T
+    T | B   T   T   T   T
+    ```
+
+- for both of these examples we can define the abstract transfer functions using tables because the abstract domains are finite; this isn't always the case (but again, to guarantee that infinite abstract domains still result in decidable analyses requires some math we'll get into later).
+
+- we could combine these abstract domains if we want: an abstract value would be a pair `(parity, sign)`, with the obvious abstract semantics. this is generally true of all abstract domains, that they can be combined to get more precise domains.
+
+- note that again we're being hand-wavy, we can't just make these transfer functions be anything we want and still ensure the analysis works---soon we'll need to formalize this notion of transfer function and give some restrictions to make sure they'll work properly.
 
 ## abstract execution (MOP vs MFP)
 
@@ -326,40 +479,198 @@
 
         - example: f(x) = x²: fixpoints are 0, 1; least fixpoint is 0
 
+    + so for MFP, we want to assign abstract values to each variable at each program point s.t. if we execute the abstract semantics on the program, we get the results we started with.
+
+        - and specifically, we want the most precise abstract values for each variable that makes this true, i.e., the 'least fixpoint'
+
     + polynomial time complexity
 
     + [give the worklist algorithm for computing a fixpoint]
 
-    + later we'll worry about how to guarantee a fixpoint exists and that we can find it
+      ```
+      GIVEN: CFG as a set of basic blocks
 
-- EXAMPLE: [do parity analysis]
+      create a map from each block to an empty abstract store
+      initialize worklist with entry block
+
+      while worklist isn't empty:
+        pop block from worklist
+        execute block using abstract semantics (drawing values from abstract store)
+        if terminal instruction is a jump or branch:
+          take final abstract store and merge it with abstract store for beginning of target blocks
+          if the abstract store for target block has changed, add target block to worklist
+      ```
+
+    + remember that fixpoints don't necessarily exist (and if they do there isn't necessarily a least fixpoint); later we'll worry about how to guarantee a least fixpoint exists and that we can find it (you guessed it: we need math)
+
+- EXAMPLE: [do parity analysis; have students do signedness analysis as exercise]
 
   ```
-    int x = input(), y, z;
-    while (x <= 10) {
-      x := x + 2;
-      y := y + 1;
+    int x = input(), y = -2, z = 0;
+    while (x < 10) {
+      x = x + 1;
+      y = y - 2;
+      z = z + 1;
     }
-    z := x * y;
+    z = y + z;
+    return z
   ```
 
-    + IN_k = merge of OUT_p | p is a predecessor of k
+  CFG (draw):
 
-    + OUT_k = abstract transfer function on IN_k
+  ```
+  bb1: x:int = $call input()
+       y:int = $copy -2
+       z:int = $copy 0
+       $jump bb2
+
+  bb2: tmp:int = $cmp lt x:int 10
+       $branch tmp:int bb3 bb4
+
+  bb3: x:int = $arith add x:int 1
+       y:int = $arith sub y:int 2
+       z:int = $arith add z:int 1
+       $jump bb2
+
+  bb4: z:int = $arith add y:int z:int
+       $ret z:int
+  ```
 
 - to get an intuitive understanding of the difference between MOP and MFP, consider the following example:
 
   ```
-  int x, y = input(), z = input();
-  if (y) { x := 1; } else { x := 2; }
-  if (z) { x := x + x; } else { x := x - x; }
-  x := x + x;
+  int x = 0, y = input(), z = input();
+  if (y) { x = 1; } else { x = 2; }
+  if (z) { x = x + x; } else { x = x - x; }
+  x = x + x;
+  return x;
   ```
 
-    + [draw CFG, show MOP paths (exponential) then MFP paths (linear), then show that using parity domain MOP is more precise than MFP]
+  CFG (draw):
+
+  ```
+  bb1: x:int = $copy 0
+       y:int = $call input()
+       z:int = $call input()
+       tmp1:int = $cmp neq y:int 0
+       $branch tmp1:int bb2 bb3
+
+  bb2: x:int = $copy 1
+       $jump bb4
+
+  bb3: x:int = $copy 2
+       $jump bb4
+
+  bb4: tmp2:int = $cmp neq z:int 0
+       $branch tmp2:int bb5 bb6
+
+  bb5: x:int = $arith add x:int x:int
+       $jump bb7
+
+  bb6: x:int = $arith sub x:int x:int
+       $jump bb7
+
+  bb7: x:int = $arith add x:int x:int
+       $ret x:int
+  ```
+
+    + [show MOP paths (exponential) then MFP paths (linear), then show that using parity domain MOP is more precise than MFP]
 
 - an analysis is _distributive_ if, for transfer function F, merge(F(x), F(y)) = F(merge(x, y))
 
     + in other words, it doesn't matter if we merge abstract values before applying the transfer function or afterwards.
 
-- for distributive analyses, MOP = MFP; for non-distributive domains, MOP <= MFP
+    + for distributive analyses, MOP = MFP; for non-distributive domains, MOP <= MFP
+
+- this concludes the high-level overview of how DFA works; next we'll define some specific analyses in detail.
+
+# defining the full signedness analysis
+## abstract domain
+
+- the signedness domain we've been using (BOT, TOP, 0, POS, NEG)
+
+## abstract transfer functions
+
+- `lhs = $arith <operation> op1 op2`
+
+    + lhs, op1, op2 must be integer types (either constants or integer variables)
+    + translate op1, op2 to abstract values (using alpha or abstract store)
+    + apply abstract transfer function
+    + update store to map lhs to result
+
+- `lhs = $cmp <relation> op1 op2`
+
+    + same as $arith
+
+- `lhs = $phi(ops...)`
+
+    + if lhs isn't an integer type, ignore instruction
+    + merge abstract values of all arguments to the phi function
+    + update store to map lhs to result
+
+- `lhs = $copy op`
+
+    + if lhs isn't an integer type, ignore instruction
+    + update store to map lhs to abstract value of op
+
+- `lhs = $load src_ptr`
+
+    + if lhs isn't an integer type, ignore instruction
+    + update store to map lhs to TOP
+
+- `$store $dst_ptr op`
+
+    + if op isn't an integer, ignore instruction
+    + update store to map all integer-typed address-taken variables to TOP
+
+- `lhs = $select op1 op2 op3`
+
+    + if lhs isn't an integer type, ignore instruction
+    + if op1 is BOT, ignore instruction
+    + if op1 is + or -, update store to map lhs to abstract value of op2
+    + if op1 is 0, update store to map lhs to abstract value of op3
+    + if op1 is TOP, update store to map lhs to merge of op2 and op3 abstract values
+
+- `lhs = $call <function>(ops...)`
+
+    + if there is any argument that is a pointer (directly or indirectly) to an integer-type, update store to map all integer-typed address-taken variables to TOP
+    + if lhs is integer-typed, update store to set lhs to TOP
+
+- `lhs = $icall <pointer>(ops...)`
+
+    + same as $call
+
+- `$jump <label>`
+
+    + propagate abstract store to <label>
+
+- `$branch op <label1> <label2>`
+
+    + if abstract value of op includes + or -, propagate abstract store to <label1>
+    + if abstract value of op includes 0, propagate abstract store to <label2>
+    + note that depending on the abstract value of op, we may propagate the abstract store only to <label1>, only to <label2>, or to both
+
+- we can ignore: `$ret` (because it doesn't do anything in an intraprocedural analysis) and `$addrof`, `$alloc`, `$gep` (because they only operate on pointers and we're ignoring pointers)
+
+## MFP
+
+- if you're using my C++ infrastructure, you'll want to use VarPtr_t to reference variables and BbPtr_t to reference basic blocks.
+
+- use the standard worklist algorithm:
+
+    + initialize empty abstract store for beginning of entry block (if looking up a variable that doesn't currently exist in the store, assume the value is BOT)
+
+    + initialize worklist with entry basic block
+
+    + merging two stores: merge the values for each variable in the two stores (again, if a variable doesn't exist assume its value is BOT)
+
+- note that for the initial abstract stores of entry blocks for functions with integer parameters, those parameters should have the value TOP (we ignore non-integer parameters).
+
+# second-order DFA analyses
+???
+
+# defining the full reaching defs analysis
+???
+
+# the math behind DFA
+???
