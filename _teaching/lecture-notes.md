@@ -169,6 +169,7 @@
 
 # basics of dataflow analysis (DFA)
 ## intro
+### high-level idea
 
 - we'll begin with the high-level idea of DFA, hand-wavy and without low-level details, just enough to give you some intuition about how it works. then we'll define some specific analyses in detail (the ones you'll implement for homework), and finally we'll go through the math behind DFA that makes it all work (i.e., guarantee it's computable).
 
@@ -190,34 +191,34 @@
 
     + "execute" program on abstract values to over-approximate concrete behaviors
 
-- example: signedness analysis (i.e., 0/positive/negative)
+### example: signedness analysis (i.e., 0/positive/negative)
 
-    + there are infinite possible concrete integers (assuming arbitrary precision integers); we'll approximate them using sets of integers corresponding to signedness
+- there are infinite possible concrete integers (assuming arbitrary precision integers); we'll approximate them using sets of integers corresponding to signedness
 
-    + abstract values:
+- abstract values:
 
-        + 0: {0}
-        + pos: {n | n > 0}
-        + neg: {n | n < 0}
-        + bottom (undefined): {}
-        + top (any value): N
+    + 0: {0}
+    + pos: {n | n > 0}
+    + neg: {n | n < 0}
+    + bottom (undefined): {}
+    + top (any value): N
 
-        + notice that these form a partial order based on subset, corresponding to the precision of the abstract value
+    + notice that these form a partial order based on subset, corresponding to the precision of the abstract value
 
-        + also notice that we could have included abstract values for "non-negative" and "non-positive"; defining the set of abstract values is part of analysis design
+    + also notice that we could have included abstract values for "non-negative" and "non-positive"; defining the set of abstract values is part of analysis design
 
-    + abstract semantics for addition:
+- abstract semantics for addition:
 
-        + 0 + 0 = 0
-        + 0 + pos = pos
-        + 0 + neg = neg
-        + pos + pos = pos
-        + pos + neg = top
-        + neg + neg = neg
-        + bottom + X = X
-        + top + X = X (where X is not bottom)
+    + 0 + 0 = 0
+    + 0 + pos = pos
+    + 0 + neg = neg
+    + pos + pos = pos
+    + pos + neg = top
+    + neg + neg = neg
+    + bottom + X = X
+    + top + X = X (where X is not bottom)
 
-    + example program (just doing things by eye, no specific algorithm):
+- example program (just doing things by eye, no specific algorithm):
 
     ```
     int x := input(0, 100); <-- x is top
@@ -234,12 +235,13 @@
 - now let's get a little bit more in-depth (though still high-level)
 
 ## control-flow graph (CFG)
+### basic idea
 
 - DFA was originally defined for flowchart-style programs with explicit and obvious control-flow. thus, it is based on the idea of a 'control-flow graph' (CFG, which is confusing if you're also talking about grammars). a CFG is just a representation of a program's possible execution paths.
 
 - [define CFG using examples; talk about basic blocks---a block will always begin with a label that can be jumped to and end in a terminator instruction (ret, jump, branch)]
 
-- EXAMPLE 1
+### EXAMPLE 1
 
   ```
   int x = input(), y = 0, z = 0;
@@ -275,7 +277,7 @@
        $ret z:int
   ```
 
-- EXAMPLE 2
+### EXAMPLE 2
 
   ```
   int x = input(), y = input(), z = input();
@@ -306,7 +308,7 @@
   bb4: $ret x:int
   ```
 
-- EXAMPLE 3
+### EXAMPLE 3
 
   ```
   int x = input(), y = input(), z = input();
@@ -344,6 +346,8 @@
   bb6: $ret x:int
   ```
 
+### wrap-up
+
 - the usual assumption is that for each function there is a single entry basic block and a single exit basic block
 
     + if this isn't true (e.g., there are multiple return instructions) it's easy to massage the CFG to make it true (e.g., replace all the return instructions with jumps to a new basic block that contains a single return instruction).
@@ -358,7 +362,7 @@
 
 ## abstract domains
 
-- naive approach to analysis: execute program on all possible inputs---obviously not tractable
+- an abstract domain is a set of abstract values that represent possible solutions to our analysis. in other words, our analysis will result in some answer that is contained in the abstract domain that we define.
 
 - the main source of undecidability is infinite domains (e.g., the integer domain). this gives us an infinite space of behaviors. thus, we need to constrain the domain to be finite. at the same time, we need to over-approximate the actual behaviors. this means our finite 'abstract' domain must over-approximate the infinite 'concrete' domain. how?
 
@@ -400,14 +404,13 @@
 - in general we need to define abstract domains for every kind of concrete value that we're interested in (integers, pointers, etc).
 
 ## abstract transfer functions
+### basic idea
 
 - now that we're operating on abstract values instead of concrete values, we need to know how concrete operators map to abstract operators. when we see, e.g., `x + y` in a program, we're no longer operating on integers but on partitions of integers. the abstract versions of concrete operations are often called 'abstract transfer functions'.
 
-- give abstract transfer functions for both example domains used above. do so for some other the arithmetic and comparison operators (with class help).
+### parity
 
-- parity
-
-    + addition
+- addition
 
     ```
         B | E | O | T
@@ -418,7 +421,7 @@
     T | B   T   T   T
     ```
 
-    + less-than (assume result of comparison is either 0 [false] or 1 [true])
+- less-than (assume result of comparison is either 0 [false] or 1 [true])
 
     ```
         B | E | O | T
@@ -429,9 +432,9 @@
     T | B   T   T   T
     ```
 
-- signedness
+### signedness
 
-    + addition
+- addition
 
     ```
         B | + | 0 | - | T
@@ -443,7 +446,7 @@
     T | B   T   T   T   T
     ```
 
-    + less-than (assume result of comparison is either 0 [false] or 1 [true])
+- less-than (assume result of comparison is either 0 [false] or 1 [true])
 
     ```
         B | + | 0 | - | T
@@ -455,6 +458,8 @@
     T | B   T   T   T   T
     ```
 
+### wrap-up
+
 - for both of these examples we can define the abstract transfer functions using tables because the abstract domains are finite; this isn't always the case (but again, to guarantee that infinite abstract domains still result in decidable analyses requires some math we'll get into later).
 
 - we could combine these abstract domains if we want: an abstract value would be a pair `(parity, sign)`, with the obvious abstract semantics. this is generally true of all abstract domains, that they can be combined to get more precise domains.
@@ -462,6 +467,7 @@
 - note that again we're being hand-wavy, we can't just make these transfer functions be anything we want and still ensure the analysis works---soon we'll need to formalize this notion of transfer function and give some restrictions to make sure they'll work properly.
 
 ## abstract execution (MOP vs MFP)
+### intro
 
 - given a CFG, abstract domains, and abstract transfer functions, how do we actually analyze a given program?
 
@@ -469,29 +475,33 @@
 
     + contrast with path-sensitive and flow-insensitive
 
-- method 1: MOP. trace through each execution path in turn, then for each program point find the most precise abstract value that contains all the abstract values computed at the program point.
+### method 1: MOP
 
-    + at best exponential time complexity, at worst non-termination
+- trace through each execution path in turn, then for each program point find the most precise abstract value that contains all the abstract values computed at the program point.
 
-    + gives the best possible precision; serves as the "gold standard" for judging other methods
+- at best exponential time complexity, at worst non-termination
 
-- method 2: MFP. treat the transfer functions as a system of equations and compute a fixpoint (more particularly, the most precise fixpoint).
+- gives the best possible precision; serves as the "gold standard" for judging other methods
 
-    + fixpoint review:
+### method 2: MFP
 
-        - define fixpoint of a function: an input that yields itself.
+- treat the transfer functions as a system of equations and compute a fixpoint (more particularly, the most precise fixpoint).
 
-        - functions can have zero fixpoints, a single fixpoint, multiple but finite fixpoints, or infinite fixpoints.
+- fixpoint review:
 
-        - example: f(x) = x²: fixpoints are 0, 1; least fixpoint is 0
+    + define fixpoint of a function: an input that yields itself.
 
-    + so for MFP, we want to assign abstract values to each variable at each program point s.t. if we execute the abstract semantics on the program, we get the results we started with.
+    + functions can have zero fixpoints, a single fixpoint, multiple but finite fixpoints, or infinite fixpoints.
 
-        - and specifically, we want the most precise abstract values for each variable that makes this true, i.e., the 'least fixpoint'
+    + example: f(x) = x²: fixpoints are 0, 1; least fixpoint is 0
 
-    + polynomial time complexity
+- so for MFP, we want to assign abstract values to each variable at each program point s.t. if we execute the abstract semantics on the program, we get the results we started with.
 
-    + [give the worklist algorithm for computing a fixpoint]
+    + and specifically, we want the most precise abstract values for each variable that makes this true, i.e., the 'least fixpoint'
+
+- polynomial time complexity (assuming abstract domain and transfer functions have the correct properties)
+
+- [give the worklist algorithm for computing a fixpoint]
 
       ```
       GIVEN: CFG as a set of basic blocks
@@ -507,9 +517,11 @@
           if the abstract store for target block has changed, add target block to worklist
       ```
 
-    + remember that fixpoints don't necessarily exist (and if they do there isn't necessarily a least fixpoint); later we'll worry about how to guarantee a least fixpoint exists and that we can find it (you guessed it: we need math)
+- remember that fixpoints don't necessarily exist (and if they do there isn't necessarily a least fixpoint); later we'll worry about how to guarantee a least fixpoint exists and that we can find it (you guessed it: we need math)
 
-- EXAMPLE: [do parity analysis; have students do signedness analysis as exercise]
+### EXAMPLE 1
+
+- [do parity analysis; have students do signedness analysis as exercise]
 
   ```
     int x = input(), y = -2, z = 0;
@@ -541,6 +553,8 @@
   bb4: z:int = $arith add y:int z:int
        $ret z:int
   ```
+
+### EXAMPLE 2
 
 - to get an intuitive understanding of the difference between MOP and MFP, consider the following example:
 
@@ -582,7 +596,7 @@
        $ret x:int
   ```
 
-    + [show MOP paths (exponential) then MFP paths (linear), then show that using parity domain MOP is more precise than MFP]
+- [show MOP paths (exponential) then MFP paths (linear), then show that using parity domain MOP is more precise than MFP]
 
 - an analysis is _distributive_ if, for transfer function F, merge(F(x), F(y)) = F(merge(x, y))
 
@@ -590,12 +604,10 @@
 
     + for distributive analyses, MOP = MFP; for non-distributive domains, MOP <= MFP
 
-- this concludes the high-level overview of how DFA works; next we'll define some specific analyses in detail.
-
 # defining the full signedness analysis
 ## abstract domain
 
-- the signedness domain we've been using (BOT, TOP, 0, POS, NEG)
+- the signedness domain we've been using (BOT, TOP, 0, POS, NEG); the abstract store will map from variables to their abstract value.
 
 ## abstract transfer functions
 
@@ -675,10 +687,491 @@
 - note that for the initial abstract stores of entry blocks for functions with integer parameters, those parameters should have the value TOP (we ignore non-integer parameters).
 
 # second-order DFA analyses
-???
+## basic idea
+
+- we've been looking at so-called 'first-order analysis': analyses where we care about _values_ at a particular point in the program (i.e., CFG node). a 'second-order analysis' asks questions about program _paths_ (sequence of execution states), not individual program states.
+
+- EXAMPLE: a taint analysis might ask 'how did this string get to this sensitive system call? in particular, did it get here from user input without being sanitized?' this isn't a question we can answer just by looking at an abstract value at a particular CFG node; we have to know the execution history that brought the value to that node.
+
+- how do we answer these questions? by abstracting program _traces_ just like we abstract program _values_
+
+## EXAMPLE: reaching definitions
+
+- problem statement: for each program point, for each variable, what are the set of defs (i.e., declaration or assignments) of that variable that may "reach" this program point? "reach" means there is some path from the def to the program point that does not definitely redefine that variable
+
+- this information allows us to trace how values flow through the program and is a useful foundation for more elaborate analyses.
+
+- notice that this is a "may" analysis: we're asking what's possibly true (i.e., not definitely false).
+
+### example program:
+
+FIXME: put in onenote
+
+    ```
+    int x, y, z = input();
+    x = 4;
+    y = 6;
+    if (z) { x = 2; } else { x = 3; y = 3; }
+    z := x+y;
+    return z;
+    ```
+
+    CFG (draw):
+
+    ```
+    bb1: z:int = $call input()
+         x:int = $copy 4
+         y:int = $copy 6
+         tmp:int = $cmp neq z:int 0
+         $branch tmp:int if_true if_false
+
+    if_true:
+         x:int = $copy 2
+         $jump if_end
+
+    if_false:
+        x:int = $copy 3
+        y:int = $copy 3
+        $jump if_end
+
+    if_end:
+        z:int = $arith add x:int y:int
+        $ret z:int
+    ```
+
+### abstract domain
+
+- remember that our abstract domain is a set of abstract values that represent possible solutions to our analysis.
+
+- we want abstract values that represent executation traces...specifically, traces from the beginning of the function to the current point following a path along which a particular variable has (1) been defined at program point X; and (2) has not been redefined at any point between X and now.
+
+    + example: focusing on variable x in the example program and the point `if_end.0`, the abstract value `x -> {if_true.0, if_false.0}` abstracts the set of traces (starting from the beginning of the function) that define variable x with no intervening redefinitions before getting to `if_end.0`.
+
+    + example: focusing on variable y in the example program and the point `if_end.0`, the abstract value `x -> {bb1.2, if_false.1}` abstracts the set of traces (starting from the beginning of the function) that define variable y with no intervening redefinitions before getting to `if_end.0`.
+
+- therefore, an abstract value for some variable v is a set of program points containing definitions of v.
+
+- remember that we need to create an abstract domain s.t. there is an abstract value for all possible concrete answers.
+
+    + what is the least precise abstract value? the set of all program points
+
+    + what is the most precise abstract value? the empty set
+
+    + what is the entire abstract domain? the powerset of the set of all program points, ordered via subset
+
+- L♯ = (P(Stmt), ⊆), ⊔ = ∪
+
+    + the elements of the abstract domain are sets of program points
+
+    + they are ordered via subset
+
+    + we can merge abstract values using set union
+
+### abstract transfer functions
+
+- now we need to create abstract semantics to replace the program's concrete semantics. in this case, we don't care about the _values_ of the variables, just whether they are being defined or not by a given instruction. so we don't need abstract semantics for arithmetic operations, relational comparisons, etc, just for variable definition.
+
+- given instruction `var = ...` at program point `k`, we need to update the abstract values for `var` at point `k` (again, we don't care what the instruction is doing to the values of the variables).
+
+    + general formula: `F♯ = GEN ∪ (IN − KILL)`, where:
+
+    ```
+    [k] x = e ==> GEN(x) = {k}, KILL(x) = { pp | x defined at pp }
+    else      ==> GEN = KILL = {}
+    ```
+
+- what about instructions that could indirectly define a variable, e.g., `$store`? since we don't track pointer information, we treat them conservatively:
+
+    + if we're storing a value of type `T`, then the store could potentially define any _address-taken_ variable of type `T` and so we have to include this program point in the abstract value for that variable.
+
+    + however, it may _not_ be defining that variable, so we also can't remove any existing program points in the abstract value for that variable.
+
+    + this is called a `weak update`, as opposed to our usual `strong updates`; a strong update _replaces_ the old abstract value with a new abstract value (like concrete assignment) while a weak updated _merges_ the old abstract value with a new abstract value.
+
+    + example:
+
+    ```
+    bb1:
+      z:int* = addrof x:int
+
+    [...more program...]
+
+    bb2:
+      x:int = $copy 42
+      w:int = $copy 34
+      $store y:int* 12
+      $ret x:int
+    ```
+
+    + what should the abstract value at the return instruction be for variable x? `{bb2.0, bb2.2}`
+
+    + what about for variable w? `{bb2.1}` (_not_ including `bb2.2` because w isn't address-taken)
+
+- a similar reasoning for any `$call` or `$icall` that passes a pointer as an argument---since we don't know what that pointer refers to, and since we don't know what the callee will do with it, we have to assume that it _could_ define any address-taken variable of the appropriate type (not just the type of the pointer itself, but any type reachable from the pointer)
+
+    + example:
+
+    ```
+    bb:
+      x:int = $copy 0
+      y:int* = $addrof x:int
+      z:int** = $addrof y:int*
+      w:int = $call foo(z:int**)
+      $ret x:int
+    ```
+
+    + what is the abstract value for variable x at the return instruction? `{bb.0, bb.3}`
+
+### MFP
+
+- now we use the same worklist algorithm as before to compute the analysis solution.
+
+- [go through example program]
+
+- [use a solution in addition to the abstract store the same as the actual assignment]
 
 # defining the full reaching defs analysis
-???
+### abstract domain
+
+- abstract store: for each variable, a set of program points (`label.index`)
+
+    + if using my C++ infrastructure: i suggest a map from VarPtr_t to set of InstPtr_t where an InstPtr_t is an alias for `const ir::Instruction*`.
+
+    + if using my C++ infrastructure, defs should be represented as InstPtr_t; for external defs just use nullptr.
+
+        - note that in certain cases objects may have been defined outside the current function (as discussed below); in our analysis we will consolidate all such objects and just say `external-def` in the printed solution.
+
+- we'll represent other relevant objects using VarPtr_t as well:
+
+    + $alloc'd objects (create a VarPtr_t for each $alloc instruction, with the name "alloc")
+
+    + struct fields (create a VarPtr_t for each field type [not individual field], with the name "field). for example, there would be one VarPtr_t for all fields of type Int.
+
+    + all of these 'fake' VarPtr_t will count as addressable objects, along with any variables that are operands of a $addrof instruction.
+
+- the actual solution will be a map from each instruction that uses some variables to the set of reaching defs for those variables.
+
+    + if using my C++ infrastructure: i suggest a map from InstPtr_t to set of InstPtr_t
+
+### abstract transfer functions
+
+- $arith, $cmp, $copy, $phi, $alloc, $gep, $select, $addrof, $ret:
+
+    + let DEF be the lhs of the instruction (if there is one) and USES be all VarPtr_t used by the instruction (note that $addrof doesn't use its argument)
+
+    + for each use in USES: soln[inst] += store[use]
+
+    + store[DEF] = {inst}
+
+- $load:
+
+    + let DEF be the lhs of the instruction; USES contains the VarPtr_t operand and also all type-appropriate addressable objects, and also if there are any pointer-type function parameters then USES contains nullptr to signify an external object.
+
+    + for each use in USES: soln[inst] += store[use]
+
+    + store[DEF] = {inst}
+
+- $store:
+
+    + let DEFS contain all type-appropriate addressable objects and USES contain the VarPtr_t operands of the instruction.
+
+    + for each use in USES: soln[inst] += store[use]
+
+    + for each def in DEFS: store[def] += {inst}
+
+- $call, $icall:
+
+    + let STRONG_DEF contain the lhs of the instruction
+
+    + if there are no pointer-type arguments then WEAK_DEFS is empty, otherwise it contains all type-appropriate addressable objects (i.e., any type reachable from the pointer argument)
+
+    + USES contains all VarPtr_t arguments and, if any arguments are pointer-typed: all type-appropriate addressable objects (the same set as for WEAK_DEFS) and if there are any pointer-type function parameters then nullptr to signify an external object.
+
+    + for each use in USES: soln[inst] += store[use]
+
+    + store[STRONG_DEF] = {inst}
+
+    + for each def in WEAK_DEFS: store[def] += {inst}
+
+- $jump, $branch:
+
+    + propagate store to target block(s); if the abstract store for the block changes then add to worklist
+
+### MFP
+
+- same worklist algorithm as for sign analysis
 
 # the math behind DFA
-???
+## preliminaries
+
+- we've been really hand-wavy so far. how can we guarantee that the analysis is decidable (i.e., terminates)? and can we be more generous with how precise the abstract domains are (e.g., can we allow infinite domains safely)?
+
+- to make guarantees about computability we can't allow arbitrary abstract domains; instead we need to impose an algebraic structure to them that will allow us to prove computability.
+
+- we'll go into a bunch of definitions and theorems in abstract algebra, and then afterwards connect it back to abstract domains and computability.
+
+- these definitions are about _ordering_: given a set S, an ordering is a binary relation on that set which meets certain requirements.
+
+    + examples of well-known orderings: (ℤ, ≤), (Strings, ≤).
+
+    + we often use the notation ⊑ for an arbitrary ordering.
+
+## definitions
+### BINARY RELATION
+
+- a binary relation on set S ⊆ P(S × S)
+
+- example: ({1, 2, 3, 6}, ⊑) where ⊑ means 'divides evenly'. the binary relation ⊑ is {(1,1), (1,2), (1,3), (1,6), (2,2), (2,6), (3,3), (3,6), (6,6)}
+
+- instead of saying '(1,3) ∈ ⊑' we usually say '1 ⊑ 3'
+
+- [review reflexive, transitive, symmetric, anti-symmetric]
+
+### PREORDER
+
+- a binary relation that is _reflexive_ and _transitive_
+
+- example: reachability relation on a directed graph (note that it can contain cycles)
+
+- counterexample: "person X likes person Y"
+
+- recall that a preorder that is also symmetric is an _equivalence relation_
+
+    + (ℤ, =)
+
+    + "has same birthday as"
+
+### PARTIAL ORDER aka POSET
+
+- a preorder that is _anti-symmetric_
+
+- examples:
+
+    + reachability on a DAG
+    + ℕ and divisibility: (ℕ, |)
+    + P(S) and ⊆
+
+- counterexample:
+
+    + (ℤ, |) (not anti-symmetric, e.g., 2 | -2 and -2 | 2)
+
+- we can visualize partial orders as Hasse diagrams:
+
+    + example: P({1, 2, 3}), ⊆
+
+    + example: ({1, 2, 3, 5, 6, 10, 15, 30}, "divides into")
+
+- a partial order can be a _total order_, i.e., a partial order s.t. for any two elements x and y, either x ⊑ y or y ⊑ x
+
+    + examples: (ℤ, ≤), (Strings, ≤)
+
+    + counterexample: the partial order examples given above
+
+### LEAST UPPER BOUND, aka JOIN, aka ⊔
+
+- for D ⊆ S, the least x ∈ S s.t. ∀d ∈ D, d ⊑ x.
+
+- denoted ⊔D or (if D = {x, y}) x ⊔ y
+
+- examples: use posets from above
+
+### GREATEST LOWER BOUND, aka MEET, aka ⊓
+
+- the dual of ⊔
+
+- examples: taken from the above partial and total orders
+
+- note that ⊔ and ⊓ are not guaranteed to exist (e.g., DAG reachability, or (ℤ, ≤) where D = the set of even integers)
+
+### CHAIN
+
+- a totally ordered subset of a partial order
+
+- example: taken from previous examples of partial orders
+
+### LATTICE
+
+- a partial order s.t. any two elements are guaranteed to have a ⊔ and ⊓
+
+- examples:
+
+    + (ℕ, |)
+    + P({1, 2, 3}, ⊆)
+    + P(ℤ , ⊆)
+
+- QUIZ: lattice or not? draw Hasse diagram.
+
+  1. ({1, 2, 3}, |)             [NO]
+  2. ({1, 2, 3, 6}, |)          [YES]
+  3. ({1, 2, 3, 12, 18, 36}, |) [NO]
+  4. (ℕ, ≤)                     [YES]
+
+### NOETHERIAN LATTICE
+
+- a lattice s.t. the length of any ascending chain must be finite.
+
+    + aka 'meets the finite ascending chain condition'
+
+- examples:
+
+    + any finite lattice
+    + (ℕ, >=)
+
+- counterexample: (ℕ, ≤)
+
+### COMPLETE LATTICE
+
+- a lattice S s.t. every subset has a ⊔ and ⊓
+
+    + contrast with a regular lattice which only requires that any two elements have a ⊔ and ⊓
+
+    + notice this implies there is a single greatest element (⊔S) and a single least element (⊓S)
+
+- examples:
+
+    + any finite lattice
+    + (P(ℕ), ⊆)
+    + (ℕ, |)
+
+- counterexamples:
+
+    + ({ S ∈ P(ℕ) | S is finite }, ⊆)
+    + (ℕ, ≤)
+    + (reals [0..1], ≤)
+
+### SUMMARY OF RELATIONS
+
+```
+binary relation
+  --> preorder
+    --> equivalence relation
+    --> partial order (includes total order)
+      --> lattice (may or may not be noetherian)
+        --> complete lattice (also may or may not be noetherian)
+```
+
+## relation to program analysis
+
+- we will require our abstract domains to be (complete) lattices with a partial order based on precision (more advanced versions can use less retrictive structures, but we'll stick with lattices)
+
+  + examples: +/0/- (more than one possibility); even/odd
+
+  + example: tainted strings to track user input
+
+- so when we've said "the most precise abstract value", what we mean is the lowest possible element of the lattice that still over-approximates the given concrete values.
+
+- note that traditionally DFA actually flips the lattices, so the most precise element is on the top and the least precise is on the bottom; a.i. does it like we're doing it here. i'm keeping it consistent to make our lives easier, but it can be confusing when reading both the dfa and a.i. literature.
+
+- why is all this math useful? because we can formally define when the MFP exists and is computable.
+
+## computability
+### FIXPOINTS
+
+- recall:
+
+    + a fixpoint of F is an input x s.t. F(x) = x
+
+    + lfp_x F = u s.t. x ⊑ u, F(u) = u, ∀y. F(y) = y ⇒ u ⊑ y
+
+    + pre-fixpoint: x ⊑ F(x)
+
+    + post-fixpoint: F(x) ⊑ x
+
+- notice that these last three definitions only make sense for an ordered set (and now we know exactly what that means).
+
+- note that a function may have 0—∞ fixpoints, and just because there's more than one _doesn't_ mean that there's a least one.
+
+    + f(x) = x + 2  [0]
+
+    + f(x) = x² - x [2]
+
+    + f(x) = x² ÷ x [∞]
+
+- our worklist algorithm for computing the MFP is trying to compute this, but how can we be sure that it exists and is computable?
+
+### MONOTONICITY
+
+- function F is monotone iff x ⊑ y ⇒ f(x) ⊑ f(y), or equivalently f(x) ⊔ f(y) ⊑ f(x ⊔ y)
+
+- [SKIP] PROOF (1st direction; 2nd direction left as exercise):
+
+    1. f(x) ⊔ f(y) ⊑ f(x ⊔ y) [given]
+    2. x ⊑ y ⇒ x ⊔ y = y [by def.]
+    3. x ⊑ y ⇒ f(x) ⊔ f(y) ⊑ f(y) [by 1, 2]
+    4. f(x) ⊑ f(x) ⊔ f(y) [by def.]
+    5. x ⊑ y ⇒ f(x) ⊑ f(y) [by 3,4]
+
+- example: f(x) = x - 1
+
+- counterexample: f(x) = x+2 if x ≤ 0, x else
+
+- an _extensive_ function is one for which x ⊑ F(x). note that monotone and extensive are orthogonal properties; people often confuse them.
+
+### FIXPOINT THEOREMS
+
+- TARSKI: let L be a complete lattice and F:L→L be monotone; then the
+  set of fixpoints of F is a complete lattice (and thus there exists a
+  least fixpoint). however, it doesn't tell us how to find the least
+  fixpoint.
+
+- KLEENE: let L be a complete noetherian lattice and F:L→L be monotone
+  and x be a pre-fixpoint of F; then ∃n ≥ 0 s.t. Fⁿ(x) is stationary
+  and lfp_x F = Fⁿ(x)
+
+    + KLEENE ITERATIONS: ⊥ ⊑ F(⊥) ⊑ F(F(⊥)) ⊑ ... ⊑ Fⁿ(⊥) ⊑ ...
+
+    + it turns out that this is what we're doing when we use our worklist algorithm (though in a rather optimized way).
+
+### ABSTRACT SEMANTICS
+
+- these theorems tell us that if (1) our abstract domains are noetherian lattices, and (2) our transfer functions are monotone, then the least fixpoint exists and is computable, and our worklist algorithm will compute it.
+
+    + note that the worklist is an optimization of kleene iterations that avoids computing transfer functions that are guaranteed to have not changed their values.
+
+    + give the generic DFA functions:
+
+      ```
+      IN_k = ⊔ { OUT_i | i→k ∈ CFG }
+      OUT_k = F♯(IN_k)
+      ```
+
+### EXAMPLES
+
+- show for the following integer abstract domains that they are noetherian lattices and the appropriate transfer functions are monotone:
+
+#### signedness {-, 0, +}
+
+-  [show lattice, abstract +]
+
+- monotone if: a ⊑ a' and b ⊑ b' => a + b ⊑ a' + b'
+
+    + case 1: a' or b' = ⊥. then a or b = ⊥, a + b = ⊥, a' + b' = ⊥, thus a + b = a' + b'.
+
+    + case 2: a' or b' = ⊤. then a' + b' = ⊤, thus a + b ⊑ a' + b'.
+
+    + case 3: a' \in {+,0,-}, b' \in {+,0,-}, a,b != ⊥. then a = a', b = b', thus a + b = a' + b'.
+
+#### [SKIP?] parity
+
+- [generalize to modular arithmetic?]
+
+#### constant lattice
+
+- note that this lattice is infinite
+
+-  [have the students do this one]
+
+#### [SKIP?] finite-size interval lattice:
+
+                    [-∞, ∞]
+                   /   |   \
+            [-∞, -1]   |    [0, ∞]
+            /          |         \
+           /        [-9, 9]       \
+          /         /     \        \
+    [-∞, -10]  [-9, -1] [0, 9] [10, ∞]
+            \         | |      /
+             ---------\ /------
+                       ⊥
+
+- however, note that the general integer interval lattice is infinite but _not_ noetherian, and thus cannot be used with DFA. there are techniques that would allow us to use non-noetherian lattices safely; these are the realm of abstract interpretation rather than DFA.
