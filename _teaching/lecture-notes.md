@@ -362,6 +362,8 @@
 
 ## abstract domains
 
+- RECAP: a DFA is an abstract domain + abstract semantics + abstract execution. we'll drill down on each of these in turn.
+
 - an abstract domain is a set of abstract values that represent possible solutions to our analysis. in other words, our analysis will result in some answer that is contained in the abstract domain that we define.
 
 - the main source of undecidability is infinite domains (e.g., the integer domain). this gives us an infinite space of behaviors. thus, we need to constrain the domain to be finite. at the same time, we need to over-approximate the actual behaviors. this means our finite 'abstract' domain must over-approximate the infinite 'concrete' domain. how?
@@ -407,6 +409,8 @@
 ### basic idea
 
 - now that we're operating on abstract values instead of concrete values, we need to know how concrete operators map to abstract operators. when we see, e.g., `x + y` in a program, we're no longer operating on integers but on partitions of integers. the abstract versions of concrete operations are often called 'abstract transfer functions'.
+
+- for integer abstractions the most relevant semantics to abstract are arithmetic and comparison; we show these by example for our example analyses of parity and sign.
 
 ### parity
 
@@ -479,6 +483,8 @@
 
 - trace through each execution path in turn, then for each program point find the most precise abstract value that contains all the abstract values computed at the program point.
 
+    + [draw generic CFG example with two diamonds in a row, trace all four paths, then show merge at each basic block]
+
 - at best exponential time complexity, at worst non-termination
 
 - gives the best possible precision; serves as the "gold standard" for judging other methods
@@ -498,6 +504,10 @@
 - so for MFP, we want to assign abstract values to each variable at each program point s.t. if we execute the abstract semantics on the program, we get the results we started with.
 
     + and specifically, we want the most precise abstract values for each variable that makes this true, i.e., the 'least fixpoint'
+
+    + intuitively, this approach will merge the abstract values along different paths _before_ propagating them further, rather than keeping each path distinct and only merging them at the end.
+
+    + [take same example as for MOP and show the difference with MFP]
 
 - polynomial time complexity (assuming abstract domain and transfer functions have the correct properties)
 
@@ -703,39 +713,39 @@
 
 - notice that this is a "may" analysis: we're asking what's possibly true (i.e., not definitely false).
 
-### example program:
+### example program
 
-    ```
-    int x, y, z = input();
-    x = 4;
-    y = 6;
-    if (z) { x = 2; } else { x = 3; y = 3; }
-    z := x+y;
-    return z;
-    ```
+  ```
+  int x, y, z = input();
+  x = 4;
+  y = 6;
+  if (z) { x = 2; } else { x = 3; y = 3; }
+  z := x+y;
+  return z;
+  ```
 
-    CFG (draw):
+  CFG (draw):
 
-    ```
-    bb1: z:int = $call input()
-         x:int = $copy 4
-         y:int = $copy 6
-         tmp:int = $cmp neq z:int 0
-         $branch tmp:int if_true if_false
+  ```
+  bb1: z:int = $call input()
+       x:int = $copy 4
+       y:int = $copy 6
+       tmp:int = $cmp neq z:int 0
+       $branch tmp:int if_true if_false
 
-    if_true:
-         x:int = $copy 2
-         $jump if_end
+  if_true:
+       x:int = $copy 2
+       $jump if_end
 
-    if_false:
-        x:int = $copy 3
-        y:int = $copy 3
-        $jump if_end
+  if_false:
+      x:int = $copy 3
+      y:int = $copy 3
+      $jump if_end
 
-    if_end:
-        z:int = $arith add x:int y:int
-        $ret z:int
-    ```
+  if_end:
+      z:int = $arith add x:int y:int
+      $ret z:int
+  ```
 
 ### abstract domain
 
