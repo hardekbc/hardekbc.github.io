@@ -705,8 +705,6 @@
 
 ### example program:
 
-FIXME: put in onenote
-
     ```
     int x, y, z = input();
     x = 4;
