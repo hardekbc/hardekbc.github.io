@@ -1,3 +1,40 @@
+# RETROSPECTIVE
+
+- timing (remember that this quarter i had to cancel the entire first week, so it's only 9 weeks + finals):
+
+    + week 2.1: up through 'the language we're analyzing'
+    + week 2.2: up through 'control-flow graph (CFG)'
+    + week 3.1: up through 'abstract execution (MOP vs MFP) :: EXAMPLE 1'
+                (assigned hw1)
+    + week 3.2: up through 'second-order DFA analyses'
+    + week 4.1: ???
+    + week 4.2: ???
+    + week 5.1: ???
+                (hw1 due)
+    + week 5.2: ???
+    + week 6.1: ???
+    + week 6.2: ???
+    + week 7.1: ???
+    + week 7.2: ???
+    + week 8.1: ???
+    + week 8.2: ???
+    + week 9.1: ???
+    + week 9.2: ???
+    + week 10.1: ???
+    + week 10.2: ???
+
+- in the basics of dataflow analysis section, i had to skip the parity example and barely had time to get through the sign example (in fact, i didn't get all the way through it). maybe remove parity altogether and just talk about the sign domain.
+
+    + if i do this, then i need to change the MOP vs MFP example that currently uses parity
+
+- ask students who use languages other than C++ if i can use their parsing/datastructure for future students.
+
+    + also collect some hints about how to set up the autograder submission for different cases (e.g., for using python3)
+
+- to speed things up, maybe move the ir-specific analysis implementation details (e.g., for sign analysis and reaching definitions, etc) to the assignment description instead of covering it in lecture.
+
+    + if i do this, i need to modify the lecture to still talk about how to handle pointers conservatively for sign analysis and reaching definitions; currently i cover it when going over the ir-specific analysis details.
+
 # admin
 
 - introduce myself and this course
@@ -621,6 +658,8 @@
 
 ## abstract transfer functions
 
+- [note that there are ways to be more precise, e.g., (1) for store, merge op's abstract value with address-taken variables instead of just using TOP; (2) for store and icall, tracking which variables have actually been address-taken by that point in the program and only setting those; (3) tracking the definedness of pointers for store, load, icall, and [i]call arguments and ignoring ones that are BOT; etc. these all revolve around being more precise about pointers, which we'll actually handle by doing pointer analysis coming up.]
+
 - `lhs = $arith <operation> op1 op2`
 
     + lhs, op1, op2 must be integer types (either constants or integer variables)
@@ -630,7 +669,8 @@
 
 - `lhs = $cmp <relation> op1 op2`
 
-    + same as $arith
+    + if the operands are not integers, set lhs to T
+    + otherwise same as $arith
 
 - `lhs = $phi(ops...)`
 
@@ -849,7 +889,7 @@
 
         - note that in certain cases objects may have been defined outside the current function (as discussed below); in our analysis we will consolidate all such objects and just say `external-def` in the printed solution.
 
-- we'll represent other relevant objects using VarPtr_t as well:
+- we'll represent other relevant objects using VarPtr_t as well (we didn't have to worry about this for sign analysis because there we only cared about values of variables; here we care about any def/use of anything):
 
     + $alloc'd objects (create a VarPtr_t for each $alloc instruction, with the name "alloc")
 
@@ -873,7 +913,7 @@
 
 - $load:
 
-    + let DEF be the lhs of the instruction; USES contains the VarPtr_t operand and also all type-appropriate addressable objects, and also if there are any pointer-type function parameters then USES contains nullptr to signify an external object.
+    + let DEF be the lhs of the instruction; USES contains the VarPtr_t operand and also all type-appropriate addressable objects, and also if there are any pointer-type function parameters of the appropriate type then USES contains nullptr to signify an external object.
 
     + for each use in USES: soln[inst] += store[use]
 
@@ -1183,3 +1223,242 @@ binary relation
                        ⊥
 
 - however, note that the general integer interval lattice is infinite but _not_ noetherian, and thus cannot be used with DFA. there are techniques that would allow us to use non-noetherian lattices safely; these are the realm of abstract interpretation rather than DFA.
+# set constraint-based analysis
+## intro
+
+- we're going to use the problem of pointers to explore a totally different method for program analysis: set constraint-based analysis.
+
+- we've had to treat pointers conservatively, and this has really hurt precision. pointers allow indirect data- and control-flow: we can't tell syntactically what is being used/defined by an instruction or where control is going (e.g., function pointers). if we want useful, non-trivial analysis information we really need to deal with pointers somehow.
+
+- in theory we can use DFA to analyze pointer information, using our standard formula: abstract domain, abstract transfer functions, abstract execution. in practice, it turns out that the domain is large enough and transfer functions complex enough that this isn't really scalable (we'd be lucky to be able to analyze programs with just 10,000 LOC).
+
+    + it's possible to make it more scalable (part of my phd dissertation was about how to make DFA-based pointer analysis two orders of magnitude more scalable), but (1) it isn't commonly used because it's still expensive; and (2) doing so is complex and requires set constraint-based analysis as a sub-procedure anyway.
+
+- to be clear, set constraint-based analysis isn't specifically for pointer analysis, it can be used for many different things (just like DFA). we're going to be using pointers as the motivating example because it turns out that it's probably the most common technique for doing pointer analysis in current use.
+
+- recall that DFA gives us a `flow-sensitive` analysis (one solution per program point); set constraint-based analysis is going to give us a `flow-insensitive` analysis (one solution over the entire program).
+
+    + a flow-sensitive sign analysis: at this program point `x` is ZERO, at this other program point `x` is POS.
+
+    + a flow-insensitive sign analysis: over the entire program, `x` is NON-NEG (or TOP if we're using the simple sign abstract domain as in assignment 1).
+
+- flow-insensitive analysis is clearly less precise because it can't give different answers per program point but instead must give a single answer that is sound over the entire program. the tradeoff is that it is usually must more scalable than flow-sensitive analysis.
+
+- we'll begin by talking about set constraint-based analysis in general, then show how to apply it to pointer analysis.
+
+## general set constraint language
+
+- language of set constraints:
+
+  ```
+  0 = empty set
+  1 = universal set
+
+  X ∈ Variable
+  c ∈ Constructor
+
+  E ∈ Expr ::= X | 0 | 1 | ¬E | E1 ∪ E2 | E1 ∩ E2 | c(E1,...,En) | c^-i(E)
+  S ∈ Stmt ::= E1 ⊆ E2 | S1 ∧ S2
+  ```
+
+- what are constructors? think of them as _uninterpreted functions_ that take sets and return sets. the analysis doesn't care what they mean; it's up to us to give them a meaningful interpretation when we're defining an analysis.
+
+    + example: type constructors
+
+        - nullary constructors: int, string, bool
+        - unary constructors: Set[·], List[·]
+        - binary constructors: ·→·, Map[·,·]
+
+    + characteristics:
+
+        - _arity_: the number of arguments it takes
+        - _variance_: each argument position is either:
+
+            + _covariant_ (the constructor is monotone wrt that position)
+            + _contravariant_ (it is antitone wrt that position)
+
+- variance is the same as type variance if you've dealt with that before. basically, consider a constructor `foo` with arity 1. let's consider two cases, one where `foo`'s argument is covariant and one where it's contravariant:
+
+    + `foo's argument is covariant`: then `foo(A) ⊆ foo(B)` iff `A ⊆ B`. notice that the direction of the subset is preserved.
+
+    + `foo's argument is contravariant`: then `foo(A) ⊆ foo(B)` iff `B ⊆ A`. notice that the direction of the subset is reversed.
+
+    + we need to have this information specified because remember that the constructors are essentially uninterpreted functions---what they really _mean_ is up to us when we design our analyses. we need to explicitly specify this piece of information to allow the set constraints to be correctly solved wrt what the constructors really stand for.
+
+    + for now we'll just assume everything is covariant; we'll need contravariant things later but we'll talk more about it then.
+
+- what does projection do? take the constructors denoted by the given expression, filter out the ones that don't match the given constructor, take the i'th argument of each remaining constructor, and put all of them in a set.
+
+    + example projection: suppose that
+
+      ```
+      X -> { a(b, C), a(D, e), f(g), h(i, j, k) }
+      C -> { l, m }
+      D -> { n, o, p }
+      ```
+
+    + then `a^-2(X) = { e, l, m }`
+
+- example set constraint system:
+
+  ```
+        a ⊆ X        ∧
+        a ⊆ Y ∪ X    ∧
+        b ⊆ Y ∪ X    ∧
+        c ⊆ Y ∪ X    ∧
+    X ∩ Y ⊆ b        ∧
+        Z ⊆ ¬(X ∩ Y)
+  ```
+
+    + X, Y, Z are set variables.
+
+    + a, b, c are _nullary constructors_ (aka constants, usually written without parentheses).
+
+- what is a solution to a set constraint system?
+
+    + `GROUND TERM`: a term c(E1,...,En) s.t. E1,...,En are all ground terms. the base cases are nullary constructors. in simple terms, a ground term is a constructor whose arguments don't contain any variables or constraints.
+
+    + `HERBRAND UNIVERSE`: the set of all ground terms (denoted H)
+
+    + `ASSIGNMENT`: a mapping σ ∈ Variable → P(H)
+
+    + `SOLUTION`: an assignment that satisfies all of the constraints (there may be 0, 1, or many solutions)
+
+- for the above example, a valid solution would be:
+
+  ```
+  X -> { a, b }
+  Y -> { b, c }
+  Z -> { a, c }
+  ```
+
+- unfortunately, finding solutions for the general set constraint language is undecidable. therefore we can only use fragments of that language, restricted to ensure decidability. the complexity of solving set constraints is determined by what restrictions we put on the language (not by the particular analysis that we're doing).
+
+## restricted set constraint language
+
+- one possible restricted language:
+
+  ```
+  X ∈ Variable
+  c ∈ Constructor
+
+  T ∈ Term ::= X | c/0
+  E ∈ Expr ::= X | c(T1,...,Tn) | c^-i(X)
+  S ∈ Stmt ::= E1 ⊆ E2 | S1 ∧ S2
+  ```
+
+- this is not the only possible restricted language that yields a decidable analysis, but this one has two nice properties:
+
+    1. it is guaranteed to have a minimal solution
+    2. it is guaranteed to have cubic complexity
+
+- some of the changes don't affect the expressiveness of the language, they only make it more convenient to deal with (e.g., only allowing variables and constants as arguments for constructor calls, only allowing variables as arguments for projections).
+
+    + also, for convenience we'll just deal with sets of inclusion constraints and assume that all constraints in a set are conjoined together, rather than explicitly using ∧. that is, `{S1, S2}` means the same thing as `S1 ∧ S2`.
+
+- analyses defined using this particular restricted set constraint language are called _inclusion-based analyses_.
+
+    + an inclusion-based _pointer_ analysis is also often called _andersen-style_ pointer analysis, after the person who first described it in their phd thesis.
+
+    + as a sidenote, another common class of analyses is _equality-based analyses_, which uses the same language except with `E1 = E2` instead of `E1 ⊆ E2`. this is even less precise than inclusion-based, but can run in near-linear time complexity. an equality-based pointer analysis is also often called _steensgaard-style_ pointer analysis, after the person who first described it. we probably won't have time to go into any more detail about this class of analyses, unfortunately.
+
+## solving inclusion constraints
+###  representing constraints as a graph
+
+- it will be convenient for solving the constraints to represent them as a graph.
+
+    + a node for each set variable, projection, and constructor call
+    + an edge for each constraint from the lhs to the rhs
+
+- edges can be represented in many ways; we'll use two kinds:
+
+    + successor edges: the edge is stored in the source node
+    + predecessor edges: the edge is stored in the destination node
+
+- the rules are:
+
+    + any edge from a constructor call is a predecessor edge
+    + any edge to a projection is a predecessor edge
+    + all other edges are successor edges
+
+- why we do this will become evident when we show how to solve the constraints.
+
+- example:
+
+  ```
+  f(X,Y) ⊆ A
+  A ⊆ B
+  B ⊆ C
+  C ⊆ E
+  g ⊆ D
+  h ⊆ D
+  h ⊆ f^-2(B)
+  D ⊆ f^-1(C)
+  f^-1(C) ⊆ E
+  f^-2(B) ⊆ F
+  ```
+
+### solving the constraint graph
+
+- solving the constraints corresponds to computing the dynamic transitive closure of the graph. the predecessor edges from the constructor calls to the set variables are the solution to the constraints.
+
+    + remember that a solution maps set variables to sets of constructors, so we map each set variable to the set of constructors that have a predecessor edge to that set variable.
+
+- initialize worklist with:
+
+    1. all variables that have a predecessor edge
+    2. all projections of variables from (1)
+
+- perform the usual worklist algorithm. there are two kinds of worklist elements:
+
+    1. `set variable`: propagate the predecessor edges along all successor edges. if the predecessor edges of the destination node changed, put it and any projection using it onto the worklist.
+
+    2. `projection`: compute the projection of the given set variable to get a set of variables v_i ∈ V. for each v_i and predecessor p_i and successor s_i, add edges p_i -> v_i -> s_i. if p_i -> v_i is new add p_i to the worklist; if v_i -> s_i is new add v_i to the worklist.
+
+- when the worklist is empty, we've computed a solution to the original constraints: for each set variable, look at its predecessor edges to get its solution.
+
+- [solve above example]
+
+  ```
+  A -> { f(X,Y) }
+  B -> { f(X,Y) }
+  C -> { f(X,Y) }
+  D -> { g, h }
+  E -> { f(X,Y), g, h }
+  F -> { h }
+  X -> { g, h }
+  Y -> { h }
+  ```
+
+### important note
+
+- we're missing what to do when we have a successor edge to a constructor; in that case we need to handle constraints like "c(T1,...,Tn) ⊆ c(T1',...,Tn')". this is where variance matters:
+
+- c(T1,...,Tn) ⊆ c(T1',...,Tn') =>
+
+    + Ti  ⊆ Ti' if position i of constructor c is covariant
+    + Ti' ⊆ Ti  if position i of constructor c is contravariant
+
+- this situation will never arise for our pointer analysis unless we're dealing with function pointers, so we'll discuss variance further when we get to that.
+
+## defining a program analysis
+
+- there are two steps for defining an analysis using set constraints:
+
+    1. define the universe of discourse, i.e., the variables and the set of constructors
+
+    2. define constraint generation, mapping a program to a set of constraints whose solution will be the solution to the analysis
+
+- notice that we don't need to describe how to solve the analysis, because no matter what the analysis is they're always inclusion constraints and can be solved using the method we described earlier. that is, the only new thing we need to do to define an analysis is the two points above; we can always use the same solver for all analyses.
+
+- this process is easiest to explain by example; the example we'll be using henceforth is pointer analysis.
+
+# TODO andersen-style pointer analysis
+## TODO no structs or indirect calls
+## TODO indirect calls
+[here we'll need to add a dicussion about variance]
+## TODO structs
+### TODO background on field sensitivity
+### TODO field-insensitive
+### TODO field-based
+### TODO field-sensitive
