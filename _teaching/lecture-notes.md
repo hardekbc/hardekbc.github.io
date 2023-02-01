@@ -7,7 +7,7 @@
     + week 3.1: up through 'abstract execution (MOP vs MFP) :: EXAMPLE 1'
                 (assigned hw1)
     + week 3.2: up through 'second-order DFA analyses'
-    + week 4.1: ???
+    + week 4.1: up through the middle of LATTICES
     + week 4.2: ???
     + week 5.1: ???
                 (hw1 due)
@@ -34,6 +34,10 @@
 - to speed things up, maybe move the ir-specific analysis implementation details (e.g., for sign analysis and reaching definitions, etc) to the assignment description instead of covering it in lecture.
 
     + if i do this, i need to modify the lecture to still talk about how to handle pointers conservatively for sign analysis and reaching definitions; currently i cover it when going over the ir-specific analysis details.
+
+- really what i should do is to split things up differently: first cover signs and reaching definitions for programs without pointers (this covers 80% of the assignment points), then cover pointers but no pointer arguments, then pointer arguments. basically, mirror the way the assignment is set up.
+
+- for assign1 reaching definitions, i don't think the tests are exploring all the possibilities outlined in the explanation of the abstract semantics in the lecture notes. i should beef them up to ensure students are covering all the possible cases.
 
 # admin
 
@@ -887,7 +891,7 @@
 
     + if using my C++ infrastructure, defs should be represented as InstPtr_t; for external defs just use nullptr.
 
-        - note that in certain cases objects may have been defined outside the current function (as discussed below); in our analysis we will consolidate all such objects and just say `external-def` in the printed solution.
+        - note that parameters and objects reachable from parameters are defined outside the current function (more discussion below); in our analysis we will consolidate all such objects and just say `external-def` in the printed solution.
 
 - we'll represent other relevant objects using VarPtr_t as well (we didn't have to worry about this for sign analysis because there we only cared about values of variables; here we care about any def/use of anything):
 
@@ -939,7 +943,7 @@
 
     + store[STRONG_DEF] = {inst}
 
-    + for each def in WEAK_DEFS: store[def] += {inst}
+    + for each def in WEAK_DEFS: store[def] += {inst}. note that we're using the call instruction as a proxy for any defs that happen inside the callee (that's why we don't use `external-def` for these).
 
 - $jump, $branch:
 
@@ -948,6 +952,8 @@
 ### MFP
 
 - same worklist algorithm as for sign analysis
+
+- All parameters are defined before entering the function, so the abstract store at the  beginning of the function should map all parameters to `external-def`.
 
 # the math behind DFA
 ## preliminaries
@@ -1223,6 +1229,7 @@ binary relation
                        ⊥
 
 - however, note that the general integer interval lattice is infinite but _not_ noetherian, and thus cannot be used with DFA. there are techniques that would allow us to use non-noetherian lattices safely; these are the realm of abstract interpretation rather than DFA.
+
 # set constraint-based analysis
 ## intro
 
