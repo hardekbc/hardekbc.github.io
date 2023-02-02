@@ -37,7 +37,13 @@
 
 - really what i should do is to split things up differently: first cover signs and reaching definitions for programs without pointers (this covers 80% of the assignment points), then cover pointers but no pointer arguments, then pointer arguments. basically, mirror the way the assignment is set up.
 
-- for assign1 reaching definitions, i don't think the tests are exploring all the possibilities outlined in the explanation of the abstract semantics in the lecture notes. i should beef them up to ensure students are covering all the possible cases.
+- assignment 1 notes
+
+    + for assign1 reaching definitions, i don't think the tests are exploring all the possibilities outlined in the explanation of the abstract semantics in the lecture notes. i should beef them up to ensure students are covering all the possible cases.
+
+    + someone asked in class if we really need separate fake vars for each $alloc, and i don't think we do (they'll all be updated to the same values anyway, similar to the reasoning for having one fake var per struct field type).
+
+- maybe i can modify the lecture to replace just enumerating abstract semantics: have example programs and go through them live with student help, then generalize from each statement's specifics to the general rules. that is, make the connection between the abstract semantics and the analysis more clear.
 
 # admin
 
@@ -1205,17 +1211,17 @@ binary relation
 
     + case 3: a' \in {+,0,-}, b' \in {+,0,-}, a,b != ⊥. then a = a', b = b', thus a + b = a' + b'.
 
-#### [SKIP?] parity
-
-- [generalize to modular arithmetic?]
-
 #### constant lattice
 
 - note that this lattice is infinite
 
--  [have the students do this one]
+- [show abstract +, sketch monotonicity proof]
 
-#### [SKIP?] finite-size interval lattice:
+#### [SKIP] parity
+
+- [generalize to modular arithmetic?]
+
+#### [SKIP] finite-size interval lattice:
 
                     [-∞, ∞]
                    /   |   \
