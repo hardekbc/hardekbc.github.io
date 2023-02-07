@@ -54,6 +54,8 @@
 
     + maybe explicitly lay out for them how to approach the assignment: take an analysis, write a set of tests with no pointers, implement until tests pass, write tests with no pointer-type args, implement until tests pass, etc.
 
+    + for the reaching defs solution, we don't take type information into account for loads in terms of `external-def`; it would be an easy change and might reduce student confusion.
+
 - maybe i can modify the lecture to replace just enumerating abstract semantics: have example programs and go through them live with student help, then generalize from each statement's specifics to the general rules. that is, make the connection between the abstract semantics and the analysis more clear.
 
     + this might slow things down, though.
@@ -1159,7 +1161,7 @@
 
     + (ℕ, ≤)
 
-        - ??? FIXME
+        - meet for infinite set, but no join
 
 ### SUMMARY OF RELATIONS
 
@@ -1393,13 +1395,9 @@ binary relation
 
 - what is a solution to a set constraint system?
 
-    + `GROUND TERM`: a term c(E1,...,En) s.t. E1,...,En are all ground terms. the base cases are nullary constructors. in simple terms, a ground term is a constructor whose arguments don't contain any variables or constraints.
+    + let H = the set of all constructor calls
 
-    + `HERBRAND UNIVERSE`: the set of all ground terms (denoted H)
-
-    + `ASSIGNMENT`: a mapping σ ∈ Variable → P(H)
-
-    + `SOLUTION`: an assignment that satisfies all of the constraints (there may be 0, 1, or many solutions)
+    + a solution is an assignment σ ∈ Variable → P(H) that maps each set variable to a set of constructor calls s.t. all constraints are satisfied.
 
 - for the above example, a valid solution would be:
 
@@ -1413,14 +1411,14 @@ binary relation
 
 ## restricted set constraint language
 
-- one possible restricted language:
+- one possible restricted language is the _inclusion constraint language_:
 
   ```
   X ∈ Variable
   c ∈ Constructor
 
-  T ∈ Term ::= X | c/0
-  E ∈ Expr ::= X | c(T1,...,Tn) | c^-i(X)
+  T ∈ Term ::= X | c(T1,...,Tn)
+  E ∈ Expr ::= T | c^-i(X)
   S ∈ Stmt ::= E1 ⊆ E2 | S1 ∧ S2
   ```
 
@@ -1429,13 +1427,7 @@ binary relation
     1. it is guaranteed to have a minimal solution
     2. it is guaranteed to have cubic complexity
 
-- some of the changes don't affect the expressiveness of the language, they only make it more convenient to deal with (e.g., only allowing variables and constants as arguments for constructor calls, only allowing variables as arguments for projections).
-
-    + also, for convenience we'll just deal with sets of inclusion constraints and assume that all constraints in a set are conjoined together, rather than explicitly using ∧. that is, `{S1, S2}` means the same thing as `S1 ∧ S2`.
-
 - analyses defined using this particular restricted set constraint language are called _inclusion-based analyses_.
-
-    + an inclusion-based _pointer_ analysis is also often called _andersen-style_ pointer analysis, after the person who first described it in their phd thesis.
 
     + as a sidenote, another common class of analyses is _equality-based analyses_, which uses the same language except with `E1 = E2` instead of `E1 ⊆ E2`. this is even less precise than inclusion-based, but can run in near-linear time complexity. an equality-based pointer analysis is also often called _steensgaard-style_ pointer analysis, after the person who first described it. we probably won't have time to go into any more detail about this class of analyses, unfortunately.
 
@@ -1457,6 +1449,7 @@ binary relation
     + any edge from a constructor call is a predecessor edge
     + any edge to a projection is a predecessor edge
     + all other edges are successor edges
+    + [we disallow edges between projections]
 
 - why we do this will become evident when we show how to solve the constraints.
 
@@ -1469,10 +1462,20 @@ binary relation
   C ⊆ E
   g ⊆ D
   h ⊆ D
-  h ⊆ f^-2(B)
-  D ⊆ f^-1(C)
+  h ⊆ f^-1(B)
+  D ⊆ f^-0(C)
   f^-1(C) ⊆ E
   f^-2(B) ⊆ F
+  ```
+
+  ```
+  f(X,Y) --> A ==> B ==> C
+                          \\
+  g --> D --> f^-0(C) =======> E
+       /
+  h --<
+       \
+        f^-1(B) ==> F
   ```
 
 ### solving the constraint graph
@@ -1480,31 +1483,6 @@ binary relation
 - solving the constraints corresponds to computing the dynamic transitive closure of the graph. the predecessor edges from the constructor calls to the set variables are the solution to the constraints.
 
     + remember that a solution maps set variables to sets of constructors, so we map each set variable to the set of constructors that have a predecessor edge to that set variable.
-
-- initialize worklist with all variables that have a predecessor edge (i.e., all variables that currently have something in their solution set). the worklist will only contain set variables.
-
-- perform the usual worklist algorithm. when popping set variable X:
-
-    1. propagate X's predecessor edges along all of X's successor edges. if the predecessor edges of the destination node changed, put it onto the worklist.
-
-    2. if X has any projections, process each projection node:
-
-        + compute the given projection of X (which can be different for each projection node) to get a set of variables v_i ∈ V.
-
-        + for each v_i and predecessor p_i and successor s_i, add edges p_i -> v_i -> s_i.
-
-        + if p_i -> v_i is new add p_i to the worklist; if v_i -> s_i is new add v_i to the worklist.
-
-- what if we add an edge between two constructors? e.g., `c(T1,...,Tn) ⊆ c(T1',...,Tn')`. this is where knowing the variance of each constructor argument position matters:
-
-    + `c(T1,...,Tn) ⊆ c(T1',...,Tn')` =>
-
-        - Ti  ⊆ Ti' if position i of constructor c is covariant
-        - Ti' ⊆ Ti  if position i of constructor c is contravariant
-
-    + what if the constructors don't match? technically this is an error, but in a practical implementation we usually just ignore mismatched constructors.
-
-- when the worklist is empty, we've computed a solution to the original constraints: for each set variable, look at its predecessor edges to get its solution.
 
 - [solve above example]
 
@@ -1519,19 +1497,44 @@ binary relation
   Y -> { h }
   ```
 
+- initialize worklist with all variables that have a predecessor edge (i.e., all variables that currently have something in their solution set). the worklist will only contain set variables.
+
+- perform the usual worklist algorithm. when popping set variable X:
+
+    1. propagate X's predecessor edges along all of X's successor edges. if the predecessor edges of the destination node changed, put it onto the worklist.
+
+    2. if X has any projections, process each projection node:
+
+        + compute the given projection of X (which can be different for each projection node) to get a set of variables V.
+
+        + for each v_i ∈ V and predecessor p_i and successor s_i, add edges p_i -> v_i -> s_i.
+
+        + if p_i -> v_i is new add p_i to the worklist; if v_i -> s_i is new add v_i to the worklist.
+
+- what if we add an edge between two constructors? e.g., `c(T1,...,Tn) ⊆ c(T1',...,Tn')`. this is where knowing the variance of each constructor argument position matters:
+
+    + `c(T1,...,Tn) ⊆ c(T1',...,Tn')` =>
+
+        - Ti  ⊆ Ti' if position i of constructor c is covariant
+        - Ti' ⊆ Ti  if position i of constructor c is contravariant
+
+    + what if the constructors don't match? technically this is an error, but in a practical implementation we usually just ignore mismatched constructors.
+
+- when the worklist is empty, we've computed a solution to the original constraints: for each set variable, look at its predecessor edges to get its solution.
+
 ### implementing the constraint graph and solver
 
 - define the following classes:
 
     + `Constructor`: containing name, arity, and variance info for that constructor
 
-    + `SetVariable`: containing name, list of predecessor edges (e.g., a set of nodes), and list of successor edges (e.g., another set of nodes)
+    + `SetVariable`: containing name, list of predecessors (e.g., a set of nodes), and list of successors (e.g., another set of nodes)
 
     + `ConstructorCall`: containing a reference to the Constructor and a list of arguments (e.g., a vector of nodes)
 
-    + `Projection`: containing a reference to the SetVariable the projection is being done on, a reference to the Constructor being projected, the position of the Constructor argument being projected, the list of predecessor edges, and the list of successor edges
+    + `Projection`: containing a reference to the SetVariable the projection is being done on, a reference to the Constructor being projected, the position of the Constructor argument being projected, the list of predecessors, and the list of successors
 
-- SetVariables, ConstructorCalls, and Projections are the nodes of the constraint graph, and the predecessor and successor edges are the edges of the constraint graph.
+- SetVariables, ConstructorCalls, and Projections are the nodes of the constraint graph, and the lists of predecessors and successors are the edges of the constraint graph.
 
 - note that you need a way for the user of the constraint engine to register constructors, set variables, constructor calls, and projections. generally the easiest way to do this is to have the register function take all the relevant information (_except_ for edges) and return some handle to the created constructor or node (e.g., a pointer or an index into a vector); then there is a separate `add_edge` function that takes two handles and adds an edge between them (either predecessor or successor depending on what kind of nodes they are).
 
@@ -1562,7 +1565,7 @@ binary relation
 
     + this is perhaps the most common kind of pointer analysis in regular use.
 
-- we need an abstraction for memory (which is conceptually infinite); that is, instead of abstract values that over-approximate integers we need abstract values that over-approximate memory addresses. a common choice is _static allocation site_.
+- we need an abstraction for memory (which is conceptually infinite); that is, instead of (for example) abstract values that over-approximate integers we need abstract values that over-approximate memory addresses. a common choice is _static allocation site_.
 
     + we'll create a fake 'variable' for each instruction where memory is allocated (aka static allocation site) and it will represent all concrete memory allocated by that instruction.
 
@@ -1574,14 +1577,14 @@ binary relation
 
 - recall that a program analysis is defined as a particular set of variables and constructors along with constraint generation (i.e., a way to map a program to a set of inclusion constraints).
 
-    + unlike a DFA, a set constraint-based analysis can be implemented using a single linear traversal of the program, e.g., using IrVisitor.
+    + unlike a DFA, a set constraint-based analysis can be implemented using a single linear traversal of the program, e.g., using IrVisitor (assuming that we already have a solver available).
 
 ## start with no structs or calls
 ### setup
 
 - we'll assume for now programs that contain no struct definitions or function calls.
 
-- remember that a solution is a map from set variables to sets of ground terms (i.e., constructor calls). we want to set up the analysis so that set variable solutions map to the information we're trying to compute, i.e., points-to sets.
+- remember that a solution is a map from set variables to sets of constructor calls. we want to define the analysis so that set variable solutions map to the information we're trying to compute, i.e., points-to sets.
 
 - universe of discourse:
 
@@ -1644,6 +1647,68 @@ binary relation
 
     + `$call`, `$icall`, `$ret` (because we're not considering function calls for now)
 
+### example
+
+CODE
+```
+def function main() -> int {
+  entry:
+    a:int** = $alloc
+    b:int = $copy 42
+    c:int* = $addrof b:int
+    d:int** = $gep a:int** 42
+    $store d:int** c:int*
+    $branch b:int bb1 bb2
+
+  bb1:
+    e:int** = $copy d:int**
+    $jump bb3
+
+  bb2:
+    f:int** = $addrof c:int*
+    $jump bb3
+
+  bb3:
+    g:int** = $phi(e:int**, f:int**)
+    h:int* = $load g:int**
+    i:int = $load h:int*
+    $ret 0
+}
+```
+
+CONSTRAINTS
+```
+ref(alloc.main.entry.0, ALLOC.MAIN.ENTRY.O) ⊆ A
+ref(b, B) ⊆ C
+A ⊆ D
+C ⊆ ref^-1(D)
+D ⊆ E
+ref(c, C) ⊆ F
+E ⊆ G
+F ⊆ G
+ref^-1(G) ⊆ H
+```
+
+GRAPH
+```
+ref(alloc) --> A ==> D ==> E ====> G
+ref(c) ------------> F =======//
+ref(b) --> C --> ref^-1(D)
+ref^-1(G) --> H
+```
+
+SOLUTION
+```
+A -> { ref(alloc.main.entry.0, ALLOC.MAIN.ENTRY.0) }
+C -> { ref(b, B) }
+D -> { ref(alloc.main.entry.0, ALLOC.MAIN.ENTRY.0) }
+E -> { ref(alloc.main.entry.0, ALLOC.MAIN.ENTRY.0) }
+F -> { ref(c, C) }
+G -> { ref(alloc.main.entry.0, ALLOC.MAIN.ENTRY.0), ref(c, C) }
+H -> { ref(b, B) }
+ALLOC.MAIN.ENTRY.0 -> { ref(b, B) }
+```
+
 ## adding structs
 ### intro
 
@@ -1670,8 +1735,6 @@ binary relation
     + just keep the $gep constraint generation that we're already doing, ignoring any `fieldname` that it might specify.
 
 - example:
-
-  FIXME: ADD TO ONENOTE
 
   ```
   struct foo {
@@ -1706,6 +1769,7 @@ binary relation
 - this only works because we require the program to be strictly typed (and there's no inheritance); if we can have the same pointer point to structs with different numbers of fields things become more complicated.
 
 ## adding direct calls
+### constraint generation
 
 - our final analysis will be _interprocedural_, that is, we'll track how information flows back and forth between functions. this means we need to add constraint generation for $call (we'll ignore indirect calls for now).
 
@@ -1723,13 +1787,72 @@ binary relation
 
 - these constraints account for pointer-related information being passed to the callee via the call arguments and back from the callee via the return instruction.
 
-## adding indirect calls
+### example
 
-- these will be trickier to deal with. we need to create a constructor for each address-taken function type to hold the parameters values and return value, then create the proper constraints during generation so make sure that things line up properly.
+CODE
+```
+def function main() -> int {
+  entry:
+    a:int = $copy 42
+    b:int* = $addrof a:int
+    c:int = $copy 12
+    d:int* = $addrof c:int
+    e:int** = $addrof d:int*
+    f:int* = $call foo(b:int*, e:int**)
+    g:int = $load f:int*
+    $ret g:int
+}
+
+def function foo(p1:int*, p2:int**) -> int* {
+  entry:
+    h:int* = $load p2:int**
+    $store p2:int** p1:int*
+    $ret h:int*
+}
+```
+
+CONSTRAINTS
+```
+ref(a, A) ⊆ B
+ref(c, C) ⊆ D
+ref(d, D) ⊆ E
+B ⊆ P1
+E ⊆ P2
+H ⊆ F
+ref^-1(P2) ⊆ H
+P1 ⊆ ref^-1(P2)
+```
+
+GRAPH
+```
+ref(a) --> B ==> P1 --> ref^-1(P2) ==> H ==> F
+ref(c) --> D
+ref(d) --> E ==> P2
+```
+
+SOLUTION
+```
+ A -> {}
+ B -> { ref(a) }
+ C -> {}
+ D -> { ref(a), ref(c) }
+ E -> { ref(d) }
+ F -> { ref(a), ref(c) }
+ H -> { ref(a), ref(c) }
+P1 -> { ref(a) }
+P2 -> { ref(d) }
+```
+
+## adding indirect calls
+### setup
+
+- unlike direct calls, we can't generate constraints that link a call with its callee and the callee return value with the lhs of the call (because we don't know what the callee is). instead we need to generate constraints that can somehow figure out these links dynamically during constraint solving.
+
+- we'll define a constructor `lam_X` for each function type `X` of an address-taken function; constructor calls to this constructor will represent address-taken functions of type `X` (i.e., for each such function its parameters and return value) and also any indirect calls via a function pointer to type `X`.
+
+### example
 
 - we'll start with an example:
-
-  FIXME: ADD TO ONENOTE
 
   ```
   def function foo(p1:int*, p2:int, p3:int*) -> int* {
@@ -1747,6 +1870,20 @@ binary relation
       $ret 0
   }
   ```
+
+  ```
+  let X = int*[int*,int,int*]
+  define lam_X/3
+
+  lam_X(P1, _P1_, _P3_) ⊆ @FOO
+
+  ref(alloc.main.entry.0, ALLOC.MAIN.ENTRY.0) ⊆ A
+  ref(alloc.main.entry.1, ALLOC.MAIN.ENTRY.1) ⊆ B
+  @FOO ⊆ F
+  F ⊆ lam_X(C, _A_, _B_)
+  ```
+
+### constraint generation
 
 - for each global function pointer `@<func>:X*` (e.g., `@foo:int*[int,int]*`):
 
