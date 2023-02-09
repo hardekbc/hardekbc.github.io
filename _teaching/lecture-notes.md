@@ -1,28 +1,41 @@
+# FINAL GRADING REMINDERS
+
+- for assign1 i allowed late submissions up to a week but said i would subtract 11 points from the overall score as a late penalty.
+
+    + i should make sure that students don't get a lower score than they had before turning in late: look at everyone's (who turned it in late) submission history and take the higher of (pre-deadline, post-deadline).
+
+    + one group turned it in slightly late (a few minutes) but it's kind of my fault since i moved the deadline from 1am to 12:05am at the last moment, so don't count it against them.
+
 # RETROSPECTIVE
 ## timing
 
-- remember that this quarter i had to cancel the entire first week, so it's only 9 weeks + finals)
+- remember that this quarter i had to cancel the entire first week, so it's only 9 weeks + finals); also apparently i actually have 1 hr 50 min but i've only been using 1 hr 40 min.
 
     + week 2.1: up through 'the language we're analyzing'
+                (ended 20 minutes early)
     + week 2.2: up through 'control-flow graph (CFG)'
     + week 3.1: up through 'abstract execution (MOP vs MFP) :: EXAMPLE 1'
-                (assigned hw1)
+                (hw1 out)
     + week 3.2: up through 'second-order DFA analyses'
     + week 4.1: up through middle of LATTICES
     + week 4.2: up through middle of general set constraint language description
-    + week 5.1: ???
+    + week 5.1: up through solver optimization
                 (hw1 due)
     + week 5.2: ???
+                (hw2 out)
     + week 6.1: ???
     + week 6.2: ???
     + week 7.1: ???
     + week 7.2: ???
+                (hw2 due, hw3 out)
     + week 8.1: ???
     + week 8.2: ???
     + week 9.1: ???
     + week 9.2: ???
+                (hw3 due, hw4 out)
     + week 10.1: ???
     + week 10.2: ???
+    + week 11 (finals): (hw4 due)
 
 ## intro to DFA
 
@@ -46,7 +59,7 @@
 
     + for assign1 reaching definitions, i don't think the tests are exploring all the possibilities outlined in the explanation of the abstract semantics in the lecture notes. i should beef them up to ensure students are covering all the possible cases.
 
-    + someone asked in class if we really need separate fake vars for each $alloc, and i don't think we do (they'll all be updated to the same values anyway, similar to the reasoning for having one fake var per struct field type).
+    + someone asked in class if we really need separate fake vars for each $alloc, and i don't think we do (they'll all be updated to the same values anyway, similar to the reasoning for having one fake var per struct field type). i fact, i think we actually only need one fake variable per _type_ that is either alloc'd _or_ is a struct field (since we're assuming any load/store can access any type-appropriate object).
 
     + from questions that come up, it seems like i need to give more in-class examples for these analysis (though unfortunately it would slow lecture down even more).
 
@@ -55,6 +68,10 @@
     + maybe explicitly lay out for them how to approach the assignment: take an analysis, write a set of tests with no pointers, implement until tests pass, write tests with no pointer-type args, implement until tests pass, etc.
 
     + for the reaching defs solution, we don't take type information into account for loads in terms of `external-def`; it would be an easy change and might reduce student confusion.
+
+    + for the sign analysis it sometimes isn't clear to the students when they need to add a variable that maps to BOTTOM to the store---sometimes my solution does and sometimes it doesn't. it would probably be easiest and most consistent to just never print a variable that maps to BOTTOM (and assume that any unmapped variable has value BOTTOM). i would need to change my implementation for this.
+
+    + people seem to have real difficulty with the address-taken objects for reaching definitions; i need to figure out a better way to explain it.
 
 - maybe i can modify the lecture to replace just enumerating abstract semantics: have example programs and go through them live with student help, then generalize from each statement's specifics to the general rules. that is, make the connection between the abstract semantics and the analysis more clear.
 
@@ -85,6 +102,56 @@
     + solver optimization details (e.g., cycle elimination)
     + details of field-{based, sensitive} analysis
     + equality-based analysis, steensgaard, type inference
+
+## things i left out that could be added somewhat easily
+
+- simple widening (integer interval analysis)
+
+- more DFA analyses:
+
+    + string analyses (string constants, prefix, regex)
+    + uninitialized variables / necessarily initialized variables
+    + available expressions
+    + very busy expressions
+    + liveness analysis
+
+- constraint solver optimizations
+
+- field-based and field-sensitive pointer analysis details
+
+- equality-based set constraints
+
+    + steensgaard pointer analysis
+    + type inference
+
+- SSA and sparse analysis
+
+- abstract interpretation stuff
+
+- dealing with languages that don't have easily-computed control-flow (JSAI)
+
+    + kind of needs abstract interpretation stuff as a setup
+
+- abstract garbage collection (?)
+
+## things i left out that could be added with more work
+
+- flow- and/or context-sensitive pointer analysis
+
+- symbolic/concolic execution
+
+- more context-sensitivity options
+
+    + transfer functions (summary-based)
+    + CFL
+    + object-sensitivity
+    + IFDS
+
+- demand-driven program analysis
+
+- incremental program analysis
+
+- declarative program analysis (DOOP, souffle)
 
 # admin
 
@@ -1464,8 +1531,8 @@ binary relation
   h ⊆ D
   h ⊆ f^-1(B)
   D ⊆ f^-0(C)
-  f^-1(C) ⊆ E
-  f^-2(B) ⊆ F
+  f^-0(C) ⊆ E
+  f^-1(B) ⊆ F
   ```
 
   ```
@@ -1505,11 +1572,11 @@ binary relation
 
     2. if X has any projections, process each projection node:
 
-        + compute the given projection of X (which can be different for each projection node) to get a set of variables V.
+        + compute the given projection of X (which can be different for each projection node) to get a set of variables and/or constructor calls; call that set Y.
 
-        + for each v_i ∈ V and predecessor p_i and successor s_i, add edges p_i -> v_i -> s_i.
+        + for each y_i ∈ Y and predecessor p_i and successor s_i of the projection node, add edges p_i -> y_i -> s_i (using the standard rules for pred vs succ edges).
 
-        + if p_i -> v_i is new add p_i to the worklist; if v_i -> s_i is new add v_i to the worklist.
+        + if a node has a new pred or succ edge added to it, add that node to the worklist.
 
 - what if we add an edge between two constructors? e.g., `c(T1,...,Tn) ⊆ c(T1',...,Tn')`. this is where knowing the variance of each constructor argument position matters:
 
@@ -1600,9 +1667,9 @@ binary relation
 
 - [for all instructions with lhs, ignore them if the type of lhs is not a pointer; for $store ignore it if the type of the operand is not a pointer]
 
-- given a program variable `x`, we'll use the notation `[x]` to mean translate `x` into a set variable (if it doesn't already exist) and return the set variable and `const(x)` to mean translate `x` into a constant (if it doesn't already exist) and return the constant.
+- given a program variable `x`, we'll use the notation `[x]` to mean translate `x` into a set variable (creating it if it doesn't already exist) and return the set variable, and `const(x)` to mean translate `x` into a constant (creating it if it doesn't already exist) and return the constant.
 
-- given an $alloc instruction, we'll use the notation `abstract(here)` to mean create a fake program variable named `alloc.<function name>.<basic block label>.<index>`.
+- given an $alloc instruction, we'll use the notation `abstract(here)` to mean create a fake program variable named `alloc.<function name>.<basic block label>.<index>` (if it doesn't already exist).
 
 - `lhs = $copy var`
 
@@ -1621,13 +1688,19 @@ binary relation
 
     + ref(const(abstract(here)), [abstract(here)]) ⊆ [lhs]
 
+    + notice that since the left-hand side is a constructor call this constraint will be represented as a predecessor edge in the constraint graph---i.e., it will be part of the solution for the [lhs] set variable.
+
 - `lhs = $addrof var`
 
     + ref(const(var), [var]) ⊆ [lhs]
 
+    + same as $alloc, this call will be part of [lhs]'s solution.
+
 - `lhs = $gep src_ptr op`
 
     + [src_ptr] ⊆ [lhs]
+
+    + since there are no structs (for now), there can't be a fieldname argument to the $gep
 
     + note that we're being 'array-insensitive', which is common in these kinds of analyses
 
@@ -1635,9 +1708,13 @@ binary relation
 
     + ref^-1([src_ptr]) ⊆ [lhs]
 
+    + why? we're asking for the current solution of [src_ptr] (which will be a set of ref calls representing what src_ptr points to), projecting out the second argument (which is the set variable representing the pointed-to variable's points-to set), and saying that those set variable flow into [lhs]. the projection is essentially modeling pointer dereference.
+
 - `$store dst_ptr var`
 
     + [var] ⊆ ref^-1([dst_ptr])
+
+    + why? similar to load except the information is flowing _into_ the pointed-to variables instead of _from_ them.
 
 - we can ignore:
 
@@ -1854,6 +1931,7 @@ P2 -> { ref(d) }
 
 - we'll start with an example:
 
+  CODE:
   ```
   def function foo(p1:int*, p2:int, p3:int*) -> int* {
     entry:
@@ -1871,6 +1949,7 @@ P2 -> { ref(d) }
   }
   ```
 
+  CONSTRAINTS:
   ```
   let X = int*[int*,int,int*]
   define lam_X/3
@@ -1914,3 +1993,195 @@ P2 -> { ref(d) }
     + since the retval position (if it exists) is covariant, retval will flow into lhs.
 
     + since the remaining positions are contravariant, the arguments will flow into the parameters.
+
+# TODO program slicing
+## intro
+
+- [the point is to (1) show why pointer info is useful now that we have it; (2) introduce a different application for program analysis than optimization; (3) describe some generally useful things like dominance and PDG]
+
+- now that we have a way to compute pointer information for our analyses, let's use it on a practical application: program slicing.
+
+    + problem statement: given a specific instruction I, return the set of instructions that influence the result of I. the name is inspired by the idea that we're computing a "slice" of the program that only contains relevant instructions.
+
+    + slicing is a well-known and heavily-used analysis and there are many variations; we're using one of the basic definitions here but there are many more possible versions.
+
+    + sign analysis was a stand-in for constant propagation (i used it instead of constant propagation because the abstract semantics are more interesting; for constant propagation it's just standard arithmetic), so that was exploring program analysis for program optimization. slicing is usually used for things like program understanding and debugging, so we're now exploring a different use-case for program analysis.
+
+- example:
+
+  ```
+  main() {
+    int i, j, x = input(), y = 0, z = 1;
+
+    for (i = 0, j = 0; i < x; i++, j +=2) {
+      y += 2;
+      z *= j;
+    }
+
+    return y;
+  }
+  ```
+
+  SLICE WRT RETURN STATEMENT:
+  ```
+  main() {
+    int i, x = input(), y = 0;
+
+    for (i = 0; i < x; i++) {
+      y += 2;
+    }
+
+    return y;
+  }
+  ```
+
+- however, we can't go straight to slicing; we need to build up to it:
+
+    + reaching defs with pointer info + control analysis ==> PDG ==> slicing
+
+    + remember that i said reaching definitions was more for follow-on analyses than for human consumption; this is the kind of thing i meant. also note that, as i promised earlier, assignment 1 is important to the remaining assignments (the above set of things will be assignment 3).
+
+    + notice that if we treat pointers conservatively like in assignment 1 then slicing is pretty useless; the "slice" it computes will contain many irrelevant instructions and overwhelm the user with useless info.
+
+    + also note that the PDG is a very useful data structure in its own right and can be used for things besides slicing; i'll talk more about that later.
+
+- to keep things simpler and more focused we'll stay with intraprocedural analysis for this problem; we'll move to interprocedural analysis after we're done with slicing.
+
+## control analysis
+
+- [to help avoid confusion for the people still working on implementing reaching defs without pointer info for assign1, we'll hold off on discussing reaching defs with pointer info to next week]
+
+### intro
+
+- the subject of this analysis is control dominance and control dependence: how the execution of the basic blocks depend on each other. it is conducted on the CFG, and while there is a relatively simple DFA-based algorithm for computing dependence info it will be convenient to use a more optimized version.
+
+    + this optimized version is from Cooper et al, "A Simple, Fast Dominance Algorithm".
+
+- for this analysis we don't care about individual instructions, just entire basic blocks---because of the way we defined basic blocks, if one instruction is executed all the others necessarily must be executed as well.
+
+### definitions:
+
+- the DOM relation: `x DOM y iff every path from function entry to y must pass through x`
+
+   + that is, we can't get to y without going through x first
+
+   + reflexive, transitive, anti-symmetric (i.e., a partial order)
+
+- strict dominance: `x DOM! y iff x DOM y and x != y`
+
+   + that is, the irreflexive version of DOM
+
+- immediate dominance: `x IDOM y iff x DOM! y and x is dominated by all other strict dominators of y`
+
+   + intuitively, this is the "closest" strict dominator of y
+
+- post-dominance: `x PDOM y iff every path from y to the function exist must pass through x`
+
+   + the dual of dominance; just reverse the CFG and PDOM becomes DOM (and vice-versa).
+
+### examples
+#### example 1:
+
+  CFG:
+  ```
+  A --> B ----> C --> E
+          \          /
+           \__> D __/
+  ```
+
+  RELATIONS:
+  ```
+  A DOM { A, B, C, D, E }
+  B DOM { B, C, D, E }
+  C DOM { C }
+  D DOM { D }
+  E DOM { E }
+
+  A DOM! { B, C, D, E }
+  B DOM! { C, D, E }
+  C DOM! {}
+  D DOM! {}
+  E DOM! {}
+
+  A IDOM { B }
+  B IDOM { C, D, E }
+  C IDOM {}
+  D IDOM {}
+  E IDOM {}
+  ```
+
+#### example 2:
+
+  CFG:
+  ```
+          +-----+
+          |     |
+          v     |
+  A ----> B --> C
+    \       \
+     \       \
+      \_> D --> E
+  ```
+
+  RELATIONS:
+  ```
+  A DOM { A, B, C, D, E }
+  B DOM { B, C }
+  C DOM { C }
+  D DOM { D }
+  E DOM { E }
+
+  A DOM! { B, C, D, E }
+  B DOM! { C }
+  C DOM! {}
+  D DOM! {}
+  E DOM! {}
+
+  A IDOM { B, D, E }
+  B IDOM { C }
+  C IDOM {}
+  D IDOM {}
+  E IDOM {}
+  ```
+
+### why do we care?
+
+- we'll show how it's useful for program slicing in a bit, but it's useful information even by itself:
+
+    + security: every use of user input is dominated by a sanitizer
+    + concurrency: every lock is post-dominated by an unlock
+
+### dominator tree
+
+- a convenient data structure to represent dominance information is a `dominator tree`:
+
+    + a node for each basic block
+
+    + an edge x --> y iff x IDOM y
+
+- given a dominator tree, we can easily compute DOM and DOM! info
+
+- notice that this representation only works if we're guaranteed that no node can be IDOM by more than one other node (otherwise this wouldn't be a tree).
+
+    + we want to prove that if a IDOM c and b IDOM c, then a = b
+    + by definition of IDOM, a DOM! c and b DOM! c
+    + by definition of DOM!, all strict dominators of c must dominate a (which includes b)
+    + by definition of DOM!, all strict dominators of c must dominate b (which includes a)
+    + therefore a DOM b and b DOM a
+    + since DOM is anti-symmetric, a = b
+
+- example 1: [show dominator tree for example 1 above]
+
+- example 2: [show dominator tree for example 2 above]
+
+### TODO computing dominance
+### TODO control-dependence
+
+- [x is control-dependent on y iff y is in the post-dominance frontier of x]
+
+## TODO reaching defs with pointer info
+## TODO pdg
+## TODO slicing
+# TODO taint analysis
+
+- [interprocedural analysis and context-sensitivity, using a security application]
