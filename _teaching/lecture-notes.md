@@ -1519,6 +1519,8 @@ binary relation
   S ∈ Stmt ::= E1 ⊆ E2 | S1 ∧ S2
   ```
 
+- where E1 and E2 cannot both be projections. also note that projections cannot be call arguments according to the grammar. these rules don't actually restrict the language at all---it's simple to put the result of a projection in a set variable and use that set variable as the call argument or as one side of a constraint with another projection. The rules just make implementing a solver for the constraint language simpler, with fewer cases to worry about.
+
 - this is not the only possible restricted language that yields a decidable analysis, but this one has two nice properties:
 
     1. it is guaranteed to have a minimal solution
