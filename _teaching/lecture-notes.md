@@ -37,6 +37,32 @@
     + week 10.2: ???
     + week 11 (finals): (hw4 due)
 
+## grading
+
+- see assignment-specific notes in the sections below.
+
+- copy the autograder tests to the unit tests for the analysis implementations.
+
+- for the autograder, rather than having entirely separate versions for each assignment that share a huge amount of code, it would probably be better to have a single integrated autograder that can be easily configured to grade a specific assignment just by setting a flag.
+
+- i might also want some tests to be worth more than others; maybe add in points values to their names a la mentor (e.g., a complex test that explores many aspects of the problem together would be worth more than a simple, focused test).
+
+- a common student habit is to neglect to write any of their own tests and just use the autograder as a debugger. one way to combat this is to require them to submit their own tests.
+
+    - problem 1: i need to write a mutation test suite to assess their tests.
+
+    - problem 2: can't they just throw together one huge test that does bunches of stuff to try to get good coverage without really thinking about it? what we really want is a large set of small, targeted tests, but that will require some thought on how to enforce.
+
+- if i divide the tests into suites by what they're testing (as i do now), then perhaps generating random tests for each suite and grading a suite by percentage of tests passed would be fine. this would allow more thorough testing and allow me to give the failing test as feedback to the student (since there could be thousands of them).
+
+    + the difficulty is ensuring that the tests are non-trivial, since a randomly generated program (or set of constraints) may not do anything interesting analysis-wise. maybe a filtering heuristic based on the analysis solution for the generated test?
+
+- the tests aren't as comprehensive and/or targeted as i would like, for example for assignment 2 part 1 the constraint inputs mix testing various combinations of constraint types plus various combinations of constructor types in an ad-hoc way. it would maybe be better to vary exactly one thing between tests (at least along a particular test chain, like 'simple-chain' vs 'simple-cycle') so that failing a test pinpoints exactly one issue.
+
+    + another thing to consider is the weight of the tests; since they're all worth equal amounts, if there's only one test that exercises a specific thing then that thing is only worth a small percentage of the total test suite (even if it's important). to combat this either we need multiple tests that all test that thing or we need to be able to manually specify test weights. or make the entire test suite pass/fail as a whole, but this seems unfair if the students can't figure out what a specific failing test is actually testing since they can't see the inputs.
+
+    + something to consider is to have a number of very targeted tests vs having a small number of more general tests, and the spectrum in-between. the more tests there are the less each is worth and so the less a student is penalized for a mistake; the fewer tests the more each is worth and the more students are penalized for a mistake. whether small or large penalties are better is something to decide. for example, for "test chains" of the form `<analysis>-<test-suite>-<name>_<index>`, i could conflate all the tests that are part of that test chain into a single test.
+
 ## intro to DFA
 
 - in the basics of dataflow analysis section, i had to skip the parity example and barely had time to get through the sign example (in fact, i didn't get all the way through it). maybe remove parity altogether and just talk about the sign domain.
@@ -73,6 +99,8 @@
 
     + people seem to have real difficulty with the address-taken objects for reaching definitions; i need to figure out a better way to explain it.
 
+    + i need to remind students that they can answer a lot of their own questions about output format and analysis behavior by using the solution that i provide.
+
 - maybe i can modify the lecture to replace just enumerating abstract semantics: have example programs and go through them live with student help, then generalize from each statement's specifics to the general rules. that is, make the connection between the abstract semantics and the analysis more clear.
 
     + this might slow things down, though.
@@ -91,6 +119,8 @@
 
     + it's also hard to diagnose simple things like they forgot to order the output correctly (which only causes an error if they write a test where the functions/blocks are out of order and the output preserves that incorrect order, so it's hard for them to write a failing test case when this is the problem).
 
+    + maybe the answer is to say that they can't share code between groups, but they *can* share tests. this does mean that there isn't as much incentive to write their own tests, but some groups aren't doing that anyway (and the ones that are would probably write them regardless).
+
 - maybe abbreviate the math definitions and theorems for DFA; instead of building up gradually i could just go straight to lattices and kleene's theorem.
 
 ## set constraint-based analysis
@@ -99,7 +129,7 @@
 
 - i'm skipping a lot of things that were in the old lecture notes (or not, but are covered in my existing analysis implementations); depending on how the final timing works out i might want to add them back in
 
-    + solver optimization details (e.g., cycle elimination)
+    + solver optimizations
     + details of field-{based, sensitive} analysis
     + equality-based analysis, steensgaard, type inference
 
@@ -1029,7 +1059,7 @@
 
     + store[DEF] = {inst}
 
-- $load:
+- `lhs = $load op`:
 
     + let DEF be the lhs of the instruction; USES contains the VarPtr_t operand and also all type-appropriate addressable objects, and also if there are any pointer-type function parameters of the appropriate type then USES contains nullptr to signify an external object.
 
@@ -1037,7 +1067,7 @@
 
     + store[DEF] = {inst}
 
-- $store:
+- `$store dst_ptr op`:
 
     + let DEFS contain all type-appropriate addressable objects and USES contain the VarPtr_t operands of the instruction.
 
@@ -1045,13 +1075,13 @@
 
     + for each def in DEFS: store[def] += {inst}
 
-- $call, $icall:
+- `lhs = $[i]call <func/ptr>(args...)`:
 
     + let STRONG_DEF contain the lhs of the instruction
 
     + if there are no pointer-type arguments then WEAK_DEFS is empty, otherwise it contains all type-appropriate addressable objects (i.e., any type reachable from the pointer argument)
 
-    + USES contains all VarPtr_t arguments and, if any arguments are pointer-typed: all type-appropriate addressable objects (the same set as for WEAK_DEFS) and if there are any pointer-type function parameters then nullptr to signify an external object.
+    + USES contains all VarPtr_t arguments and, if this is an $icall, the function ptr being called and, if any arguments are pointer-typed: all type-appropriate addressable objects (the same set as for WEAK_DEFS) and if there are any pointer-type function parameters then nullptr to signify an external object.
 
     + for each use in USES: soln[inst] += store[use]
 
@@ -2047,10 +2077,99 @@ P2 -> { ref(d) }
 
 - to keep things simpler and more focused we'll stay with intraprocedural analysis for this problem; we'll move to interprocedural analysis after we're done with slicing.
 
+## reaching defs with pointer info
+### intro
+
+- we'll revisit our old friend reaching defs, but now with pointer information. we'll keep it intraprocedural, but we'll use pointer information to improve precision for loads, stores, and calls.
+
+- we'll assume that we have the solution of a flow-insensitive pointer analysis available (i.e., it maps each program variable / static allocation site to its points-to set, which itself contains program variables and static allocation sites).
+
+    + we'll assume a field-insensitive pointer analysis since that's what we implemented for assignment 2. this means that we can basically ignore structs altogether.
+
+- we'll also pre-process the program we're analyzing to compute "mod/ref" information: for each function, what set of inputs to the function can be defined by a $store ("mod") or used by a $load ("ref") either directly by that function or by some function that it transitively calls.
+
+    + this mod/ref info will allow us to be less conservative when processing calls during our intraprocedural analysis.
+
+### mod/ref info
+
+- step 1: compute the call graph of the program.
+
+    + a node for each function.
+
+    + an edge from function A to function B if A contains a call to B (via either $call or $icall; use the points-to solution for $icall).
+
+    + this is an very common and useful data structure that a lot of program analysis tools use.
+
+- step 2: compute the transitive closure of the call graph.
+
+    + augment the call graph so that there is an edge from A to B if A can directly or transitively reach B in the call graph.
+
+- step 3: compute initial mod/ref info.
+
+    + for each function `<func>`, compute (1) the set of pointed-to objects that can be defined by a $store in `<func>` (`Mods(<func>)`) and (2) the set of pointed-to objects that can be used by a $load in `<func>` (`Refs(<func>)`).
+
+- step 4: propagate the mod/ref info using the transitively closed call graph.
+
+    + for `<func2>` s.t. `<func> --> <func2>` in the closed graph: `Refs(<func>) = Refs(<func>) \union Refs(<func2>)`; `Mods(<func>) = Mods(<func>) \union Mods(<func2>)`.
+
+- what does this tell us? given a function `<func>`, `Refs(<func>)` is the set of objects that can be used by a $load in `<func>` or any function that `<func>` may call, and `Mods(<func>)` is the set of objects that can be defined by a $store in `<func>` or any function that `<func>` may call.
+
+    + this info will help us be more precise when processing calls during the reaching defs analysis.
+
+### the improved analysis
+
+- no more need for "fake variables"; that's handled by the pointer analysis (i.e., the static allocation sites) and we'll just use its results.
+
+- all parameters still have a def of `external-def` (same as before); also all variables reachable via the parameters (per the points-to solution) have a def of `external-def` (this is new).
+
+    + the second part was handled before by being conservative and assuming that any $load could be using an `external-def` object, but now the pointer analysis will allow us to be more precise.
+
+    + as before, we record this info in the initial abstract store of the entry
+      basic block.
+
+- all the instructions stay the same except for $load, $store, $call, $icall.
+
+- `lhs = $load src_ptr`:
+
+    + USES = { src_ptr } \union points-to[src_ptr]
+
+    + for each use in USES: soln[inst] += store[use]
+
+    + store[lhs] = {inst}
+
+- `$store dst_ptr op`:
+
+    + USES = { dst_ptr } \union { op if it's a var }
+
+    + DEFS = points-to[dst_ptr]
+
+    + for each use in USES: soln[inst] += store[use]
+
+    + for each def in DEFS: store[def] += {inst}
+
+- `lhs = $[i]call <func/ptr>(args...)`:
+
+    + REACHABLE = all objects reachable from the arguments per the points-to solution
+
+    + CALLEES = all possible callee functions for this call (using the points-to solution if this is an $icall)
+
+    + REFS = (\Union_{callee \in CALLEES} Refs(callee)) \intersect REACHABLE
+
+        + all objects reachable from the arguments that are used by a $load in the callee directly or transitively.
+
+    + USES = { args that are variables } \union { ptr if this is an $icall } \union REFS
+
+    + WEAK_DEFS = (\Union_{callee \in CALLEES}: Mods(callee)) \intersect REACHABLE
+
+        + all objects reachable from the arguments that are defined by a $store in the callee directly or transitively.
+
+    + for each use in USES: soln[inst] += store[use]
+
+    + store[lhs] = {inst}
+
+    + for each def in WEAK_DEFS: store[def] += {inst}
+
 ## control analysis
-
-- [to help avoid confusion for the people still working on implementing reaching defs without pointer info for assign1, we'll hold off on discussing reaching defs with pointer info to next week]
-
 ### intro
 
 - the subject of this analysis is control dominance and control dependence: how the execution of the basic blocks depend on each other. it is conducted on the CFG, and while there is a relatively simple DFA-based algorithm for computing dependence info it will be convenient to use a more optimized version.
@@ -2179,7 +2298,6 @@ P2 -> { ref(d) }
 
 - [x is control-dependent on y iff y is in the post-dominance frontier of x]
 
-## TODO reaching defs with pointer info
 ## TODO pdg
 ## TODO slicing
 # TODO taint analysis
