@@ -2293,7 +2293,79 @@ P2 -> { ref(d) }
 
 - example 2: [show dominator tree for example 2 above]
 
-### TODO computing dominance
+### computing dominance
+
+- there is a simple, straightforward DFA analysis for dominance, but it is very slow and also makes computing control-dependence information (which we'll get to soon) somewhat annoying.
+
+- this algorithm is taken from Cooper et al, "A Simple, Fast Dominance Algorithm", which is as advertised and also makes computing control-dependence information easy.
+
+- instead of computing dominance directly, it computes the dominator tree (from which dominance information can be extracted very easily).
+
+- given: the CFG as a graph of basic blocks, with entry point `entry`. let `idom` be a map from a basic block to its immediate dominator basic block (i.e., it represents the dominator tree).
+
+- worklist algorithm (slightly different than the one in the paper, which round-robins all basic blocks instead of using a worklist):
+
+  ```
+  idom[entry] = entry
+  push successors of entry onto worklist
+
+  while worklist is not empty:
+    pop bb from worklist
+
+    // A predecessor meeting this requirement must necessarily exist.
+    let bb_idom = some predecessor of bb s.t. idom[bb_idom] exists
+
+    // Computes the intersection of the immediate dominators of all predecessors. Some
+    // predecessors may not have been computed yet; we'll revisit bb when they are in order to
+    // update bb's information.
+    for pred in predecessors of bb:
+      if idom[pred] doesn't exist, skip
+      bb_idom = intersect(bb_idom, pred)
+
+    // The immediate dominator of bb is the computed intersection.
+    if idom[bb] doesn't exist OR idom[bb] != bb_idom:
+      idom[bb] = bb_idom
+      push successors of bb into worklist
+  ```
+
+- the slightly tricky part is the intersection algorithm: given the current `idom`, how do we compute the immediate dominator intersection of two basic blocks bb1 and bb2 in the tree?
+
+    + the idea is to place two `fingers` on the dominator tree, one at bb1 and one at bb2, and then move the fingers up the tree to find the least common ancestor of both bb1 and bb2. [show on some made-up tree]
+
+    + to make this fast and simple, number each basic block in the CFG using post-order:
+
+      ```
+      let index = 0
+      call DFS(entry) where:
+
+      define DFS(bb) {
+        mark bb visited
+        for each successor succ of bb:
+          if succ is not yet visited, call DFS(succ)
+        postorder[bb] = index
+        index++
+      }
+      ```
+
+    + now we can define the intersection algorithm:
+
+      ```
+      define intersect(bb1, bb2) {
+        finger1 = bb1
+        finger2 = bb2
+
+        while finger1 != finger2:
+          while postorder[finger1] < postorder[finger2]:
+            finger1 = idom[finger1]
+          while postorder[finger2] < postorder[finger1]:
+            finger2 = idom[finger2]
+
+        return finger1
+      }
+      ```
+
+- examples: [use examples 1 and 2 above]
+
 ### TODO control-dependence
 
 - [x is control-dependent on y iff y is in the post-dominance frontier of x]
