@@ -11,19 +11,19 @@
 
 - remember that this quarter i had to cancel the entire first week, so it's only 9 weeks + finals); also apparently i actually have 1 hr 50 min but i've only been using 1 hr 40 min.
 
-    + week 2.1: up through 'the language we're analyzing'
+    + week 2.1: through 'the language we're analyzing'
                 (ended 20 minutes early)
-    + week 2.2: up through 'control-flow graph (CFG)'
-    + week 3.1: up through 'abstract execution (MOP vs MFP) :: EXAMPLE 1'
+    + week 2.2: through 'control-flow graph (CFG)'
+    + week 3.1: through 'abstract execution (MOP vs MFP) :: EXAMPLE 1'
                 (hw1 out)
-    + week 3.2: up through 'second-order DFA analyses'
-    + week 4.1: up through middle of LATTICES
-    + week 4.2: up through middle of general set constraint language description
-    + week 5.1: up through solver optimization
+    + week 3.2: through 'second-order DFA analyses'
+    + week 4.1: through middle of LATTICES
+    + week 4.2: through middle of general set constraint language description
+    + week 5.1: through solver optimization
                 (hw1 due)
-    + week 5.2: ???
+    + week 5.2: through andersen constraint generation for direct calls
                 (hw2 out)
-    + week 6.1: ???
+    + week 6.1: through program slicing intro
     + week 6.2: ???
     + week 7.1: ???
     + week 7.2: ???
@@ -148,6 +148,8 @@
 - constraint solver optimizations
 
 - field-based and field-sensitive pointer analysis details
+
+- using andersen-style pointer analysis to optimize DFA pointer analysis
 
 - equality-based set constraints
 
@@ -2026,7 +2028,7 @@ P2 -> { ref(d) }
 
     + since the remaining positions are contravariant, the arguments will flow into the parameters.
 
-# TODO program slicing
+# program slicing
 ## intro
 
 - [the point is to (1) show why pointer info is useful now that we have it; (2) introduce a different application for program analysis than optimization; (3) describe some generally useful things like dominance and PDG]
@@ -2178,9 +2180,10 @@ P2 -> { ref(d) }
 
     + this optimized version is from Cooper et al, "A Simple, Fast Dominance Algorithm".
 
-- for this analysis we don't care about individual instructions, just entire basic blocks---because of the way we defined basic blocks, if one instruction is executed all the others necessarily must be executed as well.
+- for this analysis we don't care about individual instructions, just entire basic blocks---because of the way we defined basic blocks, if one instruction is executed all the others in the same block necessarily must be executed as well.
 
-### definitions:
+### control dominance
+#### definitions:
 
 - the DOM relation: `x DOM y iff every path from function entry to y must pass through x`
 
@@ -2200,8 +2203,9 @@ P2 -> { ref(d) }
 
    + the dual of dominance; just reverse the CFG and PDOM becomes DOM (and vice-versa).
 
-### examples
-#### example 1:
+#### examples
+
+- EXAMPLE 1
 
   CFG:
   ```
@@ -2231,7 +2235,7 @@ P2 -> { ref(d) }
   E IDOM {}
   ```
 
-#### example 2:
+- EXAMPLE 2:
 
   CFG:
   ```
@@ -2265,14 +2269,14 @@ P2 -> { ref(d) }
   E IDOM {}
   ```
 
-### why do we care?
+#### why do we care?
 
 - we'll show how it's useful for program slicing in a bit, but it's useful information even by itself:
 
     + security: every use of user input is dominated by a sanitizer
     + concurrency: every lock is post-dominated by an unlock
 
-### dominator tree
+#### dominator tree
 
 - a convenient data structure to represent dominance information is a `dominator tree`:
 
@@ -2295,7 +2299,9 @@ P2 -> { ref(d) }
 
 - example 2: [show dominator tree for example 2 above]
 
-### computing dominance
+- note that the DOM relation is a partial order, and the dominator tree is essentially the Hasse diagram of that partial order.
+
+#### computing dominance
 
 - there is a simple, straightforward DFA analysis for dominance, but it is very slow and also makes computing control-dependence information (which we'll get to soon) somewhat annoying.
 
@@ -2303,7 +2309,7 @@ P2 -> { ref(d) }
 
 - instead of computing dominance directly, it computes the dominator tree (from which dominance information can be extracted very easily).
 
-- given: the CFG as a graph of basic blocks, with entry point `entry`. let `idom` be a map from a basic block to its immediate dominator basic block (i.e., it represents the dominator tree).
+- given: the CFG as a graph of basic blocks, with entry point `entry`. let `idom` be a map from a basic block to its immediate dominator basic block (i.e., it represents the dominator tree, mapping a block to its parent in the tree).
 
 - worklist algorithm (slightly different than the one in the paper, which round-robins all basic blocks instead of using a worklist):
 
@@ -2368,12 +2374,274 @@ P2 -> { ref(d) }
 
 - examples: [use examples 1 and 2 above]
 
-### TODO control-dependence
+### control dependence
+#### intro
 
-- [x is control-dependent on y iff y is in the post-dominance frontier of x]
+- dominance tells us what basic blocks _must_ be executed before (or after for post-dominance) other blocks, but it can also be used to tell us what blocks are _control dependent_ on what other blocks.
 
-## TODO pdg
-## TODO slicing
+- intuitively, block X is control dependent on block Y if the execution of block Y directly determines whether block X will be executed or not (including how many times it will be executed, for loops).
+
+#### examples
+
+- EXAMPLE 1
+
+  ```
+  entry:
+    secret:int = $call boolean_input()
+    $branch secret:int bb2 bb3
+
+  bb2:
+    public:int = $copy 1
+    $jump exit
+
+  bb3:
+    public:int = $copy 0
+    $jump exit
+
+  exit:
+    d:int = $call output(public:int)
+    $ret 0
+  ```
+
+    + bb2 and bb3 are both control dependent on bb1; entry and exit are _not_ control dependent on any other blocks
+
+    + this also shows one reason why control dependence is interesting (other than for slicing which we'll show later): notice that the value of `public` is equal to the value of `secret` even though there is no explicit assignment between them. it can only leak one bit of information, but if we put something like this in a loop we could leak arbitrary bits.
+
+- EXAMPLE 2
+
+  ```
+        +-----------+
+        |           |
+        V           |
+  A --> B --> C --> F --> G
+        |           ^
+        |           |
+        + --> D --> E
+              ^     |
+              |     |
+              +-----+
+  ```
+
+  CONTROL DEPENDENCIES:
+  ```
+  A: { }
+  B: { F }
+  C: { B }
+  D: { B, E }
+  E: { B, E }
+  F: { F }
+  G: { }
+  ```
+
+    + B is control dependent on F because F controls how often B is executed; similarly for (D, E), (E, E), and (F, F).
+
+#### dominance frontiers
+
+- to compute control dependence info we need something called _dominance frontiers_.
+
+- the dominance frontier of block X is the set of all blocks Y s.t. X dominates a predecessor of Y but does not strictly dominate Y.
+
+    + intuitively, the dominance frontier is the set of blocks that are _almost_ dominated by X, but just outside its control. or, its the set of blocks that are the earliest point where some competing control-flow path may reach that block.
+
+- given the dominator tree, computing dominance frontiers is simple:
+
+  ```
+  for all blocks X:
+    if the number of predecessors of X >= 2:
+      for all predecessors P of X:
+        runner = P
+        while runner != idom[X]:
+          add X to runner's dominance frontier
+          runner = idom[runner]
+  ```
+
+- intuitively:
+
+    + X cannot be in a dominance frontier if it doesn't have at least two predecessors (because that's the only way it can "escape" from another block's dominance).
+
+    + X cannot be in the dominance frontier of its immediate dominator (by definition of dominance frontier).
+
+    + otherwise, X is in the dominance frontier of Y if Y dominates a predecessor of X (recall that we can compute dominance from the dominator tree by following the path from a leaf to the root).
+
+- [demonstrate on example 2 above]
+
+  DOMINATOR TREE:
+  ```
+          A
+          |
+          B
+        / | \
+       /  |  \
+      C   D   F
+          |   |
+          E   G
+  ```
+
+  DOMINANCE FRONTIERS:
+  ```
+  A: { }
+  B: { B }
+  C: { F }
+  D: { D, F }
+  E: { D, F }
+  F: { B }
+  G: { }
+  ```
+
+#### computing control dependence
+
+- X is control dependent on Y iff Y is in the post-dominance frontier of X
+
+    + remember that post-dominance (and post-dominance frontiers) are exactly the same as dominance (and dominance frontiers) except on a reversed CFG.
+
+    + if Y is in the post-dominance frontier of X, then that means Y has multiple successors s.t. if a specific one is taken then X must necessarily execute, and if it is not taken then X will definitely not execute. in other words, X is control dependent on Y.
+
+- algorithm:
+
+    + step 1: compute post-dominator tree (i.e., flip the edges of the CFG and compute the dominator tree on that).
+
+    + step 2: compute post-dominance frontiers (i.e., compute dominance frontiers but using the post-dominator tree).
+
+- that's it: each block X is control dependent on any block in its post-dominance frontier.
+
+- [demonstrate on example 2 above]
+
+  POST-DOMINATOR TREE:
+  ```
+          G
+          |
+          F
+        / | \
+       /  |  \
+      C   E   B
+          |   |
+          D   A
+  ```
+
+  POST-DOMINANCE FRONTIERS:
+  ```
+  A: { }
+  B: { F }
+  C: { B }
+  D: { B, E }
+  E: { B, E }
+  F: { F }
+  G: { }
+  ```
+
+## pdg
+
+- the PDG is a data structure that embodies the reaching defs and control dependence information we computed earlier.
+
+- a node for for each instruction.
+
+- a _data dependence_ edge from A to B if the definition at A reaches a use at B.
+
+    + we get this directly from the reaching defs analysis.
+
+- a _control dependence_ edge from A to B if B is control dependent on A.
+
+    + we expand the basic block control dependence info into individual instructions: if basic block X is control dependent on block Y, then all instructions in X have control dependence edges from the terminator instruction in Y.
+
+- it will be useful to have bi-directional edges so that we can go forwards or backwards in the PDG.
+
+- [demonstrate using the original example for program slicing]
+
+  ORIGINAL:
+  ```
+  main() {
+    int i, j, x = input(), y = 0, z = 1;
+
+    for (i = 0, j = 0; i < x; i++, j +=2) {
+      y += 2;
+      z *= j;
+    }
+
+    return y;
+  }
+  ```
+
+  IR:
+  ```
+   1. entry:
+   2.   i:int = $copy 0
+   3.   j:int = $copy 0
+   4.   x:int = $call input()
+   5.   y:int = $copy 0
+   6.   z:int = $copy 1
+   7.   $jump loop_hdr
+
+   8. loop_hdr:
+   9.   tmp:int = $cmp lt i:int x:int
+  10.   $branch tmp:int loop_body exit
+
+  11. loop_body:
+  12.  y:int = $arith add y:int 2
+  13.  z:int = $arith mul z:int j:int
+  14.  i:int = $arith add i:int 1
+  15.  j:int = $arith add j:int 2
+  16.  $jump loop_hdr
+
+  17. exit:
+  18.  $ret y:int
+  ```
+
+  PDG:
+  ```
+  [12--16] control dependent on [10]
+
+   [9] data dependent on [2, 4, 14]
+  [10] data dependent on [9]
+  [12] data dependent on [5, 12]
+  [13] data dependent on [3, 6, 13, 15]
+  [14] data dependent on [2, 14]
+  [15] data dependent on [3, 15]
+  [18] data dependent on [5, 12]
+  ```
+
+## slicing
+
+- recall: a slice of a function for instruction X consists of all instructions that affect the behavior of X.
+
+- if X is data dependent on Y, then clearly Y affects X's behavior...and so do the instructions that Y is data dependent on, and so on.
+
+    + this is the transitive closure of the data dependence edges in the PDG (going backwards from X).
+
+- if Y controls whether X even executes or not, then clearly Y affect's X's behavior...and so do all the instructions that control whether Y executes or not, and so on.
+
+    + this is the transitive closure of the control dependence edges in the PDG (going backwards from X).
+
+- if you think about it, if X is data dependent on Y and Y is control dependent on Z, then Z also affects X's behavior; and if X is control dependent on Y and Y is data dependent on Z, then same thing.
+
+- so to compute a slice wrt X: compute the transitive closure of all data and control dependence edges from X (going backwards in the PDG).
+
+    + this is called a _backwards slice_; we could also compute a _forwards slice_ by doing the same thing except going forwards in the PDG. this kind of slice tells us what instructions the execution of X can directly or indirectly affect.
+
+- for human consumption, rather than a simple set of instructions it's useful to present the slice as a new function that only contains the relevant instructions.
+
+- [demonstrate using the original example for program slicing]
+
+  SLICED:
+  ```
+  entry:
+    i:int = $copy 0
+    x:int = $call input()
+    y:int = $copy 0
+    $jump loop_hdr
+
+  loop_hdr:
+    tmp:int = $cmp lt i:int x:int
+    $branch tmp:int loop_body exit
+
+  loop_body:
+    y:int = $arith add y:int 2
+    i:int = $arith add i:int 1
+    $jump loop_hdr
+
+  exit:
+    $ret y:int
+  ```
+
 # TODO taint analysis
 
 - [interprocedural analysis and context-sensitivity, using a security application]
