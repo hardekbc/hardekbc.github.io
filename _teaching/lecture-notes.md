@@ -24,7 +24,7 @@
     + week 5.2: through andersen constraint generation for direct calls
                 (hw2 out)
     + week 6.1: through program slicing intro
-    + week 6.2: ???
+    + week 6.2: up to dominance frontier example
     + week 7.1: ???
     + week 7.2: ???
                 (hw2 due, hw3 out)
@@ -2028,7 +2028,7 @@ P2 -> { ref(d) }
 
     + since the remaining positions are contravariant, the arguments will flow into the parameters.
 
-# program slicing
+# program slicing (using pointer info; control analysis; pdg)
 ## intro
 
 - [the point is to (1) show why pointer info is useful now that we have it; (2) introduce a different application for program analysis than optimization; (3) describe some generally useful things like dominance and PDG]
@@ -2340,6 +2340,8 @@ P2 -> { ref(d) }
 
     + the idea is to place two `fingers` on the dominator tree, one at bb1 and one at bb2, and then move the fingers up the tree to find the least common ancestor of both bb1 and bb2. [show on some made-up tree]
 
+    + remember that dominance is a partial order and the dominator tree is its hasse diagram; then this 'intersection' operation is just the join operation on the partial order (as long as there is one basic block that dominates all others, the join is guaranteed to exist).
+
     + to make this fast and simple, number each basic block in the CFG using post-order:
 
       ```
@@ -2642,6 +2644,410 @@ P2 -> { ref(d) }
     $ret y:int
   ```
 
-# TODO taint analysis
+# SUMMARY SO FAR
 
-- [interprocedural analysis and context-sensitivity, using a security application]
+- [this can go wherever it makes sense to put it; i'm putting it here for now because i need to buy some time for my prep to catch up to the class]
+
+- basics of DFA: abstract domain + abstract semantics (transfer functions) + abstract execution (MOP vs MFP; worklist algorithm)
+
+    + flow-sensitive
+    + intraprocedural
+    + no pointer info
+
+- two examples thereof:
+
+    + sign analysis (a stand-in for constant propagation)
+    + reaching definitions
+
+- the math behind DFA: neotherian lattices, monotone functions, fixpoint theorems
+
+    + make the abstract domain a noetherian lattice
+    + make the abstract transfer functions monotone
+    + then the worklist algorithm is guaranteed to terminate with the most precise answer
+
+- set constraint-based analysis:
+
+    + picking a constraint language (specifically, inclusion constraints)
+    + implementing a constraint solver
+    + analysis = constraint generation
+    + example: andersen-style pointer analysis (flow-insensitive, field-insensitive)
+
+- using pointer info: program slicing (still intraprocedural for DFA)
+
+    + revisiting reaching definitions, now with pointer info
+    + control analysis: dominance and dependence
+    + program dependence graph (PDG)
+    + backwards slicing
+
+- now on to something new!
+
+# TODO taint analysis (interprocedural dfa; icfg; context sensitivity)
+## intro
+
+- we've seen applications of program analysis for optimization and debugging, and we've seen how to overcome the difficulty of pointers. let's explore how to deal with function calls and interprocedural analysis at the same time as we expand our applications to include security.
+
+- we'll look at _taint analysis_. the goal of taint analysis is to track "tainted" information (e.g., input from users) as it propagates through a program and to ensure that it doesn't influence sensitive operations.
+
+    + example: sql injection.
+
+    + we can also use taint analysis for the inverse: track sensitive information (e.g., from a user's private data) to ensure that it doesn't influence information output from the program (e.g., that a browser addon doesn't read a user's credit card info and send it out over the network).
+
+- to make this analysis useful, it needs to be interprocedural---that is, it needs to track information across function call boundaries.
+
+    + andersen-style pointer analysis was interprocedural, but not in a DFA setting.
+
+- when dealing with the intraprocedural CFG we had two choices: flow-sensitive vs flow-insensitive.
+
+    + flow-sensitive: respect the flow of control; a solution per program point. a variable can have a difference abstract value at different places in the program.
+
+    + flow-insensitive: disregard the flow of control and assume any statement can execute at any time; one solution for the entire program. a variable must have one abstract value that over-approximates all possible concrete values it might have anywhere.
+
+- when dealing with interprocedural analysis we have a similar choice: context-insensitive vs context-sensitive.
+
+    + concretely during program execution, every function call results in a unique function instance (typically using stack frames). conceptually, this results in an infinite domain of possible function instances.
+
+    + for program analysis to be decidable, we need to abstract this infinite domain into something tractable while still over-approximating the conrete domain.
+
+    + context-insensitive: we'll abstract all function instances of the same function into a single abstract function instance that over-approximates all of them. that is, the information for every call to the same function is merged together.
+
+    + context-sensitive: we'll partition the set of function instances for the same function into a set of different abstract function instances, treating each one as distinct. the different ways that we partition the set result in different context-sensitivity schemes.
+
+        - unlike flow-sensitivity (for which there is just one definition), there are many different versions of context-sensitivity.
+
+- we'll look at these choices in more detail one at a time, starting with interprocedural context-insensitive taint analysis and then exploring a couple of different context-sensitivity strategies to make it more precise.
+
+## FIXME[onenote] icfg
+
+- we need to revisit our old program representation of the CFG. now that we're propagating information to calls and back, we need something that shows the connections between functions.
+
+- Interprocedural Control-Flow Graph (ICFG): take the individual function CFGs and add edges:
+
+    + from a call instruction to the entry nodes of all callee functions.
+    + from a ret instruction to the callsites for that function.
+
+- problem: the call edges can be from the middle of a basic block and the return edges can be into the middle of a basic block.
+
+- solution 1: allow it to happen without changing anything. this is easy to implement because it doesn't involve changing anything but makes the analysis implementation more complex because we have to track whether we're making a call or returning from a call and do different things depending.
+
+    + the worklist has to contain program points, not basic blocks, because when you pop an entry off the worklist it could be the beginning of a basic block or it could be returning from a call inside the basic block.
+
+    + this is what i did, though you don't have to do the same thing as me.
+
+- solution 2: split the basic blocks at call instructions and separate each call instruction into two instances: (1) the actual call, placed at the end of the basic block; (2) the return site, placed at the beginning of a new basic block. this complicates things at the beginning because you have to transform the basic blocks, but it makes the analysis implementation simpler.
+
+    + the worklist can be the normal one on basic blocks, but you need to add a new instruction representing a 'call return' point.
+
+    + this is the more traditional way to do things.
+
+- example:
+
+  ```
+  def main() -> int {
+    entry:
+      x:int = $call input()
+      $branch x:int call_f1 call_f2
+
+    call_f1:
+      y:int = $call func1(x:int)
+      z:int = $arith add z:int 2
+      $jump exit
+
+    call_f2:
+      y:int = $call func2(x:int)
+      z:int = $arith mul z:int 4
+      $jump exit
+
+    exit:
+      $ret z:int
+  }
+
+  def func1(p1:int) -> int {
+    entry:
+      a:int = $call func3(p1:int)
+      a:int = $arith add a:int 1
+      $ret a:int
+  }
+
+  def func2(p2:int) -> int {
+    entry:
+      b:int = $call func3(p2:int)
+      b:int = $arith mul b:int 2
+      $ret b:int
+  }
+
+  def func3(p3:int) -> int {
+    entry:
+      $ret p3:int
+  }
+  ```
+
+## TODO context-insensitive taint analysis
+### FIXME[onenote] intro
+
+- we'll suppose that there are a set of functions that create tainted information, called _sources_, and a set of functions that consume information, called _sinks_.
+
+    + what these sets are will dependent on the specific program we're analyzing.
+
+    + example: we could say that `user_input()` is a source, `database_query()` is a sink.
+
+- the taint analysis solution should be a map from each sink to the set of sources that _reach_ that sink. that is, there is some path along which the information from some source can reach an argument to that sink without being sanitized.
+
+    + we'll only care about what sources and sinks are involved, not which specific call instructions were involved; e.g., if there are two calls to the same source `source()` and two calls to the same sink `sink()` and one source reaches each sink, the solution will just say `sink --> { source }`.
+
+- example
+
+  ```
+  def main() -> int {
+    entry:
+      v1:int* = $alloc
+      v2:int* = $call foo(v1:int*)
+      _d:int  = $call sink1(v1:int*)
+      _d:int  = $call sink2(v2:int*)
+      $ret 0
+  }
+
+  function foo(p1:int*) -> int* {
+    entry:
+      x:int   = $call source1(p1:int*)
+      y:int*  = $addof x:int
+      _e:int  = $call sink1(y:int*)
+      p2:int  = $call source2()
+      p3:int* = $addrof p2:int
+      $ret p3:int*
+  }
+  ```
+
+  SOLUTION
+  ```
+  sink1 --> { source1 }
+  sink2 --> { source2 }
+  ```
+
+### setup and assumptions
+
+- the sets of sources and sinks are given as input to the analysis; they are collectively known as `special functions`.
+
+    + they should be disjoint sets.
+
+    + special functions can be internal or external; either way we don't actually analyze them (we treat them as a black box that operates on taint).
+
+    + sources that return a pointer must be internal (so that the pointer analysis can work correctly).
+
+- all objects possibly reachable from a pointer passed as an argument or returned as a result from a source function, and all values returned from a source function, are considered to be tainted.
+
+- all arguments and all objects possibly reachable from an argument passed to a sink function are considered to reach that sink.
+
+- we'll be operating on the ICFG. unlike previous analyses which analyze each function in turn, here we always start at the entry to `main` and only analyze those functions that are reachable via call instructions.
+
+- we have the results of a field-insensitive andersen-style pointer analysis available; our analysis will also be field-insensitive.
+
+### abstract domain
+
+- an abstract value will be a set of sources, signifying which sources may have contributed to the concrete value.
+
+    + this is a second-order analysis like reaching defs; we don't care what the value is just where it came from.
+
+    + the empty set means that this data hasn't been influenced by any source.
+
+- the join operation is set union.
+
+- the abstract store will map variables to abstract values as usual.
+
+### abstract semantics, no calls (except to special functions)
+
+- helpers:
+
+    + let `taint(op)` = store[op] if op is a variable, else {}
+
+    + let `reachable(v...)` be the set of pointed-to objects reachable from the given arguments according to the points-to solution.
+
+- `lhs = $call <source>(args...)`
+
+    + store[lhs] = {source}
+
+    + for v in (reachable(lhs) \union reachable(args)): store[v] |= source
+
+    + note the weak updates for pointed-to objects.
+
+- `lhs = $call <sink>(args...)`
+
+    + for v in (args \union reachable(args)): soln[sink] |= store[v]
+
+- `lhs = $icall fptr(args...)`
+
+    + process all sink callees then all source callees (unioning the taints for lhs).
+
+    + sources need to be processed last because any taints from them shouldn't affect sink callees.
+
+- `lhs = $arith <operation> op1 op2`
+
+    + store[lhs] = taint(op1) | taint(op2)
+
+- `lhs = $cmp <relation> op1 op2`
+
+    + store[lhs] = taint(op1) | taint(op2)
+
+- `lhs = $copy op`
+
+    + store[lhs] = taint(op)
+
+- `lhs = $select op1 op2 op3`
+
+    + store[lhs] = taint(op1) | taint(op2) | taint(op3)
+
+- `lhs = $phi(ops...)`
+
+    + store[lhs] = \union_{op \in ops} taint(op)
+
+- `lhs = $alloc`
+
+    + store[lhs] = {}
+
+- `lhs = $addrof var`
+
+    + store[lhs] = {}
+
+- `lhs = $gep src_ptr op [fieldname]`
+
+    + store[lhs] = store[src_ptr] | taint(op)
+
+    + note that gep is basically pointer arithmetic, i.e., `src_ptr + op`.
+
+- `lhs = $load src_ptr`
+
+    + store[lhs] = store[src_ptr] | \union_{v \in ptsto(src_ptr)} store[v]
+
+- `$store dst_ptr op`
+
+    + for v in ptsto(dst_ptr): store[v] |= (store[dst_ptr] | taint(op))
+
+    + note the weak update.
+
+- `$jump` and `$branch`: propagate abstract store as normal
+
+- we're assuming no calls other than to special functions, so we can ignore other `$call` and `$icall` instructions and also `$ret`.
+
+### FIXME[onenote] examples
+
+- example 1: with direct calls to special functions
+
+  ```
+  def src1(s1:int*) -> int* {
+    entry:
+      s2:int* = $alloc
+      $ret s2:int*
+  }
+
+  def main() -> int {
+    entry:
+      v1:int* = $alloc
+      v2:int* = $call src1(v1:int*)
+      v3:int  = $call src2()
+      v4:int* = $addrof v3:int
+      v5:int* = $gep v1:int* v3:int
+      v6:int* = $alloc
+      $store v6:int* v3:int
+      v7:int  = $load v5:int*
+      _x:int  = $call sink1(v1:int*, v4:int*)
+      _y:int  = $call sink2(v7:int)
+      _z:int  = $call sink3(v2:int*, v6:int*)
+      $ret 0
+  }
+  ```
+
+  POINTS-TO
+  ```
+  v1 --> { main.entry.0 }
+  v2 --> { src1.entry.0 }
+  v4 --> { v3 }
+  v5 --> { main.entry.0 }
+  v6 --> { main.entry.5 }
+  ```
+
+  FINAL ABSTRACT STORE
+  ```
+  v1 --> {}
+  v2 --> { src1 }
+  v3 --> { src2 }
+  v4 --> {}
+  v5 --> { src2 }
+  v6 --> {}
+  v7 --> { src1, src2 }
+  main.entry.0 --> { src1 }
+  main.entry.5 --> { src2 }
+  src1.entry.0 --> { src1 }
+  ```
+
+  SOLUTION
+  ```
+  sink1 --> { src1, src2 }
+  sink2 --> { src1, src2 }
+  sink3 --> { src1, src2 }
+  ```
+
+- example 2: with indirect calls to special functions
+
+  ```
+  def src1(s1:int) -> int {
+    entry:
+      $ret 0
+  }
+
+  def src2(s2:int) -> int {
+    entry:
+      $ret 0
+  }
+
+  def sink1(p1:int) -> int {
+    entry:
+      $ret 0
+  }
+
+  def main() -> int {
+    entry:
+      fptr:int[int]* = $copy @src1:int[int]*
+      fptr:int[int]* = $copy @src2:int[int]*
+      fptr:int[int]* = $copy @sink1:int[int]*
+      x:int = $call src1(42)
+      y:int = $icall fptr(x:int)
+      z:int = $call sink2(y:int)
+      $ret 0
+  }
+  ```
+
+  FINAL ABSTRACT STORE
+  ```
+  fptr --> {}
+  x --> { src1 }
+  y --> { src1, src2 }
+  z --> {}
+  ```
+
+  SOLUTION
+  ```
+  sink1 --> { src1 }
+  sink2 --> { src1, src2 }
+  ```
+
+### TODO, FIXME[example, onenote] adding calls
+#### TODO abstract semantics
+
+- `lhs = $call <func>(args...)`
+
+- `lhs = $icall fptr(args...)`
+
+- `$ret op`
+
+#### TODO abstract garbage collection
+#### FIXME example
+
+  ```
+  FIXME TODO (including copying to onenote)
+  ```
+
+## TODO context-sensitivity
+### TODO call-string context-sensitivity
+### TODO functional context-sensitivity
+### TODO handling recursive cycles
+### TODO other kinds of context-sensitivity
+### TODO context-sensitive heap models
