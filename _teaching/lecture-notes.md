@@ -6,7 +6,17 @@
 
     + one group turned it in slightly late (a few minutes) but it's kind of my fault since i moved the deadline from 1am to 12:05am at the last moment, so don't count it against them.
 
+- for assign2 andrew alex has a doctor's note so i extended the deadline for him to tuesday feb 28 without penalty.
+
 # RETROSPECTIVE
+## misc
+
+- it would be nice to clean up the codebase a bit for next time
+
+    + student-facing code (ir.h): simplify ir representation if possible, maybe move all the inline method defs to ir.cc to make it easier to read.
+
+    + revamp the analyses (this doesn't actually affect the students at all, so it's mostly for my sake).
+
 ## timing
 
 - remember that this quarter i had to cancel the entire first week, so it's only 9 weeks + finals); also apparently i actually have 1 hr 50 min but i've only been using 1 hr 40 min.
@@ -133,6 +143,10 @@
     + details of field-{based, sensitive} analysis
     + equality-based analysis, steensgaard, type inference
 
+- assignment 2: since this is interprocedural and we're printing out the result textually, i need to specify that variable names are unique across functions. alternatively i could specify that we should print them out as `<function>.<name>`, but that would require changing my own implementation.
+
+    + this will be true of future assignments as well.
+
 ## things i left out that could be added somewhat easily
 
 - simple widening (integer interval analysis)
@@ -163,8 +177,6 @@
 - dealing with languages that don't have easily-computed control-flow (JSAI)
 
     + kind of needs abstract interpretation stuff as a setup
-
-- abstract garbage collection (?)
 
 ## things i left out that could be added with more work
 
@@ -2621,7 +2633,7 @@ P2 -> { ref(d) }
 
 - for human consumption, rather than a simple set of instructions it's useful to present the slice as a new function that only contains the relevant instructions.
 
-- [demonstrate using the original example for program slicing]
+- [demonstrate using the original example for program slicing (see pdg example)]
 
   SLICED:
   ```
@@ -2629,7 +2641,6 @@ P2 -> { ref(d) }
     i:int = $copy 0
     x:int = $call input()
     y:int = $copy 0
-    $jump loop_hdr
 
   loop_hdr:
     tmp:int = $cmp lt i:int x:int
@@ -2638,11 +2649,12 @@ P2 -> { ref(d) }
   loop_body:
     y:int = $arith add y:int 2
     i:int = $arith add i:int 1
-    $jump loop_hdr
 
   exit:
     $ret y:int
   ```
+
+    + notice that we're missing some $jump instructions; that's because they are unconditional and so there is no control dependence on them.
 
 # SUMMARY SO FAR
 
@@ -2716,7 +2728,7 @@ P2 -> { ref(d) }
 
 - we'll look at these choices in more detail one at a time, starting with interprocedural context-insensitive taint analysis and then exploring a couple of different context-sensitivity strategies to make it more precise.
 
-## FIXME[onenote] icfg
+## icfg
 
 - we need to revisit our old program representation of the CFG. now that we're propagating information to calls and back, we need something that shows the connections between functions.
 
@@ -2782,7 +2794,7 @@ P2 -> { ref(d) }
   ```
 
 ## TODO context-insensitive taint analysis
-### FIXME[onenote] intro
+### intro
 
 - we'll suppose that there are a set of functions that create tainted information, called _sources_, and a set of functions that consume information, called _sinks_.
 
@@ -2927,7 +2939,7 @@ P2 -> { ref(d) }
 
 - we're assuming no calls other than to special functions, so we can ignore other `$call` and `$icall` instructions and also `$ret`.
 
-### FIXME[onenote] examples
+### examples
 
 - example 1: with direct calls to special functions
 
