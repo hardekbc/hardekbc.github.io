@@ -47,15 +47,21 @@
     + week 10.2: ???
     + week 11 (finals): (hw4 due)
 
-## grading
-
-- see assignment-specific notes in the sections below.
+## assignments and grading
 
 - copy the autograder tests to the unit tests for the analysis implementations.
 
 - for the autograder, rather than having entirely separate versions for each assignment that share a huge amount of code, it would probably be better to have a single integrated autograder that can be easily configured to grade a specific assignment just by setting a flag.
 
 - i might also want some tests to be worth more than others; maybe add in points values to their names a la mentor (e.g., a complex test that explores many aspects of the problem together would be worth more than a simple, focused test).
+
+- the grading scheme has a bit of a flaw: if a student is failing a test but can't create their own test that fails, it's hard to provide guidance.
+
+    + maybe just be more precise about what each test contains?
+
+    + it's also hard to diagnose simple things like they forgot to order the output correctly (which only causes an error if they write a test where the functions/blocks are out of order and the output preserves that incorrect order, so it's hard for them to write a failing test case when this is the problem).
+
+    + maybe the answer is to say that they can't share code between groups, but they *can* share tests. this does mean that there isn't as much incentive to write their own tests, but some groups aren't doing that anyway (and the ones that are would probably write them regardless).
 
 - a common student habit is to neglect to write any of their own tests and just use the autograder as a debugger. one way to combat this is to require them to submit their own tests.
 
@@ -72,24 +78,6 @@
     + another thing to consider is the weight of the tests; since they're all worth equal amounts, if there's only one test that exercises a specific thing then that thing is only worth a small percentage of the total test suite (even if it's important). to combat this either we need multiple tests that all test that thing or we need to be able to manually specify test weights. or make the entire test suite pass/fail as a whole, but this seems unfair if the students can't figure out what a specific failing test is actually testing since they can't see the inputs.
 
     + something to consider is to have a number of very targeted tests vs having a small number of more general tests, and the spectrum in-between. the more tests there are the less each is worth and so the less a student is penalized for a mistake; the fewer tests the more each is worth and the more students are penalized for a mistake. whether small or large penalties are better is something to decide. for example, for "test chains" of the form `<analysis>-<test-suite>-<name>_<index>`, i could conflate all the tests that are part of that test chain into a single test.
-
-## intro to DFA
-
-- in the basics of dataflow analysis section, i had to skip the parity example and barely had time to get through the sign example (in fact, i didn't get all the way through it). maybe remove parity altogether and just talk about the sign domain.
-
-    + if i do this, then i need to change the MOP vs MFP example that currently uses parity
-
-- ask students who use languages other than C++ if i can use their parsing/datastructure for future students.
-
-    + also collect some hints about how to set up the autograder submission for different cases (e.g., for using python3)
-
-- to speed things up, maybe move the ir-specific analysis implementation details (e.g., for sign analysis and reaching definitions, etc) to the assignment description instead of covering it in lecture.
-
-    + if i do this, i need to modify the lecture to still talk about how to handle pointers conservatively for sign analysis and reaching definitions; currently i cover it when going over the ir-specific analysis details.
-
-- really what i should do is to split things up differently: first cover signs and reaching definitions for programs without pointers (this covers 80% of the assignment points), then cover pointers but no pointer arguments, then pointer arguments. basically, mirror the way the assignment is set up.
-
-    + this doesn't help with getting through the material faster, but should help the students make sense of it better.
 
 - assignment 1 notes
 
@@ -111,6 +99,28 @@
 
     + i need to remind students that they can answer a lot of their own questions about output format and analysis behavior by using the solution that i provide.
 
+- assignment 2: since this is interprocedural and we're printing out the result textually, i need to specify that variable names are unique across functions. alternatively i could specify that we should print them out as `<function>.<name>`, but that would require changing my own implementation.
+
+    + this will be true of future assignments as well.
+
+## intro to DFA
+
+- in the basics of dataflow analysis section, i had to skip the parity example and barely had time to get through the sign example (in fact, i didn't get all the way through it). maybe remove parity altogether and just talk about the sign domain.
+
+    + if i do this, then i need to change the MOP vs MFP example that currently uses parity
+
+- ask students who use languages other than C++ if i can use their parsing/datastructure for future students.
+
+    + also collect some hints about how to set up the autograder submission for different cases (e.g., for using python3)
+
+- to speed things up, maybe move the ir-specific analysis implementation details (e.g., for sign analysis and reaching definitions, etc) to the assignment description instead of covering it in lecture.
+
+    + if i do this, i need to modify the lecture to still talk about how to handle pointers conservatively for sign analysis and reaching definitions; currently i cover it when going over the ir-specific analysis details.
+
+- really what i should do is to split things up differently: first cover signs and reaching definitions for programs without pointers (this covers 80% of the assignment points), then cover pointers but no pointer arguments, then pointer arguments. basically, mirror the way the assignment is set up.
+
+    + this doesn't help with getting through the material faster, but should help the students make sense of it better.
+
 - maybe i can modify the lecture to replace just enumerating abstract semantics: have example programs and go through them live with student help, then generalize from each statement's specifics to the general rules. that is, make the connection between the abstract semantics and the analysis more clear.
 
     + this might slow things down, though.
@@ -122,14 +132,6 @@
     + definitely emphasize to the students that they shouldn't use them as tests for the assignments; some students are using them instead of creating their own tests at all. maybe i need to think of a way to ensure that they write their own tests instead of taking the lazy way out.
 
     + maybe only have one or two examples instead of a bunch of them?
-
-- the grading scheme has a bit of a flaw: if a student is failing a test but can't create their own test that fails, it's hard to provide guidance.
-
-    + maybe just be more precise about what each test contains?
-
-    + it's also hard to diagnose simple things like they forgot to order the output correctly (which only causes an error if they write a test where the functions/blocks are out of order and the output preserves that incorrect order, so it's hard for them to write a failing test case when this is the problem).
-
-    + maybe the answer is to say that they can't share code between groups, but they *can* share tests. this does mean that there isn't as much incentive to write their own tests, but some groups aren't doing that anyway (and the ones that are would probably write them regardless).
 
 - maybe abbreviate the math definitions and theorems for DFA; instead of building up gradually i could just go straight to lattices and kleene's theorem.
 
@@ -143,9 +145,9 @@
     + details of field-{based, sensitive} analysis
     + equality-based analysis, steensgaard, type inference
 
-- assignment 2: since this is interprocedural and we're printing out the result textually, i need to specify that variable names are unique across functions. alternatively i could specify that we should print them out as `<function>.<name>`, but that would require changing my own implementation.
+## slicing
 
-    + this will be true of future assignments as well.
+- our ir has the $select instruction, which encapsulates an if..else block in a single instruction. the condition operand controls which other operand is assigned to the lhs, so this is technically a control dependence, but we don't have a great way to represent this fact (we're representing control dependencies between instructions, and since we're not assuming SSA form there isn't a one-to-one mapping between variable and instruction). fortunately this doesn't really matter for slicing, since we're following control and data dependence edges and there is a data dependence edge from the $select to the reaching defs of the condition operand anyway.
 
 ## things i left out that could be added somewhat easily
 
@@ -2514,7 +2516,7 @@ P2 -> { ref(d) }
 
     + step 1: compute post-dominator tree (i.e., flip the edges of the CFG and compute the dominator tree on that).
 
-    + step 2: compute post-dominance frontiers (i.e., compute dominance frontiers but using the post-dominator tree).
+    + step 2: compute post-dominance frontiers (i.e., compute dominance frontiers but using the reversed CFG and the post-dominator tree).
 
 - that's it: each block X is control dependent on any block in its post-dominance frontier.
 
@@ -2905,7 +2907,9 @@ P2 -> { ref(d) }
 
 - `lhs = $select op1 op2 op3`
 
-    + store[lhs] = taint(op1) | taint(op2) | taint(op3)
+    + store[lhs] = taint(op2) | taint(op3)
+
+    + note that op1 does not contribute to the value of lhs even though it controls which value it gets---we're tracking data dependencies and this is a control dependence.
 
 - `lhs = $phi(ops...)`
 
@@ -3041,20 +3045,16 @@ P2 -> { ref(d) }
   sink2 --> { src1, src2 }
   ```
 
-### TODO, FIXME[example, onenote] adding calls
+### TODO adding calls
 #### TODO abstract semantics
 
-- `lhs = $call <func>(args...)`
-
-- `lhs = $icall fptr(args...)`
+- `lhs = $[i]call <func/fptr>(args...)`
 
 - `$ret op`
 
-#### TODO abstract garbage collection
-#### FIXME example
+#### FIXME[todo, onenote] example
 
   ```
-  FIXME TODO (including copying to onenote)
   ```
 
 ## TODO context-sensitivity
