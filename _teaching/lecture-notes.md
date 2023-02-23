@@ -9,14 +9,6 @@
 - for assign2 andrew alex has a doctor's note so i extended the deadline for him to tuesday feb 28 without penalty.
 
 # RETROSPECTIVE
-## misc
-
-- it would be nice to clean up the codebase a bit for next time
-
-    + student-facing code (ir.h): simplify ir representation if possible, maybe move all the inline method defs to ir.cc to make it easier to read.
-
-    + revamp the analyses (this doesn't actually affect the students at all, so it's mostly for my sake).
-
 ## timing
 
 - remember that this quarter i had to cancel the entire first week, so it's only 9 weeks + finals); also apparently i actually have 1 hr 50 min but i've only been using 1 hr 40 min.
@@ -102,6 +94,16 @@
 - assignment 2: since this is interprocedural and we're printing out the result textually, i need to specify that variable names are unique across functions. alternatively i could specify that we should print them out as `<function>.<name>`, but that would require changing my own implementation.
 
     + this will be true of future assignments as well.
+
+## implementation
+
+- it would be nice to clean up the codebase a bit for next time
+
+    + student-facing code (ir.h): simplify ir representation if possible, maybe move all the inline method defs to ir.cc to make it easier to read.
+
+    + reimplement the constraint solver so that only set variables are on the worklist (could potentially allow me to clean up the representation of graph nodes).
+
+    + reimplement the taint analysis to use an ICFG. this could allow me to leave some things set up that would make it easier for students (e.g., automatically translate from CFG to ICFG using pointer info if necessary).
 
 ## intro to DFA
 
@@ -2695,7 +2697,7 @@ P2 -> { ref(d) }
 
 - now on to something new!
 
-# TODO taint analysis (interprocedural dfa; icfg; context sensitivity)
+# taint analysis (interprocedural dfa; icfg; context sensitivity)
 ## intro
 
 - we've seen applications of program analysis for optimization and debugging, and we've seen how to overcome the difficulty of pointers. let's explore how to deal with function calls and interprocedural analysis at the same time as we expand our applications to include security.
@@ -2795,7 +2797,7 @@ P2 -> { ref(d) }
   }
   ```
 
-## TODO context-insensitive taint analysis
+## context-insensitive taint analysis
 ### intro
 
 - we'll suppose that there are a set of functions that create tainted information, called _sources_, and a set of functions that consume information, called _sinks_.
@@ -3045,16 +3047,164 @@ P2 -> { ref(d) }
   sink2 --> { src1, src2 }
   ```
 
-### TODO adding calls
-#### TODO abstract semantics
+### adding calls
+
+- for simplicity of describing the analysis, we'll assume we're using an ICFG: basic blocks end at a call instruction and may begin with a call_return instruction (that has the same information as the corresponding call).
+
+    + we'll define `bb_in` as a map from basic block to the initial input store for that basic block.
+
+- intuition:
+
+    + what are we actually passing to a callee? the value of the arguments PLUS anything reachable from the arguments via the points-to solution.
+
+    + what are we returning? the return value PLUS anything reachable from the return value PLUS anything reachable from the parameters.
+
+    + if we only pass the reachable part of the store to the callee, what happens to the rest? we need to propagate it to the call_return point to eventually be merged with the callee's returned store.
+
+    + if we have multiple callees (including a mix of normal and special function callees) then we need to behave as if each one is being called independently "in parallel".
 
 - `lhs = $[i]call <func/fptr>(args...)`
 
+    + let `CALLEE_STORE`, `REMAINING_STORE` = SplitStore(store, args)
+
+        - SplitStore will copy the given store into two new stores: one containing everything reachable from args (not including args themselves), the other containing whatever remains.
+
+    + let `CALLEES` be the set of (non-special) function callees (skipping any external functions, which we'll ignore).
+
+    + for each callee \in CALLEES:
+
+        - let `THIS_CALLEE_STORE` be a fresh copy of CALLEE_STORE (we need a fresh copy for each callee because we'll be adding the callee's parameters to it).
+
+        - for each variable arg \in args with corresponding parameter param: THIS_CALLEE_STORE[param] = store[args]
+
+        - let `callee_entry` be the entry basic block of callee: bb_in[callee_entry] |= THIS_CALLEE_STORE. if bb_in[callee_entry] changed, push onto worklist.
+
+    + let `ret_point` be the basic block begining with the call_return instruction for this call: bb_in[ret_point] |= REMAINING_STORE. if bb_in[ret_point] changed, push onto worklist.
+
+    + remember to handle the case of there being special funcion callees and normal callees mixed together.
+
 - `$ret op`
 
-#### FIXME[todo, onenote] example
+    + if this is the `main` function then there is no caller; skip this instruction.
 
+    + let `ROOTS` = { returned variable if pointer } \union { pointer-typed parameters }
+
+    + let `REACHABLE_STORE` = a copy of the current store containing only entries reachable from ROOTS (but not including ROOTS)
+
+    + let `RETURN_POINTS` be the set of call_return basic blocks we're returning to.
+
+    + for each ret_point in RETURN_POINTS:
+
+        - let `lhs = $[i]call(...)` be the call_return instruction at the beginning of the basic block (i.e., a copy of the corresponding call instruction).
+
+        - let `RETURNED_STORE` be a copy of RETURNED_STORE.
+
+        - let `retval_taint` be the taint of the $ret operand: RETURNED_STORE[lhs] = retval_taint.
+
+        - bb_in[ret_point] |= RETURNED_STORE; if bb_in[ret_point] changed then push onto worklist.
+
+            + notice that we strongly updated RETURNED_STORE with new lhs taint, but then weakly updated bb_in[ret_point]; that's because the call may have had multiple callees and we need to merge all their return values together.
+
+### examples
+
+- example 1: direct calls
+
+  PROGRAM CFG (remember to show conversion to ICFG)
   ```
+  function main() -> int {
+    entry:
+      a:int = $call src1()
+      b:int* = $addrof a:int
+      $branch a:int bb2 bb3
+
+    bb2:
+      c:int* = $call src2()
+      d:int* = $call foo(c:int*)
+      e:int = $load d:int*
+      $jump exit
+
+    bb3:
+      f:int = $call src3()
+      g:int* = $addrof f:int
+      h:int* = $call foo(g:int*)
+      j:int = $load h:int*
+      $jump exit
+
+    exit:
+      i:int = $call sink(j:int)
+      $ret i:int
+  }
+
+  function foo(p:int*) -> int* {
+    entry:
+      q:int = $call src4()
+      r:int = $load p:int*
+      s:int = $arith add q:int r:int
+      t:int* = $addrof s:int
+      $ret t:int*
+  }
+
+  function src1() -> int* {
+    entry:
+      x:int* = $alloc
+      $ret x:int*
+  }
+  ```
+
+  POINTS-TO
+  ```
+  b --> a
+  {c, g, p} --> alloc1
+  {d, h, t} --> s
+  ```
+
+  SOLUTION
+  ```
+  sink --> { src2, src3, src4 }
+  ```
+
+- example 2: indirect calls with multiple targets
+
+  PROGRAM (remember to show conversion to ICFG)
+  ```
+  function main() -> int {
+    entry:
+      f1:int[int*]* = $copy @foo:int[int*]*
+      f1:int[int*]* = $copy @bar:int[int*]*
+      f1:int[int*]* = $copy @src1:int[int*]*
+      f1:int[int*]* = $copy @sink1:int[int*]*
+      a:int* = $alloc
+      x:int = $icall f1:int[int*]*(a:int*)
+      y:int = $call sink2(x:int)
+      $ret 0
+  }
+
+  function foo(p1:int*) -> int {
+    entry:
+      $ret 0
+  }
+
+  function bar(p2:int*) -> int {
+    entry:
+      q2:int = $call src2()
+      $ret q2:int
+  }
+
+  function src1(p3:int*) -> int {
+    entry:
+      $ret 0
+  }
+
+  function sink1(p4:int*) -> int {
+    entry:
+      $ret 0
+  }
+  ```
+
+  SOLUTION
+  ```
+  sink1 --> {}
+  sink2 --> { src1, src2 }
   ```
 
 ## TODO context-sensitivity
