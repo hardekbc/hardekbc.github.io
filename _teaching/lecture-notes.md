@@ -6,7 +6,7 @@
 
     + one group turned it in slightly late (a few minutes) but it's kind of my fault since i moved the deadline from 1am to 12:05am at the last moment, so don't count it against them.
 
-- for assign2 andrew alex has a doctor's note so i extended the deadline for him to tuesday feb 28 without penalty.
+- i ended up doing this for assign2 as well (up to the next tuesday), so probably i'll do it for the remaining assignments too.
 
 # RETROSPECTIVE
 ## timing
@@ -27,8 +27,8 @@
                 (hw2 out)
     + week 6.1: through program slicing intro
     + week 6.2: up to dominance frontier example
-    + week 7.1: ???
-    + week 7.2: ???
+    + week 7.1: midway through taint analysis intro
+    + week 7.2: almost done with intraprocedural abstract semantics
                 (hw2 due, hw3 out)
     + week 8.1: ???
     + week 8.2: ???
@@ -2887,6 +2887,7 @@ P2 -> { ref(d) }
 
 - `lhs = $call <sink>(args...)`
 
+    + store[lhs] = {}
     + for v in (args \union reachable(args)): soln[sink] |= store[v]
 
 - `lhs = $icall fptr(args...)`
@@ -3207,9 +3208,396 @@ P2 -> { ref(d) }
   sink2 --> { src1, src2 }
   ```
 
-## TODO context-sensitivity
-### TODO call-string context-sensitivity
-### TODO functional context-sensitivity
-### TODO handling recursive cycles
-### TODO other kinds of context-sensitivity
-### TODO context-sensitive heap models
+## context-sensitivity
+### intro
+
+- our interprocedural analysis on the ICFG does not follow the concrete semantics for how function calls concretely work. it essentially transforms calls and returns into gotos, so that values can flow into a callee from one callsite and return at another, losing precision.
+
+    + this is _context insensitive_ analysis.
+
+    + the "context", in this case, is the different circumstances in which calls to the same function are made (e.g., callsite, function stack, etc).
+
+- example:
+
+  ```
+  function main() -> int {
+    entry:
+      taint1:int = $call src1()
+      a:int = $call foo(taint1)
+      _x:int = $call sink1(a:int)
+      taint2:int = $call src2()
+      b:int = $call foo(taint2)
+      _x:int = $call sink2(b:int)
+      $ret 0
+  }
+
+  function foo(p:int) -> int {
+    entry:
+      $branch p:int bb2 bb3
+
+    bb2:
+      taint3:int = $call src3()
+      c:int = $call bar(p:int, taint3:int)
+      _y:int = $call sink3(c:int)
+      $jump exit
+
+    bb3:
+      taint4:int = $call src4()
+      c:int = $call bar(p:int, taint4:int)
+      _y:int = $call sink4(c:int)
+      $jump exit
+
+    exit:
+      $ret c:int
+  }
+
+  function bar(q:int, r:int) -> int {
+    entry:
+      q:int = $arith add q:int r:int
+      $ret q:int
+  }
+  ```
+
+  SOLUTION (CI)
+  ```
+  sink1 --> { src1, src2, src3, src4 }
+  sink2 --> { src1, src2, src3, src4 }
+  sink3 --> { src1, src2, src3, src4 }
+  sink4 --> { src1, src2, src3, src4 }
+  ```
+
+- to make the analysis more precise, we can make it _context sensitive_; that is, it can try to distinguish different contexts for the same callee function.
+
+    + there are a number of different schemes for doing so; we'll go over two in depth and then mention a few more.
+
+    + as always, there is a cost: more precision means a more expensive, less scalable analysis.
+
+### call-string context-sensitivity
+
+- one way to distinguish different contexts for the same callee function is to abstract the runtime function stack.
+
+    + maintain a stack of callsites; this will be the context.
+
+    + when making a call, push the callsite onto the stack.
+
+    + when returning from a call, pop the top callsite off that stack and use that as the return point (rather than all possible callsites).
+
+- to change the analysis to take advantage of context sensitivity:
+
+    + the worklist now contains `(context, basic block)` pairs.
+
+    + instead of mapping from `basic block --> abstract store` now map from `(context, basic block) --> abstract store`.
+
+    + the context only changes when calling into or returning from some function.
+
+- example: [use the intro example]
+
+  SOLUTION (CALLSTRING, full callstack)
+  ```
+  sink1 --> { src1, src3, src4 }
+  sink2 --> { src2, src3, src4 }
+  sink3 --> { src1, src2, src3 }
+  sink4 --> { src1, src2, src4 }
+  ```
+
+- while conceptually simple, there is an issue we need to address: the domain of possible callstacks ranges from exponential to infinite (depending on if there are any recursive cycles).
+
+    + we can see the exponential problem in the example we just gave. for the infinite problem, see the example below.
+
+- recursive example:
+
+  ```
+  function main(p:int) -> int {
+    entry:
+      $branch p:int bb2 exit
+
+    bb2:
+      p:int = $arith sub p:int 1
+      a:int = $call foo(p:int)
+      $jump exit
+
+    exit:
+      _x:int = $call sink(a:int)
+      $ret a:int
+  }
+
+  function foo(q:int) -> int {
+    entry:
+      b:int = $call src()
+      c:int = $arith add b:int q:int
+      d:int = $call main(c:int)
+      $ret d:int
+  }
+  ```
+
+- to fix this, we need to modify our scheme to something called `k-limited call-string` context sensitivity.
+
+    + for some fixed constant k, we only use the top k elements of the callstack to determine what context we're in.
+
+- this k-limiting raises two issues we need to address:
+
+    + issue 1: what context are we returning to? previously we had the entire callstack, but now we only have the top k entries. consider the 3-limited context `abc` that makes a call at callsite `d`, yielding the callee context `bcd`. when the callee returns, how does it know that it should return to the context `abc`?
+
+      SOLUTION: maintain a map `call_contexts : <callee_context, callee_function> --> <caller_context, call_return block>`, updated whenever a callsite is processed, that maps the callee context and function to the caller context and appropriate call_return basic block. when the callee's $ret instruction is being processed, use the map to figure out which block to return to and under which caller context.
+
+    + issue 2: what if the callee was already analyzed under a given callee context, but a different caller context? consider again the 3-limited context `abc` that makes a call at callsite `d`, yielding the callee context `bcd`. suppose that previously there was a context `xbc` that makes a call at `d`, yielding the same callee context. if the call from `abc` context doesn't contain new information for the `bcd` callee context then the callee won't be pushed on the worklist, and the analysis will prematurely converge. in fact, even if the callee entry's info changes, it's possible that change won't propagate all the way to the callee's $ret instruction.
+
+      SOLUTION: maintain a map `ret_values : <context, function> --> <returned value, returned store>`, updated whenever a $ret is processed, that maps the current context for the current function to its computed analysis solution. when processing a call to a callee function with some callee context, look them up in `ret_values` to see if it has been done before, and if so then propagate that info to the call_return basic block for this call. (still propagate the current store to the callee as well; we don't know if the callee will propagate changes all the way to the $ret or not.)
+
+- [revisit intro example with k == 1, recursive example with k == 2]
+
+  INTRO SOLUTION (CALLSTRING, k == 1)
+  ```
+  sink1 --> { src1, src2, src3, src4 }
+  sink2 --> { src1, src2, src3, src4 }
+  sink3 --> { src1, src2, src3 }
+  sink4 --> { src1, src2, src4 }
+  ```
+
+  RECURSIVE EXAMPLE SOLUTION (k == 2)
+  ```
+  sink --> { src }
+  ```
+
+- an alternative, common way to handle recursive cycles is to treat all the functions within a cycle context-insensitively (i.e., transform recursive call/return edges into gotos). this isn't necessary since k-limiting will ensure termination, but can help performance (but hurt precision). we won't be doing this for our own implementations.
+
+- implementation tip: it will make your lives a bit easier if you implement the analysis s.t. each 'context' is represented with a unique integer id.
+
+    + this will make your lives easier because you can easily change the context-sensitivity strategy for your analysis just by changing how you derive the integer id.
+
+        - context-insensitive: id is always 0 (or any constant value).
+
+        - call-string context-sensitive: id is derived from k-limited callstack.
+
+        - other kinds of context-sensitivity (which we'll get to shortly): id is derived using the appropriate definition of context.
+
+    + the key is that the only difference between all of these schemes is how the context is defined; otherwise they all work exactly the same way.
+
+### functional context-sensitivity (aka partial transfer function)
+
+- a different way to distinguish different contexts for the same callee function is by remembering that the abstract transfer functions are, in fact, functions---and hence if we give them the same input they will always yield the same output.
+
+    + so we memoize: for each abstract input to a function, if we haven't seen it before then we analyze the function with that input and then remember the result; if we have seen it before then we just return the corresponding result without any further analysis.
+
+- to change the analysis to take advantage of context sensitivity: do the exact same thing as before (i.e., use `(context, basic block)` instead of just `basic block`).
+
+- just like before, we need to take care of (1) figuring out which context we're returning to; and (2) what to do if the callee was previously analyzed under the same callee context, but a different caller context.
+
+    + same solutions as before.
+
+- example:
+
+  ```
+  function main(i:int) -> int {
+    entry:
+      $branch i:int bb2 bb3
+
+    bb2:
+      taint1:int = $call src1()
+      a:int = $call foo(taint1)
+      _x:int = $call sink1(a:int)
+      taint2:int = $call src2()
+      b:int = $call foo(taint2)
+      _x:int = $call sink2(b:int)
+      $jump exit
+
+    bb3:
+      taint1:int = $call src1()
+      a:int = $call foo(taint1)
+      _x:int = $call sink1(a:int)
+      taint2:int = $call src2()
+      b:int = $call foo(taint2)
+      _x:int = $call sink2(b:int)
+      $jump exit
+
+    exit:
+      c:int = $arith a:int b:int
+      d:int = $call foo(c:int)
+      _x:int = $call sink3(d:int)
+      $ret 0
+  }
+
+  function foo(p:int) -> int {
+    entry:
+      r:int = $call bar(p:int)
+      $ret r:int
+  }
+
+  function bar(q:int) -> int {
+    entry:
+      $ret q:int
+  }
+  ```
+
+  SOLUTION:
+  ```
+  sink1 --> { src1 }
+  sink2 --> { src2 }
+  sink3 --> { src1, src2 }
+  ```
+
+- however, we still have an issue to address: just like with call-string, the number of possible contexts could be infinite (consider, e.g., constant propagation).
+
+    + this only happens if our abstract domain is infinite, but if it is then we have to have some ad-hoc threshold beyond which we just merge contexts together.
+
+    + this won't happen for assign3 because our abstract domain for taint analysis is finite.
+
+### which scheme is better?
+
+- call-string: what we're doing with this scheme is essentially statically expanding the ICFG to have a separate copy of each function for each possible callstack that reaches it.
+
+    + we don't have to actually create a separate copy for each context because we keep the different contexts separate for a given function by mapping `(context, basic block) --> abstract store`.
+
+    + the drawback of this scheme is, because we're separating contexts statically, we always keep different contexts separate even if it doesn't gain any additional precision. that is, even if merging two contexts wouldn't make the analysis any less precise, we still track them separately.
+
+- functional: what we're doing with this scheme is dynamically expanding the ICFG based on what abstract inputs we actually see during the analysis.
+
+    + unlike call-string, we don't separate out different contexts for the same function unless it will (probably) benefit us (it's possible we'll still get the same output for different inputs, but less likely).
+
+    + however, the number of possible contexts is a function of both the size of the abstract domain we're working with _and_ the details of the program we're analyzing. this means it's unpredictable and could potentially get extremely expensive.
+
+- so which is better? it depends.
+
+### other kinds of context-sensitivity
+#### summary-based (aka transfer function)
+
+- the partial transfer function approach (aka functional) memoized the callee context based on its abstract inputs, so if we saw the same abstract inputs we could just retrieve the previous result.
+
+    + the partial version re-analyzes the function for each new input, and only for inputs that actually happen during the analysis.
+
+- the full transfer function approach (aka summary-based) instead directly replaces a function with an abstract version that takes the function's input abtract values and returns the function's abstract result.
+
+    + whenever the function is called, the analysis applies this transfer function to the inputs to get the result; since this happens for every call to the same function, each call is treated independently.
+
+    + the full version _replaces_ the function entirely with this new transfer function.
+
+- example:
+
+  ```
+  function main() -> int {
+    entry:
+      a:int = $copy -42
+      b:int = $call abs(a:int)
+      c:int = $copy 0
+      d:int = $call abs(c:int)
+      e:int = $arith add b:int d:int
+      $ret e:int
+  }
+
+  function abs(p:int) -> int {
+    entry:
+      t:int = $cmp lt p:int 0
+      $branch t:int bb2 bb3
+
+    bb2:
+      p:int = $arith sub 0 p:int
+      $jump bb3
+
+    bb3:
+      $ret p:int
+  }
+  ```
+
+- suppose we're doing sign analysis on the above program, which computes the sum of the absolute values of 0 and -42.
+
+    + a context-insensitive analysis would say that both calls to foo would return TOP (because it would either be ZERO or POS, and their join is TOP), so `e` is TOP.
+
+    + we can replace all calls to `abs` with the transfer function: `abs(x) = (x == NEG) ? POS : x`
+
+    + now `b` is POS and `d` is ZERO, so `e` is POS.
+
+- if we can compute a relatively simple summary for a function, this approach can work great.
+
+- however, for complex analyses (e.g., flow-sensitive pointer analysis) the summary can be at least as complicated as the function itself, and often expensive to compute at all.
+
+#### object sensitivity
+
+- so far we've talked about abstracting function instances based on the stack (call-string) or inputs (partial or full transfer functions). researchers noticed that specifically for object-oriented languages neither approach was a great fit.
+
+- quick review of how methods work:
+
+  OOP:
+  ```
+  Object* obj = new Object();
+  obj->method(arg1, arg2);
+  ```
+
+  LOWERED VERSION (static dispatch, e.g., C++ non-virtual method):
+  ```
+  Object* obj = new Object();
+  name_mangled_Object_method(obj, arg1, arg2);
+  ```
+
+- `obj` is the _receiver object_, i.e., a pointer to the allocated object in memory on which the method is being called.
+
+- when doing a static analysis, the receiver object will be some abstract object (e.g., a static allocation site). object sensitivity uses this abstract object as the context for a context-sensitive analysis.
+
+    + it doesn't track the actual callsite, like call-string context sensitivity.
+
+    + it doesn't track the method arguments, like full or partial transfer functions.
+
+- [can't show an example using our IR, since it isn't object-oriented]
+
+    + basically, for a method call `obj->method(...)` the context for analyzing `method` would be the abstract object pointed to by `obj`, as computed by some pointer analysis.
+
+#### CFL reachability
+
+- this is a different approach to program analysis than either DFA or set constraint-based.
+
+- suppose that we take a program and compute its ICFG, then label each call edge to a function foo at program point p as `(_p` and each return edge from foo to program point p as `)_p`.
+
+- example: [use example from intro]
+
+- context sensitiity is trying to emulate the concrete behavior of function calls: at a callsite we go to the callee function, execute it, and return the results back to the same callsite. we shouldn't mix results from different calls together.
+
+    + that is, a _valid path_ for the analysis to take is one that respects the concrete flow of control for a function call.
+
+- notice that in the labeled ICFG, valid paths correspond to properly nested parentheses.
+
+    + [trace some valid paths in the ICFG and show the resulting strings from the labels]
+
+- properly nested parentheses is a context-free language, i.e., it can be described using a context-free grammar or a pushdown automaton.
+
+    + notice the potential for confusion: we're talking about _context sensitivity_ using a _context free_ language. they're talking about different kinds of context.
+
+- so the CFL reachability approach to context sensitivity is to only allow the analysis to follow ICFG paths that are part of the well-matched parentheses language.
+
+    + CFL reachability == "context free language" reachability == from node X in the ICFG we can reach node Y using only valid paths according to some grammar.
+
+- we can use CFL reachability for other things besides context sensitivity as well (e.g., field sensitivity).
+
+### context-sensitive heap models
+
+- when doing pointer analysis we used a common heap model: an abstract object per static allocation site.
+
+    + we can make our pointer analysis context-sensitive using any of the methods outlined above (though it's not trivial and takes some thought and effort to make it work).
+
+    + we could still use the same heap model as before, but there is an opportunity to do better.
+
+- example:
+
+  ```
+  function main() -> int {
+    entry:
+      tainted:int = $call source()
+      untainted:int = 42
+      x:int* = $call foo()
+      y:int* = $call foo()
+      $store x:int* tainted:int
+      $store y:int* untainted:int
+      _d:int = $call sink1(x:int*)
+      _e:int = $call sink2(y:int*)
+  }
+
+  function foo() -> int* {
+    entry:
+      p:int* = $alloc
+      $ret p:int*
+  }
+  ```
+
+- for more precise results, sometimes people use context-sensitivity to make the abstract objects more precise. context-sensitive heap model: an abstract object per static allocation site per context.
+
+- example revisited: if we use a context-sensitive heap model, we get more precise results by separating the different contexts in our heap model.
+
+- as always, there's a cost: a context-sensitive heap model is more precise, but can be much more expensive.
