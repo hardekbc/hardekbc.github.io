@@ -2581,27 +2581,27 @@ P2 -> { ref(d) }
 
   IR:
   ```
-   1. entry:
-   2.   i:int = $copy 0
-   3.   j:int = $copy 0
-   4.   x:int = $call input()
-   5.   y:int = $copy 0
-   6.   z:int = $copy 1
-   7.   $jump loop_hdr
+  entry:
+    i:int = $copy 0
+    j:int = $copy 0
+    x:int = $call input()
+    y:int = $copy 0
+    z:int = $copy 1
+    $jump loop_hdr
 
-   8. loop_hdr:
-   9.   tmp:int = $cmp lt i:int x:int
-  10.   $branch tmp:int loop_body exit
+  loop_hdr:
+    tmp:int = $cmp lt i:int x:int
+    $branch tmp:int loop_body exit
 
-  11. loop_body:
-  12.  y:int = $arith add y:int 2
-  13.  z:int = $arith mul z:int j:int
-  14.  i:int = $arith add i:int 1
-  15.  j:int = $arith add j:int 2
-  16.  $jump loop_hdr
+  loop_body:
+    y:int = $arith add y:int 2
+    z:int = $arith mul z:int j:int
+    i:int = $arith add i:int 1
+    j:int = $arith add j:int 2
+    $jump loop_hdr
 
-  17. exit:
-  18.  $ret y:int
+  exit:
+    $ret y:int
   ```
 
   PDG:
@@ -2881,13 +2881,14 @@ P2 -> { ref(d) }
 
     + store[lhs] = {source}
 
-    + for v in (reachable(lhs) \union reachable(args)): store[v] |= source
+    + for v in (reachable(lhs) \union reachable(args)): store[v] |= {source}
 
     + note the weak updates for pointed-to objects.
 
 - `lhs = $call <sink>(args...)`
 
     + store[lhs] = {}
+
     + for v in (args \union reachable(args)): soln[sink] |= store[v]
 
 - `lhs = $icall fptr(args...)`
@@ -2928,17 +2929,17 @@ P2 -> { ref(d) }
 
 - `lhs = $gep src_ptr op [fieldname]`
 
-    + store[lhs] = store[src_ptr] | taint(op)
+    + store[lhs] = taint(src_ptr) | taint(op)
 
     + note that gep is basically pointer arithmetic, i.e., `src_ptr + op`.
 
 - `lhs = $load src_ptr`
 
-    + store[lhs] = store[src_ptr] | \union_{v \in ptsto(src_ptr)} store[v]
+    + store[lhs] = taint(src_ptr) | \union_{v \in ptsto(src_ptr)} taint(v)
 
 - `$store dst_ptr op`
 
-    + for v in ptsto(dst_ptr): store[v] |= (store[dst_ptr] | taint(op))
+    + for v in ptsto(dst_ptr): store[v] |= (taint(dst_ptr) | taint(op))
 
     + note the weak update.
 
@@ -3076,7 +3077,7 @@ P2 -> { ref(d) }
 
         - let `THIS_CALLEE_STORE` be a fresh copy of CALLEE_STORE (we need a fresh copy for each callee because we'll be adding the callee's parameters to it).
 
-        - for each variable arg \in args with corresponding parameter param: THIS_CALLEE_STORE[param] = store[args]
+        - for each arg \in args with corresponding parameter param: THIS_CALLEE_STORE[param] |= taint(args). note the weak update: if this is a recursive function call then the parameter may already be in THIS_CALLEE_STORE.
 
         - let `callee_entry` be the entry basic block of callee: bb_in[callee_entry] |= THIS_CALLEE_STORE. if bb_in[callee_entry] changed, push onto worklist.
 
@@ -3098,7 +3099,7 @@ P2 -> { ref(d) }
 
         - let `lhs = $[i]call(...)` be the call_return instruction at the beginning of the basic block (i.e., a copy of the corresponding call instruction).
 
-        - let `RETURNED_STORE` be a copy of RETURNED_STORE.
+        - let `RETURNED_STORE` be a fresh copy of REACHABLE_STORE.
 
         - let `retval_taint` be the taint of the $ret operand: RETURNED_STORE[lhs] = retval_taint.
 
@@ -3215,7 +3216,7 @@ P2 -> { ref(d) }
 
     + this is _context insensitive_ analysis.
 
-    + the "context", in this case, is the different circumstances in which calls to the same function are made (e.g., callsite, function stack, etc).
+    + the "context", in this case, is the execution context in which calls to the same function are made (e.g., callsite, function stack, arguments, etc).
 
 - example:
 
