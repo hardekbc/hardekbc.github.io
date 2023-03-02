@@ -30,7 +30,7 @@
     + week 7.1: midway through taint analysis intro
     + week 7.2: almost done with intraprocedural abstract semantics
                 (hw2 due, hw3 out)
-    + week 8.1: ???
+    + week 8.1: midway through interprocedural taint analysis examples
     + week 8.2: ???
     + week 9.1: ???
     + week 9.2: ???
@@ -104,6 +104,20 @@
     + reimplement the constraint solver so that only set variables are on the worklist (could potentially allow me to clean up the representation of graph nodes).
 
     + reimplement the taint analysis to use an ICFG. this could allow me to leave some things set up that would make it easier for students (e.g., automatically translate from CFG to ICFG using pointer info if necessary).
+
+- implement some of the other analyses (different types of analysis, same type of analysis but difffent applications, etc); this would allow me to switch out which ones are used for assignments.
+
+- see idea from 'general lectures' section: modify implementation to print out the analysis step-by-step to use for examples.
+
+## general lectures
+
+- it's tedious for everyone for me to walk through examples, but important to make sure they understand how to implement things.
+
+    + maybe give the example as an exercise first, then go over it in detail to show the solution once they've had time to work on it themselves.
+
+    + is there some other activity that's more interesting, but has a similar effect? maybe something like using an analysis implementation to demo?
+
+        - maybe modify an analysis implementation to print out the abstract store at each step and use that to walk through the example instead of doing it by hand.
 
 ## intro to DFA
 
@@ -3176,8 +3190,10 @@ P2 -> { ref(d) }
       f1:int[int*]* = $copy @src1:int[int*]*
       f1:int[int*]* = $copy @sink1:int[int*]*
       a:int* = $alloc
+      b:int = $call src2()
       x:int = $icall f1:int[int*]*(a:int*)
       y:int = $call sink2(x:int)
+      z:int = $call sink3(a:int*)
       $ret 0
   }
 
@@ -3207,6 +3223,7 @@ P2 -> { ref(d) }
   ```
   sink1 --> {}
   sink2 --> { src1, src2 }
+  sink3 --> { src1 }
   ```
 
 ## context-sensitivity
