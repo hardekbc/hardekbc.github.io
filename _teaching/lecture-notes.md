@@ -3403,6 +3403,8 @@ P2 -> { ref(d) }
 
     + so we memoize: for each abstract input to a function, if we haven't seen it before then we analyze the function with that input and then remember the result; if we have seen it before then we just return the corresponding result without any further analysis.
 
+    + thus, a 'context' is an abstract store describing the inputs to a given function.
+
 - to change the analysis to take advantage of context sensitivity: do the exact same thing as before (i.e., use `(context, basic block)` instead of just `basic block`).
 
 - just like before, we need to take care of (1) figuring out which context we're returning to; and (2) what to do if the callee was previously analyzed under the same callee context, but a different caller context.
@@ -3552,7 +3554,7 @@ P2 -> { ref(d) }
   name_mangled_Object_method(obj, arg1, arg2);
   ```
 
-- `obj` is the _receiver object_, i.e., a pointer to the allocated object in memory on which the method is being called.
+- `obj` is a pointer to the _receiver object_, i.e., a pointer to the allocated object in memory on which the method is being called.
 
 - when doing a static analysis, the receiver object will be some abstract object (e.g., a static allocation site). object sensitivity uses this abstract object as the context for a context-sensitive analysis.
 
