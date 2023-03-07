@@ -31,7 +31,7 @@
     + week 7.2: almost done with intraprocedural abstract semantics
                 (hw2 due, hw3 out)
     + week 8.1: midway through interprocedural taint analysis examples
-    + week 8.2: ???
+    + week 8.2: through k-limited callstring (but not example)
     + week 9.1: ???
     + week 9.2: ???
                 (hw3 due, hw4 out)
@@ -94,6 +94,12 @@
 - assignment 2: since this is interprocedural and we're printing out the result textually, i need to specify that variable names are unique across functions. alternatively i could specify that we should print them out as `<function>.<name>`, but that would require changing my own implementation.
 
     + this will be true of future assignments as well.
+
+- assignment 3:
+
+    + the tests are especially half-assed, particularly the last two test suites.
+
+    + reaching defs is written to automatically use field-sensitive pointer analysis (with no way to change it except to turn off pointer analysis entirely), but the assignment specifies field-insensitive analysis. this doesn't matter for the autograder (because no tests use structs), but it can confuse students writing their own tests. i need to modify things so that i can specify that a PDG should be created using field-insensitive pointer analysis (which transitively needs to specify it for reaching defs).
 
 ## implementation
 
@@ -3619,3 +3625,165 @@ P2 -> { ref(d) }
 - example revisited: if we use a context-sensitive heap model, we get more precise results by separating the different contexts in our heap model.
 
 - as always, there's a cost: a context-sensitive heap model is more precise, but can be much more expensive.
+
+# practice designing analyses
+
+- [go through designing a string constant analysis with the class as a warm-up, then give the prefix and regex analyses as exercises; see the pdf docs for details]
+
+    + [motivate the prefix analysis with the browser addon analysis example, i.e., figuring out what network domains are being communicated with.]
+
+- for each analysis give:
+
+    + the elements of the lattice
+
+    + which element is TOP, which is BOTTOM
+
+    + the join and meet operators and the ordering relation
+
+    + whether the lattice is finite, infinite but noetherian, or non-noetherian
+
+    + the alpha and gamma functions
+
+    + the definitions of `+`
+
+    + proof that `+` is monotone
+
+- prefix:
+
+    + the cases are handling various cells in the `+` table: case 1 is the leftmost column and the top row; case 2 is the middle cell; case 3 is rightmost middle cell; case 4 is the bottom middle and rightmost cells.
+
+    + for case 3 we're saying that `b <= b'` which means all the strings in `b` are contained in `b'`, and all we're doing is sticking the same prefix to both sides, so `a . b <= a . b'`.
+
+    + for case 4 we're saying that `a <= a'`, which means all strings starting with `a` are in `a'`, so no matter what `b` is it must be the case that `a . b <= a'`.
+
+- regex:
+
+    + remember that it's only a lattice if we use normalized regexes.
+
+    + while a lattice, it isn't a _complete_ lattice (e.g., the least upper bound of the chain `01 <= 0011 <= 000111 <= ...` is the language `0{n}1{n}`, which is context-free, and there is no _least_ regex that contains it. this is a problem, but since the lattice is non-noetherian it doesn't really matter---we can't guarantee finding a fixpoint anyway.
+
+# a touch of widening
+## definition
+
+- recall that while complete lattices with monotone functions are guaranteed to have a fixpoint, the only way we're guaranteed to be able to _find_ the fixpoint is if the lattice is noetherian (i.e., no infinite ascending chains).
+
+    + essentially, if the function is monotone then we can only stay in one place (we've found a fixpoint) or go up the lattice; if the lattice is noetherian we can only go up the lattice a finite number of times before we reach TOP.
+
+- but what if we want to use an abstract domain that isn't noetherian, in order to get greater precision?
+
+    + we've seen two examples already: integer intervals and regular expressions.
+
+- what we want is a way to accelerate/guarantee convergence, i.e., if the normal fixpoint computation is working up along the abstract lattice in a chain, what we need to is leap-frog up that chain past potentially an infinite number of lattice elements.
+
+- solution: _widening_. we replace the lattice join operator with a _widening operator_, then apply the usual worklist algorithm for computing a fixpoint.
+
+    + this comes with a cost: the fixpoint we reach is not guaranteed to be the least fixpoint of the original lattice (or even a fixpoint of the original lattice at all); all we know for sure is that `lfp_orig <= lfp_widened`.
+
+    + the idea is that while we aren't getting as precise an answer as we could be getting for that abstract domain, since the abstract domain itself is more precise than one that is noetherian, hopefully we're getting a more precise answer than we would be getting with that noetherian lattice (this isn't a guarantee, though).
+
+        - example: we need to use widening for integer intervals, but we'll still often get a better solution than using the constant abstract domain.
+
+    + an additional cost is that before, we had a simple checklist for proving our analysis is computable: we have a complete lattice and monotone transfer functions. now we need to prove that the widening operator we choose is, in fact, a proper widening operator (there are many possible operators, and we need to prove this fact for each one we want to use).
+
+- an operator ▽ ∈ DxD -> D over some poset D is a widening operator iff:
+
+    + x ⊑ (x ▽ y)
+
+    + y ⊑ (x ▽ y)
+
+    + for all ascending chains x_0 ⊑ x_1 ⊑ x_2 ⊑ ..., the following chain stabilizes in a finite number of steps:
+
+        - acc_0 = x_0
+        - acc_{n+1} = acc_n ▽ x_{n+1}
+
+- the first two conditions say that the widened result overapproximates the two original values.
+
+- the last condition says that if we use the widening operator to accumulate the value of an ascending chain, then we reach a fixpoint.
+
+    + recall that our worklist algorithm is essentially computing kleene iterations (F^n(BOTTOM)), which is computing an ascending chain. so if we use widening instead of join for the worklist algorithm, we're guaranteed to reach a fixpoint and terminate.
+
+## example 1: integer intervals
+
+- the abstract domain is a lattice L = {BOTTOM} ∪ { [a, b] | a ∈ {-INF} ∪ Z, b ∈ {INF} ∪ Z, a <= b } where:
+
+    + for all x ∈ L:
+
+        - BOTTOM ⊑ x
+        - BOTTOM ⊔ x = x ⊔ BOTTOM = x
+        - BOTTOM + x = x + BOTTOM = BOTTOM
+
+    + note that TOP = [-INF, INF]
+
+    + [a1, b1] ⊑ [a2, b2] iff a1 >= a2 and b1 <= b2
+
+    + [a1, b1] ⊔ [a2, b2] = [min(a1, a2), max(b1, b2)]
+
+    + [a1, b1] + [a2, b2] = [a1+b1, a2+b2]
+
+- this is a complete lattice, but non-noetherian.
+
+- example [do first with constant domain, then interval domain using join]:
+
+  ```
+  entry:
+    x:int = $copy 0
+    y:int = $call input()
+    $jump while_hdr
+
+  while_hdr:
+    t:int = $cmp lte x:int y:int
+    $branch t:int while_body exit
+
+  while_body:
+    x:int = $arith add x:int 1
+    $jump while_hdr
+
+  exit:
+    $ret x:int
+  ```
+
+- one possible widening operator:
+
+    + for all x ∈ L: BOTTOM ▽ x = x ▽ BOTTOM = x
+
+    + [a1, b1] ▽ [a2, b2] = [a', b'] s.t.
+
+        - if a1 <= a2, a' = a1, else a' = -INF
+        - if b1 >= b2, b' = b1, else b' = INF
+
+    + essentially, if we're growing down jump straight to -INF and if we're growing up jump straight to INF.
+
+- is this a widening operator?
+
+    + [check the conditions]
+
+- [redo example with intervals and widening operator]
+
+## example 2: regular expressions
+
+- we've already seen the regular expression abstract domain and determined it isn't noetherian.
+
+- there are many possible widening operators (with several papers proposing various ones); these get pretty complicated to retain as much precision as possible so we'll come up with one that isn't terribly precise but is simpler to understand.
+
+    + [ask students if they have any ideas]
+
+- for r1, r2 ∈ REGEX, r1 ▽ r2 = r3 . Σ* s.t. r3 = lcp(r1, r2)
+
+    + basically, find the longest common prefix over all strings in r1 and r2 then concatenate that with Σ*.
+
+- is this a widening operator?
+
+    + [check the conditions]
+
+## strategic use of widening
+
+- widening loses precision, so we'd like to use it as little as possible. fortunately, we only really need it under specific circumstances to prevent nontermination.
+
+    + [ask students: what are they?]
+
+    + it's when we have loops.
+
+- to improve precision for our analysis use join everywhere except loop headers, where we use widening.
+
+# TODO SSA and sparse analysis
+# TODO equality-based analysis: pointers, type inference
