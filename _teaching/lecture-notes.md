@@ -32,7 +32,7 @@
                 (hw2 due, hw3 out)
     + week 8.1: midway through interprocedural taint analysis examples
     + week 8.2: through k-limited callstring (but not example)
-    + week 9.1: ???
+    + week 9.1: through context-sensitive heap model
     + week 9.2: ???
                 (hw3 due, hw4 out)
     + week 10.1: ???
@@ -111,6 +111,8 @@
 
     + reimplement the taint analysis to use an ICFG. this could allow me to leave some things set up that would make it easier for students (e.g., automatically translate from CFG to ICFG using pointer info if necessary).
 
+- maybe reimplement the program verifier to use equality-based analysis so that i can add that to lectures and possibly an assignment.
+
 - implement some of the other analyses (different types of analysis, same type of analysis but difffent applications, etc); this would allow me to switch out which ones are used for assignments.
 
 - see idea from 'general lectures' section: modify implementation to print out the analysis step-by-step to use for examples.
@@ -124,6 +126,12 @@
     + is there some other activity that's more interesting, but has a similar effect? maybe something like using an analysis implementation to demo?
 
         - maybe modify an analysis implementation to print out the abstract store at each step and use that to walk through the example instead of doing it by hand.
+
+- the current SSA is just going over the idea, without needing the students to implement it.
+
+    + if i'm ever going to give SSA/sparse analysis as an assignment i should give more examples/exercises, which i can copy from the old 260 material.
+
+    + remember that SSA needs to come after PDG (or else i need to heavily change the contents of the PDG and SSA sections).
 
 ## intro to DFA
 
@@ -173,11 +181,8 @@
 
 ## things i left out that could be added somewhat easily
 
-- simple widening (integer interval analysis)
-
 - more DFA analyses:
 
-    + string analyses (string constants, prefix, regex)
     + uninitialized variables / necessarily initialized variables
     + available expressions
     + very busy expressions
@@ -187,14 +192,14 @@
 
 - field-based and field-sensitive pointer analysis details
 
-- using andersen-style pointer analysis to optimize DFA pointer analysis
+- DFA flow-sensitive pointer analysis and using andersen-style pointer analysis to optimize DFA pointer analysis
+
+    + needs to come after the SSA/sparse analysis section
 
 - equality-based set constraints
 
     + steensgaard pointer analysis
     + type inference
-
-- SSA and sparse analysis
 
 - abstract interpretation stuff
 
@@ -204,16 +209,11 @@
 
 ## things i left out that could be added with more work
 
-- flow- and/or context-sensitive pointer analysis
+- context-sensitive andersen-style pointer analysis (nystrom's summary-based stuff)
 
 - symbolic/concolic execution
 
-- more context-sensitivity options
-
-    + transfer functions (summary-based)
-    + CFL
-    + object-sensitivity
-    + IFDS
+- CFL reachability (beyond the mere mention i give it now)
 
 - demand-driven program analysis
 
@@ -3787,5 +3787,242 @@ P2 -> { ref(d) }
 
 - to improve precision for our analysis use join everywhere except loop headers, where we use widening.
 
-# TODO SSA and sparse analysis
-# TODO equality-based analysis: pointers, type inference
+# sparse analysis and SSA
+## problem with standard DFA
+
+- the DFA algorithm we've been using is an efficiency problem: information is propagated indiscriminately throughout the CFG, delaying convergence.
+
+- example (constant propagation):
+
+  ```
+  function main(p:int) -> int {
+  entry:
+    x:int = $copy 4
+    y:int = $copy 1
+    $branch p:int if_true if_false
+
+  if_true:
+    y:int = $copy 3
+    z:int = $copy x
+    $jump exit
+
+  if_false:
+    z:int = $copy 3
+    $jump exit
+
+  exit:
+    a:int = $arith add y:int z:int
+    $ret a:int
+  }
+  ```
+
+    + notice that `x` info is propagated to `if_false` and `exit` and `y` info is propagated to `if_true` and `if_false`, none of which actually use this info.
+
+- this problem doesn't affect precision, but does impact performance. it would be better to propagate information only where it is actually needed and nowhere else.
+
+## def-use chains and sparse analysis
+
+- how do we know where information is needed? we already know how to figure this out: reaching definitions. the reaching definitions solution allows us to directly connect where information is _produced_ (defs) to where it is _needed_ (uses).
+
+    + this is basically the PDG with only data dependence edges, no control dependence edges.
+
+- replace the CFG with a "def-use graph":
+
+    + nodes are statements (not basic blocks)
+
+    + there is an edge A-->B if a def at A reaches a use at B
+
+- run the standard DFA worklist algorithm, but on the def-use graph instead of the CFG.
+
+    + there is no single 'entry' point; the easiest thing to do is just initialize the worklist with all statements.
+
+- example: [reuse example from above]
+
+## factoring def-use chains: SSA form
+
+- there's still a problem with the def-use graph: the number of def-use edges can be quadratic in the number of statements.
+
+- example (using shorthand to remove irrelevant details):
+
+  ```
+  if (_)      x = _
+  else if (_) x = _
+  else        x = _
+
+  if (_)      _ = x
+  else if (_) _ = x
+  else        _ = x
+  ```
+
+    + [draw def-use graph]
+
+- the solution is to _factor_ the def-use edges, which will give us _SSA form_.
+
+- a program is in _Static Single Assignment_ (SSA) form if every variable is defined with exactly one program statement and every use of a variable has exactly one reaching definition.
+
+- example 1: renaming variables to transform into SSA
+
+  ```
+  x = 4
+  y = x
+  x = 6
+  y = x
+  ```
+
+  ```
+  x1 = 4
+  y1 = x1
+  x2 = 6
+  y2 = x2
+  ```
+
+- why _static_ single assignment?
+
+  ```
+  while (_) x = x + 1
+  ```
+
+    + there is only a single textual assignment, but it can happen dynamically an arbitrary number of times.
+
+- there's still one complexity: what if multiple defs reach a single use?
+
+  ```
+  if (_)      x1 = _
+  else if (_) x2 = _
+  else        x3 = _
+
+  if (_)      _ = x?
+  else if (_) _ = x?
+  else        _ = x?
+  ```
+
+- this is where phi functions come in: a phi function is a choice operator that multiplexes multiple defs together.
+
+    + `x1 = phi(x2, x3, ...)` _means_ that `x1` is assigned the value of whichever reaching def (one of `x2, x3, ...`) is appropriate.
+
+  ```
+  if (_)      x1 = _
+  else if (_) x2 = _
+  else        x3 = _
+  x4 = phi(x1, x2, x3)
+  if (_)      _ = x4
+  else if (_) _ = x4
+  else        _ = x4
+  ```
+
+    + [draw the new def-use graph]
+
+    + note that the number of edges has gone from quadratic to linear.
+
+- SSA form renders some analyses trivial (e.g., reaching defs) and others much easier and more efficient (e.g., sign analysis, constant propagation, slicing, taint analysis)
+
+## computing SSA form
+### intro
+
+- there are two parts to computing SSA:
+
+    + where should phi functions be placed?
+
+    + how to rename variables?
+
+### placing phi functions
+
+- where should we put these new phi functions?
+
+- naive answer: at every join point in the CFG, put a phi function for every variable. this is way too many, most of them unneeded.
+
+- better answer: for each variable `x`, if blocks A and B both define `x` and there are non-intersecting paths from A and B to block Z, then put a phi function for `x` in Z.
+
+    + this just says to find the earliest point in the CFG where multiple defs converge to one point, and put the phi function there.
+
+    + there are refinements that yield even fewer phi functions (e.g., require that variable `x` must be used at some point Z or later), but this answer is a pretty good one.
+
+- fortunately, we already know how to compute this information: dominance frontiers. recall:
+
+    + the dominance frontier of block X is the set of all blocks Y s.t. X dominates a predecessor of Y but does not strictly dominate Y.
+
+    + intuitively, the dominance frontier is the set of blocks that are _almost_ dominated by X, but just outside its control. or, its the set of blocks that are the earliest point where some competing control-flow path may reach that block.
+
+- the dominance frontier of a variable definition is the set of blocks where we need to add phi functions for that variable according to the above answer.
+
+    + remember that we used _post-dominance_ for computing control dependence; now we're using _dominance_. same algorithm, just different direction of the CFG edges.
+
+    + note that when we add a phi function this is a new definition of the variable, which itself may require more phi functions to be added.
+
+    + iterated dominance frontier: DF+(S) = the limit of the sequence:
+
+        - DF_1(S) = DF(S)
+        - DF_{i+1}(S) = DF(S ∪ DF_I(S))
+
+    + let S be the set of definitions for variable `x`; then DF+(S) is exactly the set of blocks that require phi functions for `x`.
+
+### renaming variables
+
+- after phi functions have been placed, we need to rename all the variables.
+
+- simple method:
+
+    + compute reaching defs using the original variables names (but with phi functions in place). because of how we placed phi functions only one def will ever reach any use.
+
+    + for each definition, give the defined variable a unique name.
+
+    + for each use, replace that use with the unique name of the single reaching def.
+
+- this is easy but not as efficient as it could be. there's a more complicated but efficient version found in cytron et al, "efficiently computing static single assignment form and the control dependence graph".
+
+## revisiting sparse analysis
+
+- if the program is in SSA form and we're doing a first-order analysis (i.e., computing an abstraction of program variable values), then we can modify our worklist algorithm to operate on variables instead of basic blocks or statements.
+
+    + since there is a single assignment for each variable, we don't need separate abstract stores for each block: just a single, global abstract store for the whole program.
+
+    + there is no propagation of abstract stores or anything like that.
+
+- example: constant propagation
+
+  ```
+  initialize store and worklist to empty
+
+  for each variable x:
+    if x is assigned a constant k:
+      store[x] = k
+      add x to worklist
+
+  while worklist is not empty:
+    pop x from worklist
+    for each variable y defined using x:
+      compute value for y using value of x
+      store[y] = updated value
+      if y's value changed: add y to worklist
+  ```
+
+## dealing with pointers
+
+- all of the examples i've given have contained _no_ pointers. what if they did have pointers? there are basically two options.
+
+- option 1 (the option compilers use, like gcc and llvm): don't allow address-taken variables; any source-level address-taken variable is converted into a pointer instead. do SSA only for the program variables, not for the address-taken objects.
+
+    + example:
+
+      BEFORE
+      ```
+      x:int = $copy 0
+      y:int* = $addrof x:int
+      z:int = x:int
+      ```
+
+      AFTER
+      ```
+      x:int* = $alloc
+      $store x:int* 0
+      y:int* = x:int*
+      z:int = $load x:int*
+      ```
+
+    + people generally just call this SSA as usual, but in terms of analysis i like to call it "partial SSA" because only top-level variables are really in SSA form; anything on the heap is not.
+
+- option 2 (can be useful, but not the common choice): do a pointer analysis; treat every store as a def and every load as a use of the appropriate address-taken objects and compute SSA as normal.
+
+    + the points-to sets can be large, and the pointer analysis is a "may point-to" analysis, so there can be many spurious def-use edges in this version.
+
+    + still useful: this is one of the techniques that i used to scale flow-sensitive pointer analysis to make it 100x more scalable.
