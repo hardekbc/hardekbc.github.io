@@ -369,9 +369,9 @@
 
     + i've designed a "stripped-down" version of LLVM IR, which is what we'll use in this class
 
-- example cflat program: [show `example.cb`]
+- example cflat program: [show `example.cb` (should be in one-note)]
 
-- corresponding lir program: [show `example.lir`; CFG format explained soon (intro to DFA)]
+- corresponding lir program: [show `example.lir` (should be in one-note); CFG format explained soon (intro to DFA)]
 
 # intro to dataflow analysis (DFA)
 ## the basics
@@ -533,7 +533,7 @@
        z = $arith div x y
        $jump bb2
 
-  bb4: $ret x:int
+  bb4: $ret x
   ```
 
 ### EXAMPLE 3
@@ -790,14 +790,14 @@
 - [do MFP parity analysis; have students do MFP signedness analysis as exercise]
 
   ```
-    let x:int = input(), y:int = -2, z:int = 0;
-    while (x < 10) {
+  let x:int = input(), y:int = -2, z:int = 0;
+  while (x < 10) {
       x = x + 1;
       y = y - 2;
       z = z + 1;
-    }
-    z = y + z;
-    return z;
+  }
+  z = y + z;
+  return z;
   ```
 
   CFG (draw):
