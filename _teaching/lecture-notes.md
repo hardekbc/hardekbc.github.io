@@ -3,13 +3,7 @@
 
 - update lecture notes
 
-    - for introduction to DFA:
-
-        - really what i should do is to split things up differently: first cover signs and reaching definitions for programs without pointers (this covers 80% of the assignment points), then cover pointers but no pointer arguments, then pointer arguments. basically, mirror the way the assignment is set up
-
-        - maybe i can modify the lecture to replace just enumerating abstract semantics: have example programs and go through them live with student help, then generalize from each statement's specifics to the general rules...that is, make the connection between the abstract semantics and the analysis more clear
-
-        - maybe abbreviate the math definitions and theorems for DFA; instead of building up gradually i could just go straight to lattices and kleene's theorem
+    - for DFA, maybe abbreviate the math definitions and theorems for DFA; instead of building up gradually i could just go straight to lattices and kleene's theorem
 
     - for constraint-based analysis i could speed things up by skipping the general constraint language and going straight to inclusion constraints (just mention that we can make more complicated languages but it quickly becomes undecidable)
 
@@ -63,7 +57,7 @@
 
 ## reminders for myself
 
-- when going over analysis details in lecture, maybe make it an exercise first then go over it myself (something to make the lecture more interactive and make the students think)
+- when going over analysis details in lecture, make it an exercise first then go over it myself (something to make the lecture more interactive and make the students think)
 
 - remind students that they can answer a lot of their own questions about output format and analysis behavior for the assignments by using the solution that i provide
 
@@ -71,7 +65,7 @@
 
 ## lecture timing
 
-- week 1.1: ???
+- week 1.1: through first half of `intro to dfa` -> `the basics` -> `high-level idea`; stopped 20 minutes early
 - week 1.2: ???
 - week 2.1: ???
 - week 2.2: ???
@@ -604,9 +598,9 @@
     + sign abstract domain: sign analysis
     + etc...
 
-- note that the precision of the answer that we get from the analysis is bounded by the precision of the abstract domain we use. also note that different abstract domains can be non-comparable in terms of precision (as are parity and signedness).
+- note that the precision of the answer that we get from the analysis is bounded by the precision of the abstract domain we use. also note that different abstract domains can be non-comparable in terms of precision (as are parity and signedness)
 
-    + there is a whole spectrum of possible abstract domains ranging from very imprecise but very fast to extremely precise but intractable, and many points in-between. there has been a lot of work in the field of program analysis designing many different abstract domains with different tradeoffs.
+    + there is a whole spectrum of possible abstract domains ranging from very imprecise but very fast to extremely precise but intractable, and many points in-between; there has been a lot of work in the field of program analysis designing many different abstract domains with different tradeoffs
 
 - what if we don't know which partition a value fits into? for example, `x = input()`: we don't know the value of `x` at all
 
@@ -627,7 +621,14 @@
 - we also need a way to map concrete values into the corresponding abstract values, and it can be useful mathematically to have the reverse mapping too:
 
     + α: Int -> Int#
+
+        - α for sign: α(x) = pos if x is positive, neg is x is negative, zero if x is 0
+        - α for parity: α(x) = Even if x is even, Odd if x is odd
+
     + γ: Int# -> 𝒫(Int)
+
+        - γ for sign: γ(x) = { n | n > 0 } if x is pos, { n | n < 0 } if x is neg, { 0 } if x is zero
+        - γ for parity: γ(x) = { n | n % 2 = 0 } if x is Even, { n | n % 2 = 1 } if x is Odd
 
     + note that γ(α(v)) should be a set that contains v; that's what makes the abstract domain an overapproximation
     
@@ -761,13 +762,13 @@
 
     + we could, for example, assign ⊤ to all variables, but this wouldn't be very useful
 
-    + intuitively, this approach will merge the abstract values along different paths _before_ propagating them further, rather than keeping each path distinct and only merging them at the end
+    + intuitively, this approach will join the abstract values along different paths _before_ propagating them further, rather than keeping each path distinct and only joining them at the end
 
     + [take same example as for MOP and show the difference with MFP]
 
 - polynomial time complexity (assuming abstract domain and transfer functions have the correct properties)
 
-- worklist algorithm for computing MFP:
+- generic worklist algorithm for computing MFP:
 
       ```
       GIVEN: CFG as a set of basic blocks
@@ -777,7 +778,7 @@
 
       while worklist isn't empty:
         pop block from worklist
-        execute block using abstract semantics (drawing values from abstract store)
+        execute block using abstract semantics (modifying the abstract store as appropriate)
         if terminal instruction is a jump, branch, or call:
           take final abstract store and join it with the abstract store for beginning of each target block
           if the abstract store for the target block has changed, add the target block to worklist
@@ -870,92 +871,336 @@
 
     + for distributive analyses MOP = MFP; for non-distributive domains MOP ⊑ MFP (i.e., MOP is more precise)
 
-# ===== OLD ============================================================================
+# the complete sign analysis
+## what we need
 
-# defining the full signedness analysis
+- the abstract domain we're using to replace concrete values
+
+- the abstract semantics (aka transfer functions) for each instruction to operate on the abstract domain
+
+- the MFP worklist algorithm (this is always the same for all DFA analyses)
+
+## reminder
+
+- we're doing an intraprocedural analysis, so when processing a call we'll conservatively assume that it could have done anything instead of actually analyzing the callee function
+
+    - this also means that we need to treat globals conservatively since they could be modified by other functions that we aren't analyzing (callee or caller)
+
+- we're handling pointers conservatively, so when processing a pointer access we'll assume that it could access anything of the appropriate type instead of actually analyzing what things the pointers may actually point to
+
+- we'll be lifting each of these restrictions later in the quarter
+
 ## abstract domain
 
-- the signedness domain we've been using (BOT, TOP, 0, POS, NEG); the abstract store will map from variables to their abstract value.
+- integer abstract domain: ⊥ <= {pos, neg, zero} <= ⊤
 
-## abstract transfer functions
+    - ⊥ ⊔ X = X for any X
+    - ⊤ ⊔ X = ⊤ for any X
+    - X ⊔ X = X for any X
+    - pos ⊔ neg, pos ⊔ zero, neg ⊔ zero = ⊤
 
-- [note that there are ways to be more precise, e.g., (1) for store, merge op's abstract value with address-taken variables instead of just using TOP; (2) for store and icall, tracking which variables have actually been address-taken by that point in the program and only setting those; (3) tracking the definedness of pointers for store, load, icall, and [i]call arguments and ignoring ones that are BOT; etc. these all revolve around being more precise about pointers, which we'll actually handle by doing pointer analysis coming up.]
+- pointer abstract domain: since we're handling pointers conservatively we don't need one
 
-- [for all instructions with lhs, ignore them if the type of lhs is not integer; for $store ignore it if the type of the operand is not integer]
+- the abstract store will map integer-typed variables to elements of the integer abstract domain
 
-- `lhs = $arith <operation> op1 op2`
+    - to make things a little simpler, we won't include any variables that map to ⊥
+    
+    - when looking up a variable in the store, if it isn't there then we know the value must be ⊥
 
-    + translate op1, op2 to abstract values (using alpha or abstract store)
-    + apply abstract transfer function
-    + update store to map lhs to result
+    - to join two input stores to get a new store:
+    
+        - the new store will have all variables that are in either input store
+        - if the variable is only in one of the input stores its value will be the same as in that store
+        - if the variable is in both stores its value will be the join of the values in the two stores
 
-- `lhs = $cmp <relation> op1 op2`
+## abstract semantics
 
-    + if the operands are not integers, set lhs to T
-    + otherwise same as $arith
+- [have the students try to come up with the abstract transfer functions for the instructions before giving the solution]
 
-- `lhs = $phi(ops...)`
+### prep
 
-    + merge abstract values of all arguments to the phi function
-    + update store to map lhs to result
+- compute the set of integer-typed global variables; call this `global_ints`
 
-- `lhs = $copy op`
+- compute the set of integer-typed address-taken local variables by inspecting the function for `$addrof` instructions; call this `addrof_ints`
 
-    + update store to map lhs to abstract value of op
+    - `addrof_ints` should also include everything in `global_ints`, because a global could have had its address taken in some other function
 
-- `lhs = $load src_ptr`
+### non-pointer, non-call related instructions
 
-    + update store to map lhs to TOP
+- `x = $copy op`
 
-- `$store dst_ptr op`
+    - if `x` is a pointer then ignore this instruction
+    - translate `op` to abstract value using α or store
+    - update store to map `x` to result
 
-    + update store to map all integer-typed address-taken variables to TOP
+- `x = $arith <aop> op1 op2`
 
-- `lhs = $select op1 op2 op3`
+    - translate `op1`, `op2` to abstract values using α or store
+    - apply abstract transfer function (`add` given earlier; rest left as exercise)
+    - update store to map `x` to result
 
-    + if op1 is BOT, ignore instruction
-    + if op1 is + or -, update store to map lhs to abstract value of op2
-    + if op1 is 0, update store to map lhs to abstract value of op3
-    + if op1 is TOP, update store to map lhs to merge of op2 and op3 abstract values
+- `x = $cmp <rop> op1 op2`
 
-- `lhs = $call <function>(ops...)`
+    - if `op1`, `op2` are not integer-typed then set `x` to T
+    - otherwise same as `$arith` (`lt` abstract semantics given earlier; rest left as exercise)
 
-    + if there is any argument that is a pointer (directly or indirectly) to an integer-type, update store to map all integer-typed address-taken variables to TOP
-    + if lhs is integer-typed, update store to set lhs to TOP
+- `$jump <bb>`
 
-- `lhs = $icall <pointer>(ops...)`
+    - propagate store to `<bb>`
 
-    + same as $call
+- `$branch op <bb1> <bb2>`
 
-- `$jump <label>`
+    - translate `op` to abstract value
+    - if value is in {pos, neg} propagate store to `<bb1>`
+    - if value is zero propagate store to `<bb2>`
+    - else propagate store to both `<bb1>` and `<bb2>`
 
-    + propagate abstract store to <label>
+### EXAMPLE
 
-- `$branch op <label1> <label2>`
+- [have students work through it first, then go over it]
 
-    + if abstract value of op includes + or -, propagate abstract store to <label1>
-    + if abstract value of op includes 0, propagate abstract store to <label2>
-    + note that depending on the abstract value of op, we may propagate the abstract store only to <label1>, only to <label2>, or to both
+- cflat
 
-- we can ignore:
+  ```
+  fn foo(p:int) -> int {
+    let x:int = -2, y:int = 2;
+    if p < x {
+        p = -p;
+        x = -x;
+    }
+    else if p > y {
+        p = p + y;
+    }
+    return x + y;
+  }
+  ```
 
-    + `$ret` (because it doesn't do anything in an intraprocedural analysis)
+- lir:
 
-    + `$addrof`, `$alloc`, `$gep` (because they only operate on pointers and we're ignoring pointers)
+  ```
+  fn foo(p:int) -> int {
+  let _t1:int, _t2:int, _t3:int, _t4:int, _t5:int, _t6:int, _t7:int, x:int, y:int
 
-## MFP
+  entry:
+    _t1 = $arith sub 0 2
+    x = $copy _t1
+    y = $copy 2
+    _t2 = $cmp lt p x
+    $branch _t2 bb2 bb3
 
-- if you're using my C++ infrastructure, you'll want to use VarPtr_t to reference variables and BbPtr_t to reference basic blocks.
+  bb1:
+    _t7 = $arith add x y
+    $ret _t7
 
-- use the standard worklist algorithm:
+  bb2:
+    _t3 = $arith sub 0 p
+    p = $copy _t3
+    _t4 = $arith sub 0 x
+    x = $copy _t4
+    $jump bb1
 
-    + initialize empty abstract store for beginning of entry block (if looking up a variable that doesn't currently exist in the store, assume the value is BOT)
+  bb3:
+    _t5 = $cmp gt p y
+    $branch _t5 bb5 bb4
 
-    + initialize worklist with entry basic block
+  bb4:
+    $jump bb1
 
-    + merging two stores: merge the values for each variable in the two stores (again, if a variable doesn't exist assume its value is BOT)
+  bb5:
+    _t6 = $arith add p y
+    p = $copy _t6
+    $jump bb4
+  }
+  ```
 
-- note that for the initial abstract stores of entry blocks for functions with integer parameters, those parameters should have the value TOP (we ignore non-integer parameters).
+### pointer-related instructions
+
+- `x = $load y`
+
+    - if `x` is a pointer then ignore this instruction
+    - update store to set `x` to ⊤
+
+- `$store x op`
+
+    - if `op` is a pointer then ignore this instruction
+    - translate `op` to abstract value
+    - for each variable `v` in `addrof_int`, update store to map `v` to the join of its current value and the value of `op`
+
+- `x = $alloc op [id]`
+- `x = $addrof y`
+- `x = $gep y op`
+- `x = $gfp y field`
+
+    - these always produce pointers, which we aren't tracking so we can ignore these instructions
+
+### EXAMPLE
+
+- [have students work through it first, then go over it]
+
+- cflat
+
+  ```
+  let g1: int, g2:&int;
+
+  fn foo(p:int, q:&int) -> int {
+    let x:int = 0, y:int = -2;
+    g1 = 4;
+    *q = 12;
+    y = *q;
+    q = &x;
+    return x + y;
+  }
+  ```
+
+- lir
+
+  ```
+  g1:int
+  g2:&int
+
+  fn foo(p:int, q:&int) -> int {
+  let _t1:int, _t2:int, _t3:&int, _t4:int, x:int, y:int
+
+  entry:
+    x = $copy 0
+    _t1 = $arith sub 0 2
+    y = $copy _t1
+    g1 = $copy 4
+    $store q 12
+    _t2 = $load q
+    y = $copy _t2
+    _t3 = $addrof x
+    q = $copy _t3
+    _t4 = $arith add x y
+    $ret _t4
+  }
+  ```
+
+### call-related instructions
+
+- `[x =] $call_ext <id>(op1, ...)`
+- `[x =] $call_dir <id>(op1, ...)`
+- `[x =] $call_idr fop(op1, ...)`
+
+    - [these are all treated the same by this analysis]
+
+    - for all `v` in `global_ints`, update store to map `v` to ⊤
+    - if `x` is integer-typed, update store to map `x` to ⊤
+    - if any argument is a pointer that can reach an int, for all `v` in `addrof_ints`, update store to map `v` to ⊤
+
+- `$ret [op]`
+
+    - since we're doing intraprocedural analysis we don't care about the caller and so we can ignore this instruction
+
+### EXAMPLE
+
+- [have students work through it first, then go over it]
+
+- cflat
+
+  ```
+  extern bar(&int) -> int;
+  extern baz() -> int;
+
+  let g1:int, g2:&int;
+
+  fn foo(p:int) -> int {
+    let x:int = 0, y:int = -2, z:int = 4;
+    g2 = &x;
+    y = bar(g2);
+    x = 0;
+    g1 = 12;
+    z = baz();
+    return x + y + z;
+  }
+  ```
+
+- lir
+
+  ```
+  g1:int
+  g2:&int
+
+  extern bar:(&int) -> int
+  extern baz:() -> int
+
+  fn foo(p:int) -> int {
+  let _t1:int, _t2:&int, _t3:int, _t4:int, _t5:int, _t6:int, x:int, y:int, z:int
+
+  entry:
+    x = $copy 0
+    _t1 = $arith sub 0 2
+    y = $copy _t1
+     z = $copy 4
+    _t2 = $addrof x
+    g2 = $copy _t2
+    _t3 = $call_ext bar(g2)
+    y = $copy _t3
+    x = $copy 0
+    g1 = $copy 12
+    _t4 = $call_ext baz()
+    z = $copy _t4
+    _t5 = $arith add x y
+    _t6 = $arith add _t5 z
+    $ret _t6
+  }
+  ```
+
+## MFP algorithm
+
+- standard worklist algorithm for all DFA
+
+### setup
+
+- create a map `bb2store` from basic block to abstract store, initially empty
+
+    - this map contains the _entry abstract store_ for that basic block: the abstract values of all variables at the point execution reaches that basic block
+
+    - it will be updated by the analysis as it executes
+
+- create an initial abstract store that maps integer-typed function parameters and integer-typed globals to ⊤
+
+    - no local has a value yet so they're all ⊥ (i.e., not contained in the store)
+
+    - the parameters could have been passed any value as arguments so they're ⊤
+
+    - globals could have been set to anything by the callers of the function so they're ⊤
+
+- insert a mapping from the entry basic block to the initial abstract store
+
+- create a list `worklist` that will contain basic blocks, initially empty
+
+    - this can be a queue, stack, priority queue, etc; it doesn't matter for correctness though it does affect performance
+
+- insert the entry basic block into `worklist`
+
+### analysis
+
+- while the worklist isn't empty:
+
+    - pop a block from the worklist
+
+    - look up the block's abstract store in `bb2store` and _create a copy_ (we shouldn't update the _entry_ values while processing the block)
+
+    - execute the instructions in the basic block using the abstract semantics, updating the copy of the abstract store as appropriate
+
+    - at the terminal, for each target basic block:
+
+        - join the current abstract store with the entry abstract store of the target (from `bb2store`)
+
+        - if the target's entry store changed, put the target on the worklist
+
+### finishing up
+
+- once the worklist algorithm is done we have a map from each basic block to the entry store for that block
+
+- what we often want is a map from each basic block to the _final_ store for that block
+
+    - we could have kept track of this during the analysis but it would be redundant work, easiest to compute it once at the end
+
+    - just iterate through each basic block, take its entry store, execute the block's instructions to update the store, then save the result
+
+# ===== OLD ============================================================================
 
 # second-order DFA analyses
 ## basic idea
