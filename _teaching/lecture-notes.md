@@ -880,15 +880,59 @@
 
 - the MFP worklist algorithm (this is always the same for all DFA analyses)
 
-## reminder
+## MFP algorithm
 
-- we're doing an intraprocedural analysis, so when processing a call we'll conservatively assume that it could have done anything instead of actually analyzing the callee function
+- standard worklist algorithm for all DFA
 
-    - this also means that we need to treat globals conservatively since they could be modified by other functions that we aren't analyzing (callee or caller)
+### setup
 
-- we're handling pointers conservatively, so when processing a pointer access we'll assume that it could access anything of the appropriate type instead of actually analyzing what things the pointers may actually point to
+- create a map `bb2store` from basic block to abstract store, initially empty
 
-- we'll be lifting each of these restrictions later in the quarter
+    - this map contains the _entry abstract store_ for that basic block: the abstract values of all variables at the point execution reaches that basic block
+
+    - it will be updated by the analysis as it executes
+
+- create an initial abstract store that maps integer-typed function parameters and integer-typed globals to ⊤
+
+    - no local has a value yet so they're all ⊥ (i.e., not contained in the store)
+
+    - the parameters could have been passed any value as arguments so they're ⊤
+
+    - globals could have been set to anything by the callers of the function so they're ⊤
+
+- insert a mapping from the entry basic block to the initial abstract store
+
+- create a list `worklist` that will contain basic blocks, initially empty
+
+    - this can be a queue, stack, priority queue, etc; it doesn't matter for correctness though it does affect performance
+
+- insert the entry basic block into `worklist`
+
+### analysis
+
+- while the worklist isn't empty:
+
+    - pop a block from the worklist
+
+    - look up the block's abstract store in `bb2store` and _create a copy_ (we shouldn't update the _entry_ values while processing the block)
+
+    - execute the instructions in the basic block using the abstract semantics, updating the copy of the abstract store as appropriate
+
+    - at the terminal, for each target basic block:
+
+        - join the current abstract store with the entry abstract store of the target (from `bb2store`)
+
+        - if the target's entry store changed, put the target on the worklist
+
+### finishing up
+
+- once the worklist algorithm is done we have a map from each basic block to the entry store for that block
+
+- what we often want is a map from each basic block to the _final_ store for that block
+
+    - we could have kept track of this during the analysis but it would be redundant work, easiest to compute it once at the end
+
+    - just iterate through each basic block, take its entry store, execute the block's instructions to update the store, then save the result
 
 ## abstract domain
 
@@ -916,6 +960,16 @@
 ## abstract semantics
 
 - [have the students try to come up with the abstract transfer functions for the instructions before giving the solution]
+
+### reminder
+
+- we're doing an intraprocedural analysis, so when processing a call we'll conservatively assume that it could have done anything instead of actually analyzing the callee function
+
+    - this also means that we need to treat globals conservatively since they could be modified by other functions that we aren't analyzing (callee or caller)
+
+- we're handling pointers conservatively, so when processing a pointer access we'll assume that it could access anything of the appropriate type instead of actually analyzing what things the pointers may actually point to
+
+- we'll be lifting each of these restrictions later in the quarter
 
 ### prep
 
@@ -1146,59 +1200,6 @@
   }
   ```
 
-## MFP algorithm
-
-- standard worklist algorithm for all DFA
-
-### setup
-
-- create a map `bb2store` from basic block to abstract store, initially empty
-
-    - this map contains the _entry abstract store_ for that basic block: the abstract values of all variables at the point execution reaches that basic block
-
-    - it will be updated by the analysis as it executes
-
-- create an initial abstract store that maps integer-typed function parameters and integer-typed globals to ⊤
-
-    - no local has a value yet so they're all ⊥ (i.e., not contained in the store)
-
-    - the parameters could have been passed any value as arguments so they're ⊤
-
-    - globals could have been set to anything by the callers of the function so they're ⊤
-
-- insert a mapping from the entry basic block to the initial abstract store
-
-- create a list `worklist` that will contain basic blocks, initially empty
-
-    - this can be a queue, stack, priority queue, etc; it doesn't matter for correctness though it does affect performance
-
-- insert the entry basic block into `worklist`
-
-### analysis
-
-- while the worklist isn't empty:
-
-    - pop a block from the worklist
-
-    - look up the block's abstract store in `bb2store` and _create a copy_ (we shouldn't update the _entry_ values while processing the block)
-
-    - execute the instructions in the basic block using the abstract semantics, updating the copy of the abstract store as appropriate
-
-    - at the terminal, for each target basic block:
-
-        - join the current abstract store with the entry abstract store of the target (from `bb2store`)
-
-        - if the target's entry store changed, put the target on the worklist
-
-### finishing up
-
-- once the worklist algorithm is done we have a map from each basic block to the entry store for that block
-
-- what we often want is a map from each basic block to the _final_ store for that block
-
-    - we could have kept track of this during the analysis but it would be redundant work, easiest to compute it once at the end
-
-    - just iterate through each basic block, take its entry store, execute the block's instructions to update the store, then save the result
 
 # ===== OLD ============================================================================
 
