@@ -11,37 +11,7 @@
 
 - provide documentation on cflat programs for the students? they don't really need to write cflat programs, but it might be nicer than writing lir directly
 
-- decide overall assignment grading strategy
-
-    - will have different test suites testing different language features; should i assign a percentile grade based on how many tests in the suite pass or only give points if the entire test suite passes?
-    
-        - this might be influenced by how many test suites there are for each assignment, because having only a few could make it too granular
-
-        - on the other hand, having lots of tests in the test suite but only a few that expose a certain bug would make that bug not worth many points if we use the percentage of tests passed
-
-    - i might want to mix hand-crafted with randomly-generated tests; if so then maybe the handcrafted ones should be worth more
-
-    - the benefit of using random tests is that i can display the failing test to the student; if i use handcrafted tests too then maybe i should use some refactored version to display to the student on failing the test
-
-        - as a reminder, in the past i used only handcrafted tests and did not display them to the student when they failed, the only thing the student gets is the test suite it belonged to. the problem with this scheme is that if the student can't replicate the failure using their own tests (comparing against my solution on CSIL) then they come to me for help and it's hard to give them guidance.
-
-        - the drawback of random tests is that i need to ensure they aren't trivial, i.e., they actually test something interesting; also it's pretty much impossible to focus a single test on a single aspect of the analysis (but using the different test suites should mitigate this problem)
-
-- prep assignment 1
-
-    - need to decide what it is exactly
-
-    - create autograder
-
-        - grading scheme
-        - test suites
-        - solution
-
-- prep rest of assignments
-
-    - for all assignments, maybe explicitly lay out for them how to approach the assignment: take each test suite in turn and implement enough of the analysis to pass that test suite, then iterate with the next test suite (most build on the previous suites)
-
-    - for interprocedural analyses (pointer analysis, taint analysis) need to specify that the output variable names are qualified by the function they were defined in
+- for interprocedural analyses (pointer analysis, taint analysis) need to specify that the output variable names are qualified by the function they were defined in
 
 - can i create a single autograder for all assignments?
 
@@ -66,7 +36,7 @@
 ## lecture timing
 
 - week 1.1: through first half of `intro to dfa` -> `the basics` -> `high-level idea`; stopped 20 minutes early
-- week 1.2: ???
+- week 1.2: through `intro to dfa` -> `abtract semantics`; stopped 10 minutes early
 - week 2.1: ???
 - week 2.2: ???
 - week 3.1: ???
@@ -86,43 +56,34 @@
 - week 10.1: ???
 - week 10.2: ???
 
-## assignments
-
-### assign-0
-
-- ungraded, this is just to prep for the remaining assignments
-
-- feel free to share implementations between groups using a common implementation language
-
-- read in a lir program and output a count of various statistics (see comments in assign-0.rs)
-
-### TODO: assign-1
-
-### TODO: assign-2
-
-### TODO: assign-3
-
-### TODO: assign-4
-
-### TODO: assign-5
-
 ## assignment timing
 
 - week 1.1: assign-0 out (parsing LIR, not graded)
 
-- week 2.1: assign-1 out (???)
+- week 2.1: assign-1 out (constants, intervals)
 
-- week 4.1: assign-1 in, assign-2 out (???)
+- week 4.1: assign-1 in, assign-2 out (reaching defs no pointer info, control analysis)
 
-- week 6.1: assign-2 in, assign-3 out (???)
+- week 6.1: assign-2 in, assign-3 out (andersen-style pointer analysis)
 
-- week 8.1: assign-3 in, assign-4 out (???)
+- week 8.1: assign-3 in, assign-4 out (slicing: reaching defs with pointer info, pdg)
 
-- week 10.1: assign-4 in, assign-5 out (???)
+- week 9.2: assign-4 in, assign-5 out (context-sensitive taint analysis)
 
 - finals: assign-5 in
 
-## things for future course offerings
+## thoughts for future course offerings
+### lectures
+
+- the initial example for sign analysis (`intro to DFA` -> `the basics` -> `high-level example`) confuses students because it refines the abstract values based on branch conditions and recognizes arithmetic identities like `x - x = 0`; i need to rewrite it to remove these elements and make it just like the version described later
+
+- there's a lot of redundancy between `intro to DFA` -> `the basics` and `intro to DFA` -> {`abstract domains`, `abstract semantics`}, i should collapse these together
+
+- in `intro to DFA` -> `abstract semantics` i had the students fill in the tables for addition and less-than, which worked great but came really late in the lecture; when i integrate the sections per the above note i should try to move the student interaction part earlier
+
+- in general for `intro to DFA` i feel like i'm throwing a lot of abstract concepts at them, maybe too fast and without sufficient context; is there a way for me to get to the actual analysis process more quickly before going into the ideas of abstract domains, abstract semantics, etc? maybe it would be sufficient to preface this stuff with a concrete program example and set of sign invariants that i want to infer, just to set the stage?
+
+### additional materials
 
 - create a tool to automatically log an analysis execution and play it back for the students, in order to more easily go through examples in lecture
 
@@ -764,68 +725,21 @@
 
     + intuitively, this approach will join the abstract values along different paths _before_ propagating them further, rather than keeping each path distinct and only joining them at the end
 
-    + [take same example as for MOP and show the difference with MFP]
+    + [take same diamond example as for MOP and show the difference with MFP]
 
 - polynomial time complexity (assuming abstract domain and transfer functions have the correct properties)
 
-- generic worklist algorithm for computing MFP:
-
-      ```
-      GIVEN: CFG as a set of basic blocks
-
-      create a map from each block to an abstract store mapping each variable to ⊥
-      initialize worklist with entry block
-
-      while worklist isn't empty:
-        pop block from worklist
-        execute block using abstract semantics (modifying the abstract store as appropriate)
-        if terminal instruction is a jump, branch, or call:
-          take final abstract store and join it with the abstract store for beginning of each target block
-          if the abstract store for the target block has changed, add the target block to worklist
-      ```
+- there is a standard worklist algorithm for computing the MFP, which we'll go over shortly
 
 - remember that fixpoints don't necessarily exist (and if they do there isn't necessarily a least fixpoint); later we'll worry about how to guarantee a least fixpoint exists and that we can find it (you guessed it: we need math)
 
-### EXAMPLE 1
+### EXAMPLE
 
-- [do MFP parity analysis; have students do MFP signedness analysis as exercise]
+- to get an intuitive understanding of the difference between MOP and MFP, consider the following example
 
-  ```
-  let x:int = input(), y:int = -2, z:int = 0;
-  while (x < 10) {
-      x = x + 1;
-      y = y - 2;
-      z = z + 1;
-  }
-  z = y + z;
-  return z;
-  ```
+    - since there are no loops we don't actually need a fixpoint algorithm, just execute in topological order of the CFG (i.e., execute every predecessor of a basic block before executing that basic block)
 
-  CFG (draw):
-
-  ```
-  bb1: x = $call_ext input()
-       y = $copy -2
-       z = $copy 0
-       $jump bb2
-
-  bb2: tmp = $cmp lt x 10
-       $branch tmp bb3 bb4
-
-  bb3: x = $arith add x 1
-       y = $arith sub y 2
-       z = $arith add z 1
-       $jump bb2
-
-  bb4: z = $arith add y z
-       $ret z
-  ```
-
-### EXAMPLE 2
-
-- to get an intuitive understanding of the difference between MOP and MFP, consider the following example:
-
-- [if time have students do MFP parity analysis, otherwise do it myself; either way then show MOP parity analysis]
+- [show MFP sign analysis; have students do MFP parity analysis; show MOP parity analysis (more precise than MFP parity)]
 
   ```
   let x:int = 0, y:int = input(), z:int = input();
@@ -863,15 +777,13 @@
        $ret x
   ```
 
-- [show MOP paths (exponential) then MFP paths (linear), then show that using parity domain MOP is more precise than MFP]
-
-- an analysis is _distributive_ if, for transfer function F, join(F(x), F(y)) = F(join(x, y))
+- is MFP always less precise than MOP? NO. an analysis is _distributive_ if, for transfer function F, join(F(x), F(y)) = F(join(x, y))
 
     + in other words, it doesn't matter if we merge abstract values before applying the transfer function or afterwards
 
     + for distributive analyses MOP = MFP; for non-distributive domains MOP ⊑ MFP (i.e., MOP is more precise)
 
-# the complete sign analysis
+# defining an intraprocedural, pointer-conservative integer-based analysis
 ## what we need
 
 - the abstract domain we're using to replace concrete values
@@ -886,7 +798,7 @@
 
 ### setup
 
-- create a map `bb2store` from basic block to abstract store, initially empty
+- create a map `bb2store` from basic block to abstract store at entry, initially empty
 
     - this map contains the _entry abstract store_ for that basic block: the abstract values of all variables at the point execution reaches that basic block
 
@@ -936,12 +848,26 @@
 
 ## abstract domain
 
-- integer abstract domain: ⊥ <= {pos, neg, zero} <= ⊤
+- sign integer abstract domain: ⊥ <= {pos, neg, zero} <= ⊤
 
     - ⊥ ⊔ X = X for any X
     - ⊤ ⊔ X = ⊤ for any X
     - X ⊔ X = X for any X
     - pos ⊔ neg, pos ⊔ zero, neg ⊔ zero = ⊤
+
+- parity integer abstract domain: ⊥ <= { Even, Odd } <= ⊤
+
+    - ⊥ ⊔ X = X for any X
+    - ⊤ ⊔ X = ⊤ for any X
+    - X ⊔ X = X for any X
+    - Even ⊔ Odd = ⊤
+
+- constants integer abstract domain: ⊥ <= { ..., -1, 0, 1, ... } <= ⊤
+
+    - ⊥ ⊔ X = X for any X
+    - ⊤ ⊔ X = ⊤ for any X
+    - X ⊔ X = X for any X
+    - n1 ⊔ n2 (s.t. n1 ≠ n2) = ⊤
 
 - pointer abstract domain: since we're handling pointers conservatively we don't need one
 
@@ -1009,7 +935,7 @@
     - if value is zero propagate store to `<bb2>`
     - else propagate store to both `<bb1>` and `<bb2>`
 
-### EXAMPLE
+### EXAMPLE (using signs)
 
 - [have students work through it first, then go over it]
 
@@ -1087,7 +1013,7 @@
 
     - these always produce pointers, which we aren't tracking so we can ignore these instructions
 
-### EXAMPLE
+### EXAMPLE (using signs)
 
 - [have students work through it first, then go over it]
 
@@ -1146,7 +1072,7 @@
 
     - since we're doing intraprocedural analysis we don't care about the caller and so we can ignore this instruction
 
-### EXAMPLE
+### EXAMPLE (using signs)
 
 - [have students work through it first, then go over it]
 
@@ -1201,86 +1127,292 @@
   ```
 
 
-# ===== OLD ============================================================================
+# intro to widening
 
-# second-order DFA analyses
-## basic idea
+- given the DFA framework outlined above, we can modularly plug in different abstract domains to get different analyses (e.g., sign, parity, constants, etc); however we can't just use any abstract domain and still guarantee a computable analysis
 
-- we've been looking at so-called 'first-order analysis': analyses where we care about _values_ at a particular point in the program (i.e., CFG node). a 'second-order analysis' asks questions about program _paths_ (sequence of execution states), not individual program states.
+- example: the integer interval abstract domain
 
-- EXAMPLE: a taint analysis might ask 'how did this string get to this sensitive system call? in particular, did it get here from user input without being sanitized?' this isn't a question we can answer just by looking at an abstract value at a particular CFG node; we have to know the execution history that brought the value to that node.
+    - elements: `⊥` and `[a, b]` s.t. `a` ∈ 𝐙 ∪ {-∞} and `b` ∈ 𝐙 ∪ {∞} and `a` <= `b` (note that ⊤ = [-∞, ∞])
 
-- how do we answer these questions? by abstracting program _traces_ just like we abstract program _values_
+    - γ(⊥) = {}
+    - γ([a, b]) = { n ∈ 𝐙 | n >= a and n <= b }
 
-## EXAMPLE: reaching definitions
+    - [maybe have the students figure out the operations below]
 
-- problem statement: for each program point, for each variable, what are the set of defs (i.e., declaration or assignments) of that variable that may "reach" this program point? "reach" means there is some path from the def to the program point that does not definitely redefine that variable
+    - JOIN
+    - ⊥ ⊔ X = X ⊔ ⊥ = X
+    - [a1, b1] ⊔ [a2, b2] = [min(a1, b1), max(a2, b2)]
 
-- this information allows us to trace how values flow through the program and is a useful foundation for more elaborate analyses.
+    - ADD
+    - ⊥ + X = ⊥
+    - [a1, b1] + [a2, b2] = [a1 + a2, b1 + b2]
 
-- notice that this is a "may" analysis: we're asking what's possibly true (i.e., not definitely false).
+    - LTE
+    - ⊥ <= X, X <= ⊥ = ⊥
+    - [a1, b1] <= [a2, b2] =
+        - [0, 0] if a1 > b2
+        - [1, 1] if b1 < a2
+        - [0, 1] otherwise
 
-### example program
+- this is clearly more precise than the constants abstract domain, because it contains the constants abstract domain inside of it ([-1, -1], [0, 0], [1, 1], etc)
+
+- EXAMPLE 1: let's try it out and see what happens
 
   ```
-  int x, y, z = input();
-  x = 4;
-  y = 6;
+  let x:int = 0, y:int = input();
+  while x <= y {
+    x = x+1;
+  }
+  return x;
+  ```
+
+  ```
+  entry:
+    x = $copy 0
+    y = $call_ext input()
+    $jump while_hdr
+
+  while_hdr:
+    t = $cmp lte x y
+    $branch t while_body exit
+
+  while_body:
+    x = $arith add x 1
+    $jump while_hdr
+
+  exit:
+    $ret x
+  ```
+
+- the analysis never terminates! what went wrong?
+
+    - this is why we need to study the mathematical structures behind DFA that give us the tools to determine whether a given abstract domain and abstract semantics results in a computable analysis
+
+- there is a way to get around this problem, called _widening_
+
+    - if we know that an abstract domain isn't computable but it still has certain properties then we can modify the DFA algorithm to make it computable
+
+    - the key ingredient is something called a _widening operator_ `▿` (there may be many possible such operators for a given analysis with different tradeoffs, the analysis designer needs to create or pick one of them)
+
+    - shortly we'll be looking at the math behind it all to see how this works, but for now we'll just see a practical example
+
+- a widening operator for the integer interval abstract domain (one of many possible widening operators)
+
+    - ⊥ ▿ X = X ▿ ⊥ = X
+    - [a1, b1] ▿ [a2, b2] = [a3, b3] s.t.
+        - a3 = a1 if a1 <= a2, otherwise -∞
+        - b3 = b1 if b1 >= b2, otherwise ∞
+
+- the basic idea is that we use the widening operator instead of join to combine abstract stores
+
+    - this is overly pessimistic and can lose precision unnecessarily because widening is less precise than join
+
+    - where can non-termination actually happen? loops!
+
+    - only apply the widening operator at loop headers, otherwise use join
+
+- [redo previous example, using the widening operator at the loop header]
+
+- small point: how do we identify loop headers in the CFG?
+
+    - just do a post-order labeling on the CFG; if you ever reach a node that you have already visited but not yet labeled then it's a loop header
+
+    - [demo using the previous example's CFG]
+
+- we'll look at when we need widening operators and what makes a valid widening operator shortly when we look at the math behind DFA
+
+- EXAMPLE 2 (exercise for students)
+
+  ```
+  let x:int = 0, y:int = 10, z:int = input();
+  while x - y < z {
+    if x < z {
+        x = x + y;
+    } else {
+        y = y - 1;
+    }
+  }
+  return x + y
+  ```
+
+  ```
+  let x:int, y:int, z:int, t1:int, t2:int, t3:int, t4:int
+
+  entry:
+    x = $copy 0
+    y = $copy 10
+    z = $call_ext input()
+    $jump loop_hdr
+
+  loop_hdr:
+    t1 = $arith sub x y
+    t2 = $cmp lt t1 z
+    $branch t2 if_hdr exit
+
+  if_hdr:
+    t3 = $cmp lt x z
+    $branch t3 if_true if_false
+
+  if_true:
+    x = $arith add x y
+    $jump if_end
+
+  if_false:
+    y = $arith sub y 1
+    $jump if_end
+
+  if_end:
+    $jump loop_hdr
+
+  exit:
+    t4 = $arith add x y
+    $ret t4
+  ```
+
+# second-order DFA
+## basic idea
+
+- we've been looking at so-called 'first-order analysis': analyses where we care about _values_ at a particular point in the program. a 'second-order analysis', in contrast, asks questions about program _paths_ (i.e., execution traces), not individual program states
+
+    - example: a taint analysis might ask 'how did this string get to this sensitive system call? in particular, did it get here from user input without being sanitized?'
+    
+    - this isn't a question we can answer just by looking at the value of a variable at a particular point---we have to know the execution history that brought the value to that point.
+
+- how do we answer these questions?
+
+    - by abstracting program _traces_ just like we abstract program _values_
+
+    - instead of using an abstract value to over-approximate the set of concrete values a variable might have, we use abstract values to over-approximate the set of program paths that the program could take to reach a given location
+
+- the easiest way to understand this idea is to go through some examples
+
+## first analysis example: reaching definitions
+### intro
+
+- problem statement: for each "use" of a variable, what are the set of "defs" of that variable that may "reach" this program point?
+
+    - "use" means that we require the variable's value
+
+    - "def" means definition, i.e., assignment
+
+    - "reach" means there is some path from the def to the use that does not _definitely_ redefine that variable
+
+- this information allows us to trace how values flow through the program and is a useful foundation for more elaborate analyses
+
+    - we wouldn't compute reaching definitions for its own sake, we compute it for the sake of some follow-on analysis or transformation
+
+    - we'll see several examples of such follow-on useful analyses later in the quarter
+
+- notice that this is a "may" analysis: we're asking if it's possible for a def to reach a given use (and over-approximating the exact answer)
+
+- as always for DFA, we need an abstract domain, abstract semantics, and abstract execution (which is the same MFP worklist algorithm as before)
+
+### EXAMPLE 1
+
+- [go through example intuitively, without referring to abstract domain or semantics]
+
+    - for each use of a variable, what defs reach it?
+
+  ```
+  let x:int = 4, y:int = 6, z:int = input();
   if (z) { x = 2; } else { x = 3; y = 3; }
   z := x+y;
   return z;
   ```
 
-  CFG (draw):
-
   ```
-  bb1: z:int = $call input()
-       x:int = $copy 4
-       y:int = $copy 6
-       tmp:int = $cmp neq z:int 0
-       $branch tmp:int if_true if_false
+  bb1: x = $copy 4
+       y = $copy 6
+       z = $call input()
+       tmp = $cmp neq z 0
+       $branch tmp if_true if_false
 
   if_true:
-       x:int = $copy 2
+       x = $copy 2
        $jump if_end
 
   if_false:
-      x:int = $copy 3
-      y:int = $copy 3
+      x = $copy 3
+      y = $copy 3
       $jump if_end
 
   if_end:
-      z:int = $arith add x:int y:int
-      $ret z:int
+      z = $arith add x y
+      $ret z
   ```
 
 ### abstract domain
 
-- remember that our abstract domain is a set of abstract values that represent possible solutions to our analysis.
+- remember that our abstract domain is a set of abstract values that represent possible answers for our analysis
 
-- we want abstract values that represent executation traces...specifically, traces from the beginning of the function to the current point following a path along which a particular variable has (1) been defined at program point X; and (2) has not been redefined at any point between X and now.
+    - for reaching defs, an answer to "what defs reach this use?" is a set of program points where the defs happen
 
-    + example: focusing on variable x in the example program and the point `if_end.0`, the abstract value `x -> {if_true.0, if_false.0}` abstracts the set of traces (starting from the beginning of the function) that define variable x with no intervening redefinitions before getting to `if_end.0`.
+- more precisely, we want abstract values that represent "executation traces"---specifically, traces from the beginning of the function to the current point following a path along which a particular variable has (1) been defined at program point PP; and (2) has not been redefined at any point between PP and now
 
-    + example: focusing on variable y in the example program and the point `if_end.0`, the abstract value `x -> {bb1.2, if_false.1}` abstracts the set of traces (starting from the beginning of the function) that define variable y with no intervening redefinitions before getting to `if_end.0`.
+    - example: focusing on variable `x` in the example program and the point `if_end.0`, the abstract value `x -> {if_true.0, if_false.0}` abstracts the set of traces (starting from the beginning of the function) that define variable `x` with no intervening redefinitions before getting to `if_end.0`
 
-- therefore, an abstract value for some variable v is a set of program points containing definitions of v.
+    - example: focusing on variable `y` in the example program and the point `if_end.0`, the abstract value `x -> {bb1.2, if_false.1}` abstracts the set of traces (starting from the beginning of the function) that define variable `y` with no intervening redefinitions before getting to `if_end.0`
 
-- remember that we need to create an abstract domain s.t. there is an abstract value for all possible concrete answers.
+    - therefore, an abstract value for some variable `v` is a set of program points containing definitions of `v`
 
-    + what is the least precise abstract value? the set of all program points
+    - for LIR programs, we can represent a program point as `<basic block label>`.{`<instruction index>`, `term`}; this uniquely identifies a particular point in a function
 
-    + what is the most precise abstract value? the empty set
+- so an abstract value (i.e., an element of the abstract domain) is a set of program points; what is the entire domain?
 
-    + what is the entire abstract domain? the powerset of the set of all program points, ordered via subset
+- remember that we need to create an abstract domain s.t. there is an abstract value for all possible concrete answers
 
-- L♯ = (P(Stmt), ⊆), ⊔ = ∪
+    - what is the least precise (most over-approximate) abstract value? the set of all program points
 
-    + the elements of the abstract domain are sets of program points
+    - what is the most precise (most under-approximate) abstract value? the empty set
 
-    + they are ordered via subset
+    - what is the entire abstract domain? the powerset of the set of all program points, ordered via subset
 
-    + we can merge abstract values using set union
+- L♯ = (𝒫(PP), ⊆), ⊔ = ∪
+
+    - the elements of the abstract domain are sets of program points
+
+    - they are ordered via subset
+
+    - we can join abstract values using set union
+
+- finally, the abstract store will map objects (variables and allocated objects) to abstract values
+
+    - previously for the first-order integer analyses we only cared about variables, but now we care about defs/uses of anything, not just variables
+
+    - for now we're still going to be conservative with pointers and function calls, so we'll treat the allocated objects very over-approximately
+
+        - TODO: [SEE REACHING DEFS IMPLEMENTATION FOR DETAILS]
+
+    - later we'll see a version of reaching defs that treats them more precisely
+
+### abstract semantics
+
+- TODO: [we'll only care about defs inside this function; external defs of globals and objects reachable from parameters are ignored]
+
+### abstract execution
+
+- [go through previous example again, this time using MFP worklist algorithm]
+
+- this gives us the reaching defs for every program point, now we need to transform it into the reaching defs for every use
+
+    - just "execute" each basic block one more time, and for each instruction look at what variables are used and look them up in the abstract store to find their reaching defs
+
+### EXAMPLE 2
+
+- [have students do this one on their own first]
+
+- TODO: [include some pointers and calls]
+
+  FIXME: PUT IN ONENOTE
+
+## second analysis example: control analysis
+
+- TODO:
+
+# ===== OLD ============================================================================
+
+# second-order DFA analyses
 
 ### abstract transfer functions
 
@@ -1337,37 +1469,7 @@
 
     + what is the abstract value for variable x at the return instruction? `{bb.0, bb.3}`
 
-### MFP
-
-- now we use the same worklist algorithm as before to compute the analysis solution.
-
-- [go through example program]
-
-- [use a solution in addition to the abstract store the same as the actual assignment]
-
 # defining the full reaching defs analysis
-### abstract domain
-
-- abstract store: for each variable, a set of program points (`label.index`)
-
-    + if using my C++ infrastructure: i suggest a map from VarPtr_t to set of InstPtr_t where an InstPtr_t is an alias for `const ir::Instruction*`.
-
-    + if using my C++ infrastructure, defs should be represented as InstPtr_t; for external defs just use nullptr.
-
-        - note that parameters and objects reachable from parameters are defined outside the current function (more discussion below); in our analysis we will consolidate all such objects and just say `external-def` in the printed solution.
-
-- we'll represent other relevant objects using VarPtr_t as well (we didn't have to worry about this for sign analysis because there we only cared about values of variables; here we care about any def/use of anything):
-
-    + $alloc'd objects (create a VarPtr_t for each $alloc instruction, with the name "alloc")
-
-    + struct fields (create a VarPtr_t for each field type [not individual field], with the name "field). for example, there would be one VarPtr_t for all fields of type Int.
-
-    + all of these 'fake' VarPtr_t will count as addressable objects, along with any variables that are operands of a $addrof instruction.
-
-- the actual solution will be a map from each instruction that uses some variables to the set of reaching defs for those variables.
-
-    + if using my C++ infrastructure: i suggest a map from InstPtr_t to set of InstPtr_t
-
 ### abstract transfer functions
 
 - $arith, $cmp, $copy, $phi, $alloc, $gep, $select, $addrof, $ret:
@@ -1411,12 +1513,6 @@
 - $jump, $branch:
 
     + propagate store to target block(s); if the abstract store for the block changes then add to worklist
-
-### MFP
-
-- same worklist algorithm as for sign analysis
-
-- All parameters are defined before entering the function, so the abstract store at the  beginning of the function should map all parameters to `external-def`.
 
 # the math behind DFA
 ## preliminaries
@@ -1715,6 +1811,87 @@ binary relation
                        ⊥
 
 - however, note that the general integer interval lattice is infinite but _not_ noetherian, and thus cannot be used with DFA. there are techniques that would allow us to use non-noetherian lattices safely; these are the realm of abstract interpretation rather than DFA.
+
+# widening redux
+## context
+
+- DFA enforces computability by requiring that abstract domains be noetherian lattices, but this limits the precision of what an analysis can compute
+
+    - remember that the abstract domain defines what solutions an analysis can return; a noetherian lattice may not even be able to express the kind of solution that we want
+
+    - example: the integer interval abstract domain
+
+- we saw that there is a way around this problem that allows us to use non-noetherian abstract domains but still guarantees computability: _widening_
+
+    - previously we looked at it intuitively
+
+    - now let's look at the math
+
+## definition
+
+- recall that while complete lattices with monotone functions are guaranteed to have a fixpoint, the only way we're guaranteed to be able to _find_ the fixpoint is if the lattice is noetherian (i.e., no infinite ascending chains).
+
+    + essentially, if the function is monotone then we can only stay in one place (we've found a fixpoint) or go up the lattice; if the lattice is noetherian we can only go up the lattice a finite number of times before we reach TOP.
+
+- but what if we want to use an abstract domain that isn't noetherian, in order to get greater precision?
+
+    + we've seen two examples already: integer intervals and regular expressions.
+
+- what we want is a way to accelerate/guarantee convergence, i.e., if the normal fixpoint computation is working up along the abstract lattice in a chain, what we need to is leap-frog up that chain past potentially an infinite number of lattice elements.
+
+- solution: _widening_. we replace the lattice join operator with a _widening operator_, then apply the usual worklist algorithm for computing a fixpoint.
+
+    + this comes with a cost: the fixpoint we reach is not guaranteed to be the least fixpoint of the original lattice (or even a fixpoint of the original lattice at all); all we know for sure is that `lfp_orig <= lfp_widened`.
+
+    + the idea is that while we aren't getting as precise an answer as we could be getting for that abstract domain, since the abstract domain itself is more precise than one that is noetherian, hopefully we're getting a more precise answer than we would be getting with that noetherian lattice (this isn't a guarantee, though).
+
+        - example: we need to use widening for integer intervals, but we'll still often get a better solution than using the constant abstract domain.
+
+    + an additional cost is that before, we had a simple checklist for proving our analysis is computable: we have a complete lattice and monotone transfer functions. now we need to prove that the widening operator we choose is, in fact, a proper widening operator (there are many possible operators, and we need to prove this fact for each one we want to use).
+
+- an operator ▽ ∈ DxD -> D over some poset D is a widening operator iff:
+
+    + x ⊑ (x ▽ y)
+
+    + y ⊑ (x ▽ y)
+
+    + for all ascending chains x_0 ⊑ x_1 ⊑ x_2 ⊑ ..., the following chain stabilizes in a finite number of steps:
+
+        - acc_0 = x_0
+        - acc_{n+1} = acc_n ▽ x_{n+1}
+
+- the first two conditions say that the widened result overapproximates the two original values.
+
+- the last condition says that if we use the widening operator to accumulate the value of an ascending chain, then we reach a fixpoint.
+
+    + recall that our worklist algorithm is essentially computing kleene iterations (F^n(BOTTOM)), which is computing an ascending chain. so if we use widening instead of join for the worklist algorithm, we're guaranteed to reach a fixpoint and terminate.
+
+## example: integer intervals
+
+- recall the integer interval abstract domain
+
+- this is a complete lattice, but non-noetherian.
+
+- one possible widening operator:
+
+    + for all x ∈ L: BOTTOM ▽ x = x ▽ BOTTOM = x
+
+    + [a1, b1] ▽ [a2, b2] = [a', b'] s.t.
+
+        - if a1 <= a2, a' = a1, else a' = -INF
+        - if b1 >= b2, b' = b1, else b' = INF
+
+    + essentially, if we're growing down jump straight to -INF and if we're growing up jump straight to INF.
+
+## strategic use of widening
+
+- widening loses precision, so we'd like to use it as little as possible. fortunately, we only really need it under specific circumstances to prevent nontermination.
+
+    + [ask students: what are they?]
+
+    + it's when we have loops.
+
+- to improve precision for our analysis use join everywhere except loop headers, where we use widening.
 
 # set constraint-based analysis
 ## intro
@@ -3909,7 +4086,7 @@ P2 -> { ref(d) }
 
 - as always, there's a cost: a context-sensitive heap model is more precise, but can be much more expensive.
 
-# practice designing analyses
+# PRACTICE designing analyses
 
 - [go through designing a string constant analysis with the class as a warm-up, then give the prefix and regex analyses as exercises; see the pdf docs for details]
 
@@ -3944,129 +4121,6 @@ P2 -> { ref(d) }
     + remember that it's only a lattice if we use normalized regexes.
 
     + while a lattice, it isn't a _complete_ lattice (e.g., the least upper bound of the chain `01 <= 0011 <= 000111 <= ...` is the language `0{n}1{n}`, which is context-free, and there is no _least_ regex that contains it. this is a problem, but since the lattice is non-noetherian it doesn't really matter---we can't guarantee finding a fixpoint anyway.
-
-# a touch of widening
-## definition
-
-- recall that while complete lattices with monotone functions are guaranteed to have a fixpoint, the only way we're guaranteed to be able to _find_ the fixpoint is if the lattice is noetherian (i.e., no infinite ascending chains).
-
-    + essentially, if the function is monotone then we can only stay in one place (we've found a fixpoint) or go up the lattice; if the lattice is noetherian we can only go up the lattice a finite number of times before we reach TOP.
-
-- but what if we want to use an abstract domain that isn't noetherian, in order to get greater precision?
-
-    + we've seen two examples already: integer intervals and regular expressions.
-
-- what we want is a way to accelerate/guarantee convergence, i.e., if the normal fixpoint computation is working up along the abstract lattice in a chain, what we need to is leap-frog up that chain past potentially an infinite number of lattice elements.
-
-- solution: _widening_. we replace the lattice join operator with a _widening operator_, then apply the usual worklist algorithm for computing a fixpoint.
-
-    + this comes with a cost: the fixpoint we reach is not guaranteed to be the least fixpoint of the original lattice (or even a fixpoint of the original lattice at all); all we know for sure is that `lfp_orig <= lfp_widened`.
-
-    + the idea is that while we aren't getting as precise an answer as we could be getting for that abstract domain, since the abstract domain itself is more precise than one that is noetherian, hopefully we're getting a more precise answer than we would be getting with that noetherian lattice (this isn't a guarantee, though).
-
-        - example: we need to use widening for integer intervals, but we'll still often get a better solution than using the constant abstract domain.
-
-    + an additional cost is that before, we had a simple checklist for proving our analysis is computable: we have a complete lattice and monotone transfer functions. now we need to prove that the widening operator we choose is, in fact, a proper widening operator (there are many possible operators, and we need to prove this fact for each one we want to use).
-
-- an operator ▽ ∈ DxD -> D over some poset D is a widening operator iff:
-
-    + x ⊑ (x ▽ y)
-
-    + y ⊑ (x ▽ y)
-
-    + for all ascending chains x_0 ⊑ x_1 ⊑ x_2 ⊑ ..., the following chain stabilizes in a finite number of steps:
-
-        - acc_0 = x_0
-        - acc_{n+1} = acc_n ▽ x_{n+1}
-
-- the first two conditions say that the widened result overapproximates the two original values.
-
-- the last condition says that if we use the widening operator to accumulate the value of an ascending chain, then we reach a fixpoint.
-
-    + recall that our worklist algorithm is essentially computing kleene iterations (F^n(BOTTOM)), which is computing an ascending chain. so if we use widening instead of join for the worklist algorithm, we're guaranteed to reach a fixpoint and terminate.
-
-## example 1: integer intervals
-
-- the abstract domain is a lattice L = {BOTTOM} ∪ { [a, b] | a ∈ {-INF} ∪ Z, b ∈ {INF} ∪ Z, a <= b } where:
-
-    + for all x ∈ L:
-
-        - BOTTOM ⊑ x
-        - BOTTOM ⊔ x = x ⊔ BOTTOM = x
-        - BOTTOM + x = x + BOTTOM = BOTTOM
-
-    + note that TOP = [-INF, INF]
-
-    + [a1, b1] ⊑ [a2, b2] iff a1 >= a2 and b1 <= b2
-
-    + [a1, b1] ⊔ [a2, b2] = [min(a1, a2), max(b1, b2)]
-
-    + [a1, b1] + [a2, b2] = [a1+b1, a2+b2]
-
-- this is a complete lattice, but non-noetherian.
-
-- example [do first with constant domain, then interval domain using join]:
-
-  ```
-  entry:
-    x:int = $copy 0
-    y:int = $call input()
-    $jump while_hdr
-
-  while_hdr:
-    t:int = $cmp lte x:int y:int
-    $branch t:int while_body exit
-
-  while_body:
-    x:int = $arith add x:int 1
-    $jump while_hdr
-
-  exit:
-    $ret x:int
-  ```
-
-- one possible widening operator:
-
-    + for all x ∈ L: BOTTOM ▽ x = x ▽ BOTTOM = x
-
-    + [a1, b1] ▽ [a2, b2] = [a', b'] s.t.
-
-        - if a1 <= a2, a' = a1, else a' = -INF
-        - if b1 >= b2, b' = b1, else b' = INF
-
-    + essentially, if we're growing down jump straight to -INF and if we're growing up jump straight to INF.
-
-- is this a widening operator?
-
-    + [check the conditions]
-
-- [redo example with intervals and widening operator]
-
-## example 2: regular expressions
-
-- we've already seen the regular expression abstract domain and determined it isn't noetherian.
-
-- there are many possible widening operators (with several papers proposing various ones); these get pretty complicated to retain as much precision as possible so we'll come up with one that isn't terribly precise but is simpler to understand.
-
-    + [ask students if they have any ideas]
-
-- for r1, r2 ∈ REGEX, r1 ▽ r2 = r3 . Σ* s.t. r3 = lcp(r1, r2)
-
-    + basically, find the longest common prefix over all strings in r1 and r2 then concatenate that with Σ*.
-
-- is this a widening operator?
-
-    + [check the conditions]
-
-## strategic use of widening
-
-- widening loses precision, so we'd like to use it as little as possible. fortunately, we only really need it under specific circumstances to prevent nontermination.
-
-    + [ask students: what are they?]
-
-    + it's when we have loops.
-
-- to improve precision for our analysis use join everywhere except loop headers, where we use widening.
 
 # sparse analysis and SSA
 ## problem with standard DFA
