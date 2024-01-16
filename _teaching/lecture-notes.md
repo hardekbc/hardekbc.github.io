@@ -1557,9 +1557,7 @@ fn baz(r:&&int) -> int {
 
 ```
 fn bar(p:int, q:&int) -> int {
-  let TODO:
-  entry:
-    TODO:
+  TODO:
 }
 ```
 
