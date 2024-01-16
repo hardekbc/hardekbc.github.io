@@ -1348,15 +1348,17 @@
 
     - for reaching defs, an answer to "what defs reach this use?" is a set of program points where the defs happen
 
-- more precisely, we want abstract values that represent "executation traces"---specifically, traces from the beginning of the function to the current point following a path along which a particular variable has (1) been defined at program point PP; and (2) has not been redefined at any point between PP and now
+    - we can represent a program point as `<basic block label>`.{`<instruction index>`, `term`}; this uniquely identifies a particular point in a function
+
+    - [give some examples from EXAMPLE 1]
+
+- more precisely, our abstract values represent "executation traces"---specifically, traces from the beginning of the function to the current point following a path along which a particular variable has (1) been defined at program point PP; and (2) has not been redefined at any point between PP and now
 
     - example: focusing on variable `x` in the example program and the point `if_end.0`, the abstract value `x -> {if_true.0, if_false.0}` abstracts the set of traces (starting from the beginning of the function) that define variable `x` with no intervening redefinitions before getting to `if_end.0`
 
     - example: focusing on variable `y` in the example program and the point `if_end.0`, the abstract value `x -> {bb1.2, if_false.1}` abstracts the set of traces (starting from the beginning of the function) that define variable `y` with no intervening redefinitions before getting to `if_end.0`
 
     - therefore, an abstract value for some variable `v` is a set of program points containing definitions of `v`
-
-    - for LIR programs, we can represent a program point as `<basic block label>`.{`<instruction index>`, `term`}; this uniquely identifies a particular point in a function
 
 - so an abstract value (i.e., an element of the abstract domain) is a set of program points; what is the entire domain?
 
@@ -1380,15 +1382,145 @@
 
     - previously for the first-order integer analyses we only cared about variables, but now we care about defs/uses of anything, not just variables
 
-    - for now we're still going to be conservative with pointers and function calls, so we'll treat the allocated objects very over-approximately
+    - things allocated on the heap can be def'ed/used via pointers, so we need to keep track of them
 
-        - TODO: [SEE REACHING DEFS IMPLEMENTATION FOR DETAILS]
+    - we have a problem: things allocated on the heap don't have names, we can't refer to them directly
 
-    - later we'll see a version of reaching defs that treats them more precisely
+        - solution: give them fake names so that our analysis can refer to them
+
+        - for each type of object on the heap, we'll create a fake variable that represents all heap objects of that type (we're still being very conservative with pointers and function calls)
+
+        - like before we'll have a set of address-taken variables `addr_taken` that includes the operands of `$addrof` and also globals, though now it will be all such operands and all globals, not just `int`
+
+        - here's how we create the fake variables the represent objects in the heap:
+
+            - for type τ, let `reachable_types(τ)` be the set of types 'reachable' via pointer dereferences and/or struct field accesses from τ, excluding struct and function types
+
+                - we don't include struct types (e.g., `foo`) because reading/writing a struct type is effectively reading/writing its fields
+                - we don't include function types (e.g., `(int) -> int)`) because functions aren't allocated on the heap
+                - example:
+
+>                 struct foo {
+>                   f1: &bar
+>                   f2: &int
+>                 }
+>
+>                 struct bar {
+>                   f3: &(int) -> int
+>                   f4: &&int
+>                 }
+>
+>                 g: &foo
+>
+>                 // reachable_types(g) = { &bar, &&int, &int, int, &(int)->int }
+
+            - let `PTRS` = all pointer-typed globals, parameters, and locals of the function being analyzed
+
+            - for `τ ∈ reachable_types(PTRS)` create a fake variable to represent all heap-allocated objects of type `τ`, then put all the fake variables in `addr_taken`
+
+    - later we'll see a version of reaching defs that treats pointers and function calls much more precisely
 
 ### abstract semantics
 
-- TODO: [we'll only care about defs inside this function; external defs of globals and objects reachable from parameters are ignored]
+- now we need to create abstract semantics to replace the program's concrete semantics, but in this case we don't care about the _values_ of the variables, just whether they are being defined or not by a given instruction
+
+    - our abstract semantics will update the abstract store, mapping each variable to its set of reaching defs at a particular point in the program
+
+    - our final solution will map program points containing uses to the combined set of reaching defs for all the uses; we can either do this during the analysis (but this will be a lot of redundant work) or just do it once when the analysis is finished
+
+    - [example: show abstract stores and final solution for EXAMPLE 1]
+
+- we don't need abstract semantics for arithmetic operations, relational comparisons, etc, just for variable definition (assignments and stores)
+
+- let the abstract store be σ, pp represent a program point, DEF be the set of definitions for an instruction, and USE be the set of uses for an instruction
+
+    - the set USE won't be needed during the analysis itself, only afterwards when we translate the analysis results into a final solution
+
+- [do the first one below as an example, then go through each of them but ask the students for the answer before giving the official answer]
+
+- pp: `x = {$alloc, $arith, $cmp, $copy, $gep, $gfp} <op>...`
+
+    - DEF = `{ x }`
+    - USE = `{ <op> | <op> is a variable }`
+    - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
+    - `σ[x] = { pp }`
+
+- pp: `x = $addrof y`
+
+    - DEF = `{ x }`
+    - USE = `{}`
+    - `σ[x] = { pp }`
+
+- pp: `x = $load y`
+
+    - DEF = `{ x }`
+    - USE = `{ y } ∪ { var ∈ addr_taken | type(var) = type(*y) }`
+    - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
+    - `σ[x] = { pp }`
+
+```
+    EXAMPLE:
+
+    let a:&int, b:int, c:&int, d:int
+    entry:
+      a = $addrof b
+      c = $alloc 1 [_a1]
+      d = $load c  // <-- USE = { c, b, fake_int }
+```
+
+- pp: `$store x <op>`
+
+    - DEF = `{ var ∈ addr_taken | type(var) = type(<op>) }`
+    - USE = `{ x } ∪ { <op> | <op> is a variable }`
+    - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
+    - `∀v ∈ DEF, σ[v] = σ[v] ∪ { pp }`
+
+    - [discuss strong update vs weak update]
+
+```
+    EXAMPLE:
+
+    let a:int, b:&int, c:int
+    entry:
+      b = $addrof a
+      a = $copy 42
+      c = $copy 12
+      $store b 6
+      $ret x // <-- σ[a] = { entry.1, entry.3 }; σ[c] = { entry.2 }
+```
+
+- pp: `x = $call_{dir, idr} id/<fp>(<arg_op>...)`
+
+    - SDEF = `{ x }` // <-- strong defs
+    - WDEF = `{ var ∈ addr_taken | type(var) ∈ reachable_types(<arg_op>...) }` // <-- weak defs
+    - USE = `{ <fp> } ∪ { <arg_op> | <arg_op> is a variable } ∪ WDEF`
+    - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
+    - `∀v ∈ DEF, σ[v] = σ[v] ∪ { pp }`
+    - `σ[x] = { pp }`
+
+    - we have to assume that a callee function could define and/or use any variable reachable from its arguments
+    - the order is important, handle the strong def _after_ the weak defs (in case `x` is address-taken and included in the weak defs too)
+
+```
+    EXAMPLE:
+
+    let a:int, b:&int, c:&&int
+    entry:
+      a = $copy 0
+      b = $addrof a
+      c = $addrof b
+      b = $call_dir foo(c) then exit
+
+    exit:
+      $ret a // <-- σ[a] = { entry.0, entry.term }, σ[b] = { entry.term }, σ[c] = { entry.2 }
+```
+
+- pp: `$jump bb`, `$branch <op> bb1 bb1`, `$ret <op>`
+
+    - DEF = `{}`
+    - USE = `{ <op> | <op> is a variable }`
+    - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
+    - no change to σ
 
 ### abstract execution
 
@@ -1398,121 +1530,44 @@
 
     - just "execute" each basic block one more time, and for each instruction look at what variables are used and look them up in the abstract store to find their reaching defs
 
+    - we end up with a solution mapping a program point (the location of a set of uses) to a set of program points (the locations of the reaching defs for those uses)
+
 ### EXAMPLE 2
 
 - [have students do this one on their own first]
 
-- TODO: [include some pointers and calls]
-
   FIXME: PUT IN ONENOTE
+
+```
+struct foo {
+  f1: int
+  f2: &int
+}
+
+let g:&foo;
+
+fn bar(p:int, q:&int) -> int {
+  TODO:
+}
+
+fn baz(r:&&int) -> int {
+  // ...
+}
+```
+
+```
+fn bar(p:int, q:&int) -> int {
+  let TODO:
+  entry:
+    TODO:
+}
+```
 
 ## second analysis example: control analysis
 
 - TODO:
 
 # ===== OLD ============================================================================
-
-# second-order DFA analyses
-
-### abstract transfer functions
-
-- now we need to create abstract semantics to replace the program's concrete semantics. in this case, we don't care about the _values_ of the variables, just whether they are being defined or not by a given instruction. so we don't need abstract semantics for arithmetic operations, relational comparisons, etc, just for variable definition.
-
-- given instruction `var = ...` at program point `k`, we need to update the abstract values for `var` at point `k` (again, we don't care what the instruction is doing to the values of the variables).
-
-    + general formula: `F♯ = GEN ∪ (IN − KILL)`, where:
-
-    ```
-    [k] x = e ==> GEN(x) = {k}, KILL(x) = { pp | x defined at pp }
-    else      ==> GEN = KILL = {}
-    ```
-
-- what about instructions that could indirectly define a variable, e.g., `$store`? since we don't track pointer information, we treat them conservatively:
-
-    + if we're storing a value of type `T`, then the store could potentially define any _address-taken_ variable of type `T` and so we have to include this program point in the abstract value for that variable.
-
-    + however, it may _not_ be defining that variable, so we also can't remove any existing program points in the abstract value for that variable.
-
-    + this is called a `weak update`, as opposed to our usual `strong updates`; a strong update _replaces_ the old abstract value with a new abstract value (like concrete assignment) while a weak updated _merges_ the old abstract value with a new abstract value.
-
-    + example:
-
-    ```
-    bb1:
-      z:int* = addrof x:int
-
-    [...more program...]
-
-    bb2:
-      x:int = $copy 42
-      w:int = $copy 34
-      $store y:int* 12
-      $ret x:int
-    ```
-
-    + what should the abstract value at the return instruction be for variable x? `{bb2.0, bb2.2}`
-
-    + what about for variable w? `{bb2.1}` (_not_ including `bb2.2` because w isn't address-taken)
-
-- a similar reasoning for any `$call` or `$icall` that passes a pointer as an argument---since we don't know what that pointer refers to, and since we don't know what the callee will do with it, we have to assume that it _could_ define any address-taken variable of the appropriate type (not just the type of the pointer itself, but any type reachable from the pointer)
-
-    + example:
-
-    ```
-    bb:
-      x:int = $copy 0
-      y:int* = $addrof x:int
-      z:int** = $addrof y:int*
-      w:int = $call foo(z:int**)
-      $ret x:int
-    ```
-
-    + what is the abstract value for variable x at the return instruction? `{bb.0, bb.3}`
-
-# defining the full reaching defs analysis
-### abstract transfer functions
-
-- $arith, $cmp, $copy, $phi, $alloc, $gep, $select, $addrof, $ret:
-
-    + let DEF be the lhs of the instruction (if there is one) and USES be all VarPtr_t used by the instruction (note that $addrof doesn't use its argument)
-
-    + for each use in USES: soln[inst] += store[use]
-
-    + store[DEF] = {inst}
-
-- `lhs = $load op`:
-
-    + let DEF be the lhs of the instruction; USES contains the VarPtr_t operand and also all type-appropriate addressable objects, and also if there are any pointer-type function parameters of the appropriate type then USES contains nullptr to signify an external object.
-
-    + for each use in USES: soln[inst] += store[use]
-
-    + store[DEF] = {inst}
-
-- `$store dst_ptr op`:
-
-    + let DEFS contain all type-appropriate addressable objects and USES contain the VarPtr_t operands of the instruction.
-
-    + for each use in USES: soln[inst] += store[use]
-
-    + for each def in DEFS: store[def] += {inst}
-
-- `lhs = $[i]call <func/ptr>(args...)`:
-
-    + let STRONG_DEF contain the lhs of the instruction
-
-    + if there are no pointer-type arguments then WEAK_DEFS is empty, otherwise it contains all type-appropriate addressable objects (i.e., any type reachable from the pointer argument)
-
-    + USES contains all VarPtr_t arguments and, if this is an $icall, the function ptr being called and, if any arguments are pointer-typed: all type-appropriate addressable objects (the same set as for WEAK_DEFS) and if there are any pointer-type function parameters then nullptr to signify an external object.
-
-    + for each use in USES: soln[inst] += store[use]
-
-    + store[STRONG_DEF] = {inst}
-
-    + for each def in WEAK_DEFS: store[def] += {inst}. note that we're using the call instruction as a proxy for any defs that happen inside the callee (that's why we don't use `external-def` for these).
-
-- $jump, $branch:
-
-    + propagate store to target block(s); if the abstract store for the block changes then add to worklist
 
 # the math behind DFA
 ## preliminaries
