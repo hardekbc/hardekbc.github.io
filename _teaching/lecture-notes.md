@@ -689,7 +689,7 @@
 
 - DFA is inherently _flow-sensitive_: the goal is to compute an abstract value for each variable at each program point (i.e., each node of the CFG)
 
-    + [contrast with path-sensitive and flow-insensitive]
+    + [contrast with flow-insensitive, which we'll see a bit later]
 
 ### method 1: MOP
 
@@ -744,7 +744,7 @@
   ```
   let x:int = 0, y:int = input(), z:int = input();
   if (y != 0) { x = 1; } else { x = 2; }
-  if (z != 0) { x = x + x; } else { x = x - x; }
+  if (z != 0) { x = x + x; } else { x = 0; }
   x = x + x;
   return x;
   ```
@@ -770,7 +770,7 @@
   bb5: x = $arith add x x
        $jump bb7
 
-  bb6: x = $arith sub x x
+  bb6: x = $copy 0
        $jump bb7
 
   bb7: x = $arith add x x
@@ -802,7 +802,7 @@
 
     - this map contains the _entry abstract store_ for that basic block: the abstract values of all variables at the point execution reaches that basic block
 
-    - it will be updated by the analysis as it executes
+    - we need this because for MFP to "execute" a basic block it needs the join of the results of all predecessor basic blocks, so it needs to record that somewhere
 
 - create an initial abstract store that maps integer-typed function parameters and integer-typed globals to ⊤
 
@@ -820,6 +820,8 @@
 
 - insert the entry basic block into `worklist`
 
+- [show the result of all this using `abstract semantics` -> `EXAMPLE 1` below]
+
 ### analysis
 
 - while the worklist isn't empty:
@@ -835,6 +837,10 @@
         - join the current abstract store with the entry abstract store of the target (from `bb2store`)
 
         - if the target's entry store changed, put the target on the worklist
+
+- this loop is the fixpoint computation: as long as there is some basic block whose entry abstract store has changed from the last time it was processed, it will keep going
+
+    - if we've created the abstract domain and abstract semantics correctly, this is guaranteed to terminate
 
 ### finishing up
 
@@ -931,11 +937,11 @@
 - `$branch op <bb1> <bb2>`
 
     - translate `op` to abstract value
-    - if value is in {pos, neg} propagate store to `<bb1>`
-    - if value is zero propagate store to `<bb2>`
+    - if value is definitely not 0, propagate store only to `<bb1>`
+    - if value is definitely 0, propagate store only to `<bb2>`
     - else propagate store to both `<bb1>` and `<bb2>`
 
-### EXAMPLE (using signs)
+### EXAMPLE 1 (using signs)
 
 - [have students work through it first, then go over it]
 
@@ -1013,7 +1019,7 @@
 
     - these always produce pointers, which we aren't tracking so we can ignore these instructions
 
-### EXAMPLE (using signs)
+### EXAMPLE 2 (using signs)
 
 - [have students work through it first, then go over it]
 
@@ -1072,7 +1078,7 @@
 
     - since we're doing intraprocedural analysis we don't care about the caller and so we can ignore this instruction
 
-### EXAMPLE (using signs)
+### EXAMPLE 3 (using signs)
 
 - [have students work through it first, then go over it]
 
