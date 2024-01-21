@@ -37,8 +37,8 @@
 
 - week 1.1: through first half of `intro to dfa` -> `the basics` -> `high-level idea`; stopped 20 minutes early
 - week 1.2: through `intro to dfa` -> `abtract semantics`; stopped 10 minutes early
-- week 2.1: ???
-- week 2.2: ???
+- week 2.1: through `defining...integer-based analysis` -> `MFP algorithm`
+- week 2.2: through all of `defining...integer-based analysis` (had to skim the examples)
 - week 3.1: ???
 - week 3.2: ???
 - week 4.1: ???
@@ -82,6 +82,25 @@
 - in `intro to DFA` -> `abstract semantics` i had the students fill in the tables for addition and less-than, which worked great but came really late in the lecture; when i integrate the sections per the above note i should try to move the student interaction part earlier
 
 - in general for `intro to DFA` i feel like i'm throwing a lot of abstract concepts at them, maybe too fast and without sufficient context; is there a way for me to get to the actual analysis process more quickly before going into the ideas of abstract domains, abstract semantics, etc? maybe it would be sufficient to preface this stuff with a concrete program example and set of sign invariants that i want to infer, just to set the stage?
+
+### assignments
+
+- assignment 1: having globals opens up a can of worms wrt handling function calls. the initial complication of globals is that (1) a callee can modify any `int`-typed global and so they should be set to ⊤; and (2) if there are any pointer-typed globals that can reach an `int` then a callee could potentially reach a local via the global pointer and so, just like when we pass a pointer that can reach an `int` as an argument, all address-taken locals should be set to ⊤. however, i had also decided that $call_ext should be treated exactly like $call_{dir, idr} to keep things simple for the students. the problem is that it's possible to have something like the code below in the _external_ code, i.e., the external code contains globals that we can't see in our code and thus can modify our local variables even if there are no globals in the internal code we're analyzing. we can handle this with varying levels of precision/complexity and of consistency between internal/external calls.
+
+    FIXME: for current course offering: the test inputs won't have global variables at all (except for global function pointers to the internal functions) and $call_ext acts just like $call_dir and $call_idr. for future offerings: allow globals, but update lecture notes and my implementations with the assumption that any relevant external functions have been stubbed and so we can completely ignore the effects of $call_ext (except for assigning an abstract value to the lhs of the call if necessary).
+
+    FIXME: update the reaching definitions lecture notes and implementation to handle $call_ext the same way.
+
+  ```
+  [IN EXTERNAL CODE, NOT THE CODE WE'RE ANALYZING]
+  
+  let g:&int;
+
+  fn f1(p:&int) -> _ { g = p; return; }
+  fn f2(q:int) -> _ { *g = q; return; }
+  ```
+
+- assignment 1: now that we've figured out the autograder i could streamline the assignment description (things like what arguments are passed to the script, etc)
 
 ### additional materials
 
@@ -1068,11 +1087,15 @@
 - `[x =] $call_dir <id>(op1, ...)`
 - `[x =] $call_idr fop(op1, ...)`
 
-    - [these are all treated the same by this analysis]
+    - [these are all treated the same by this analysis; note that we might expect that globals can't be changed by an external call, but depending on the source language globals could be exported and accessible from external code (e.g., `extern` in C)---to keep things uniform and simpler, we'll treat external calls the same as internal calls]
 
     - for all `v` in `global_ints`, update store to map `v` to ⊤
+
     - if `x` is integer-typed, update store to map `x` to ⊤
-    - if any argument is a pointer that can reach an int, for all `v` in `addrof_ints`, update store to map `v` to ⊤
+
+    - if (1) any global is a pointer that can reach an `int`; OR (2) any argument is a pointer that can reach an `int`: for all `v` in `addrof_ints`, update store to map `v` to ⊤
+
+        - "reach an int" means (1) the basetype is `int`, or (2) the basetype is a struct containing a pointer that reaches an `int`
 
 - `$ret [op]`
 
@@ -1448,6 +1471,7 @@
 
     - DEF = `{ x }`
     - USE = `{ <op> | <op> is a variable }`
+
     - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
     - `σ[x] = { pp }`
 
@@ -1455,12 +1479,14 @@
 
     - DEF = `{ x }`
     - USE = `{}`
+
     - `σ[x] = { pp }`
 
 - pp: `x = $load y`
 
     - DEF = `{ x }`
     - USE = `{ y } ∪ { var ∈ addr_taken | type(var) = type(*y) }`
+
     - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
     - `σ[x] = { pp }`
 
@@ -1478,6 +1504,7 @@
 
     - DEF = `{ var ∈ addr_taken | type(var) = type(<op>) }`
     - USE = `{ x } ∪ { <op> | <op> is a variable }`
+
     - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
     - `∀v ∈ DEF, σ[v] = σ[v] ∪ { pp }`
 
@@ -1495,16 +1522,17 @@
       $ret x // <-- σ[a] = { entry.1, entry.3 }; σ[c] = { entry.2 }
 ```
 
-- pp: `x = $call_{dir, idr} id/<fp>(<arg_op>...)`
+- pp: `[x =] $call_{ext, dir, idr} id/<fp>(<arg_op>...)`
 
-    - SDEF = `{ x }` // <-- strong defs
-    - WDEF = `{ var ∈ addr_taken | type(var) ∈ reachable_types(<arg_op>...) }` // <-- weak defs
+    - SDEF = `{ x }` // <-- strong def if `x` exists, otherwise `{}`
+    - WDEF = `{ var ∈ addr_taken | type(var) ∈ reachable_types(<arg_op>...) ∪ reachable_types(<globals>...) } ∪ { <globals>... }` // <-- weak defs
     - USE = `{ <fp> } ∪ { <arg_op> | <arg_op> is a variable } ∪ WDEF`
-    - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
-    - `∀v ∈ DEF, σ[v] = σ[v] ∪ { pp }`
-    - `σ[x] = { pp }`
 
-    - we have to assume that a callee function could define and/or use any variable reachable from its arguments
+    - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
+    - `∀v ∈ WDEF, σ[v] = σ[v] ∪ { pp }`
+    - `σ[x] = { pp }` (if `x` exists)
+
+    - we have to assume that a callee function could define and/or use any variable reachable from its arguments or from a global or any global
     - the order is important, handle the strong def _after_ the weak defs (in case `x` is address-taken and included in the weak defs too)
 
 ```
@@ -1525,6 +1553,7 @@
 
     - DEF = `{}`
     - USE = `{ <op> | <op> is a variable }`
+
     - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
     - no change to σ
 
