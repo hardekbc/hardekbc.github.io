@@ -85,6 +85,10 @@
 
 ### assignments
 
+- maybe only give them the JSON format instead of giving them a choice?
+
+    - TODO: check student submissions and see how many ended up using the LIR format directly and how many used the JSON version
+
 - assignment 1: having globals opens up a can of worms wrt handling function calls. the initial complication of globals is that (1) a callee can modify any `int`-typed global and so they should be set to ⊤; and (2) if there are any pointer-typed globals that can reach an `int` then a callee could potentially reach a local via the global pointer and so, just like when we pass a pointer that can reach an `int` as an argument, all address-taken locals should be set to ⊤. however, i had also decided that $call_ext should be treated exactly like $call_{dir, idr} to keep things simple for the students. the problem is that it's possible to have something like the code below in the _external_ code, i.e., the external code contains globals that we can't see in our code and thus can modify our local variables even if there are no globals in the internal code we're analyzing. we can handle this with varying levels of precision/complexity and of consistency between internal/external calls.
 
     FIXME: for current course offering: the test inputs won't have global variables at all (except for global function pointers to the internal functions) and $call_ext acts just like $call_dir and $call_idr. for future offerings: allow globals, but update lecture notes and my implementations with the assumption that any relevant external functions have been stubbed and so we can completely ignore the effects of $call_ext (except for assigning an abstract value to the lhs of the call if necessary).
@@ -1571,28 +1575,46 @@
 
 - [have students do this one on their own first]
 
-  FIXME: PUT IN ONENOTE
-
 ```
-struct foo {
-  f1: int
-  f2: &int
-}
-
-let g:&foo;
-
 fn bar(p:int, q:&int) -> int {
-  TODO:
-}
+  let a:int, b:int, c:&int;
 
-fn baz(r:&&int) -> int {
-  // ...
+  a = p - *q;
+  b = a;
+  c = &b;
+
+  while a < p {
+    *c = b + a;
+    a = a + 1;
+  }
+
+  return *c;
 }
 ```
 
 ```
 fn bar(p:int, q:&int) -> int {
-  TODO:
+let a:int, b:int, c:&int, _t1:int, _t2:int, _t3:int, _t4:int
+entry:
+  _t1 = $load q
+  a = $arith sub p _t1
+  b = $copy a
+  c = $addrof b
+  $jump while.hdr
+
+while.hdr:
+  _t2 = $cmp lt a p
+  $branch _t2 while.body exit
+
+while.body:
+  _t3 = $arith add b a
+  $store c _t3
+  a = $arith add a 1
+  $jump while.hdr
+
+exit:
+  _t4 = $load c
+  $ret _t4
 }
 ```
 
