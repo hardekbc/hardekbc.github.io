@@ -93,7 +93,7 @@
 
     FIXME: for current course offering: the test inputs won't have global variables at all (except for global function pointers to the internal functions) and $call_ext acts just like $call_dir and $call_idr. for future offerings: allow globals, but update lecture notes and my implementations with the assumption that any relevant external functions have been stubbed and so we can completely ignore the effects of $call_ext (except for assigning an abstract value to the lhs of the call if necessary).
 
-    FIXME: update the reaching definitions lecture notes and implementation to handle $call_ext the same way.
+    FIXME: update the reaching definitions lecture notes and implementation to handle `$call_ext` the same way.
 
   ```
   [IN EXTERNAL CODE, NOT THE CODE WE'RE ANALYZING]
@@ -1619,8 +1619,311 @@ exit:
 ```
 
 ## second analysis example: control analysis
+### intro
+
+- the subject of this analysis is control dominance and dependence: how the execution of the basic blocks depend on each other
+
+    - some potential uses of this analysis:
+
+        - security: every execution that reaches a use of user input must first go through a sanitizer function
+        - concurrency: every execution that enters a lock must then go through an unlock
+
+    - in general, anything related to execution control dependencies
+
+        - program slicing for debugging, program understanding, etc, which we'll implement in a later assignment
+        - converting a compiler IR into static single assignment form (SSA), which we'll hopefully get a chance to talk about later
+        - more...
+
+- for this analysis we don't care about individual instructions, just entire basic blocks---because of the way we defined basic blocks, if one instruction is executed all the others in the same block necessarily must be executed as well
+
+### control dominance
+#### definitions:
+
+- the DOM relation: `x DOM y iff every path from function entry to y must pass through x`
+
+    + that is, we can't get to y without going through x first
+
+    + reflexive, transitive, anti-symmetric (i.e., a partial order)
+
+- strict dominance: `x DOM! y iff x DOM y and x != y`
+
+    + that is, the irreflexive version of DOM
+
+- immediate dominance: `x IDOM y iff x DOM! y and x is dominated by all other strict dominators of y`
+
+    + intuitively, this is the "closest" strict dominator of y
+
+- post-dominance: `x PDOM y iff every path from y to the function exist must pass through x`
+
+    + the dual of dominance; just reverse the CFG and PDOM becomes DOM (and vice-versa)
+
+    + similarly, can have `PDOM!` and `PIDOM`
+
+- we'll only discuss the forward cases (`DOM`, `DOM!`, `IDOM`); everything we do for those works for the "post" cases too just by reversing the CFG
+
+    + remember that we've defined our CFG to have exactly one "exit" basic block (the one with the `$ret` instruction), so reversing it still leaves us with a single entry node
+
+#### examples
+
+- EXAMPLE 1
+
+  CFG:
+  ```
+  A --> B ----> C --> E
+          \          /
+           \__> D __/
+  ```
+
+  RELATIONS:
+  ```
+  A DOM { A, B, C, D, E }
+  B DOM { B, C, D, E }
+  C DOM { C }
+  D DOM { D }
+  E DOM { E }
+
+  A DOM! { B, C, D, E }
+  B DOM! { C, D, E }
+  C DOM! {}
+  D DOM! {}
+  E DOM! {}
+
+  A IDOM { B }
+  B IDOM { C, D, E }
+  C IDOM {}
+  D IDOM {}
+  E IDOM {}
+  ```
+
+- EXAMPLE 2:
+
+  CFG:
+  ```
+          +-----+
+          |     |
+          v     |
+  A ----> B --> C
+    \       \
+     \       \
+      \_> D --> E
+  ```
+
+  RELATIONS:
+  ```
+  A DOM { A, B, C, D, E }
+  B DOM { B, C }
+  C DOM { C }
+  D DOM { D }
+  E DOM { E }
+
+  A DOM! { B, C, D, E }
+  B DOM! { C }
+  C DOM! {}
+  D DOM! {}
+  E DOM! {}
+
+  A IDOM { B, D, E }
+  B IDOM { C }
+  C IDOM {}
+  D IDOM {}
+  E IDOM {}
+  ```
+
+#### dominator tree
+
+- FIXME: my implementation doesn't use a dominator tree; how do we get it from the analysis solution? do we need this?
+
+- a convenient data structure to represent dominance information is a `dominator tree`:
+
+    + a node for each basic block
+
+    + an edge `x --> y` iff `x IDOM y`
+
+- given a dominator tree, we can easily compute `DOM` and `DOM!` info by starting at a node and working our way up the tree
+
+- notice that this representation only works if we're guaranteed that no node can be `IDOM` by more than one other node (otherwise this wouldn't be a tree)
+
+    + we want to prove that if `a IDOM c` and `b IDOM c`, then `a = b`
+    + by definition of `IDOM`, `a DOM! c` and `b DOM! c`
+    + by definition of `DOM!`, all strict dominators of `c` must dominate `a` (which includes `b`)
+    + by definition of `DOM!`, all strict dominators of `c` must dominate `b` (which includes `a`)
+    + therefore `a DOM b` and `b DOM a`
+    + since `DOM` is anti-symmetric, `a = b`
+
+- example 1: [show dominator tree for example 1 above]
+
+- example 2: [show dominator tree for example 2 above]
+
+#### computing dominance
+##### abstract domain
 
 - TODO:
+
+##### abstract semantics
+
+- TODO:
+
+##### examples 
+
+- [use examples 1 and 2 above]
+
+### control dependence
+#### intro
+
+- dominance tells us what basic blocks _must_ be executed before other blocks (or after for post-dominance), but it can also be used to tell us what blocks are _control dependent_ on what other blocks
+
+- intuitively, block X is control dependent on block Y if the execution of block Y directly determines whether block X will be executed or not (including how many times it will be executed, for loops)
+
+#### EXAMPLE 1
+
+  ```
+  entry:
+    secret = $call boolean_input()
+    $branch secret bb2 bb3
+
+  bb2:
+    public = $copy 1
+    $jump exit
+
+  bb3:
+    public = $copy 0
+    $jump exit
+
+  exit:
+    d = $call output(public)
+    $ret 0
+  ```
+
+-  bb2 and bb3 are both control dependent on bb1; entry and exit are _not_ control dependent on any other blocks
+
+- this also shows another reason why control analysis is interesting: notice that the value of `public` is equal to the value of `secret` even though there is no explicit assignment between them---this can only leak one bit of information, but if we put something like this in a loop we could leak arbitrary bits
+
+#### EXAMPLE 2
+
+- CFG:
+
+  ```
+        +-----------+
+        |           |
+        V           |
+  A --> B --> C --> F --> G
+        |           ^
+        |           |
+        + --> D --> E
+              ^     |
+              |     |
+              +-----+
+  ```
+
+- CONTROL DEPENDENCIES:
+
+  ```
+  A: { }
+  B: { F }
+  C: { B }
+  D: { B, E }
+  E: { B, E }
+  F: { F }
+  G: { }
+  ```
+
+-  B is control dependent on F because F controls how often B is executed; similarly for (D, E), (E, E), and (F, F).
+
+#### dominance frontiers
+
+- to compute control dependence info we need something called `dominance frontiers`
+
+- the dominance frontier of block X is the set of all blocks Y s.t. X dominates a predecessor of Y but does not strictly dominate Y
+
+    + intuitively, the dominance frontier is the set of blocks that are _almost_ dominated by X, but just outside its control; or, its the set of blocks that are the earliest point where some competing control-flow path may reach that block
+
+- given the dominator tree, computing dominance frontiers is simple:
+
+    - FIXME: my implementation doesn't use a dominator tree; how do we get it from the analysis solution? should we just use the method i used in the implementation?
+
+  ```
+  for all blocks X in the CFG:
+    if the number of predecessors of X >= 2:
+      for all predecessors P of X:
+        runner = P
+        while runner != idom[X]:
+          add X to runner's dominance frontier
+          runner = idom[runner]
+  ```
+
+- intuitively:
+
+    + X cannot be in a dominance frontier if it doesn't have at least two predecessors (because that's the only way it can "escape" from another block's dominance)
+
+    + X cannot be in the dominance frontier of its immediate dominator (by definition of dominance frontier)
+
+    + otherwise, X is in the dominance frontier of Y if Y dominates a predecessor of X (recall that we can compute dominance from the dominator tree by following the path from a leaf to the root)
+
+- [demonstrate on example 2 above]
+
+  DOMINATOR TREE:
+  ```
+          A
+          |
+          B
+        / | \
+       /  |  \
+      C   D   F
+          |   |
+          E   G
+  ```
+
+  DOMINANCE FRONTIERS:
+  ```
+  A: { }
+  B: { B }
+  C: { F }
+  D: { D, F }
+  E: { D, F }
+  F: { B }
+  G: { }
+  ```
+
+#### computing control dependence
+
+- X is control dependent on Y iff Y is in the post-dominance frontier of X
+
+    + remember that post-dominance (and post-dominance frontiers) are exactly the same as dominance (and dominance frontiers) except on a reversed CFG
+
+    + if Y is in the post-dominance frontier of X, then that means Y has multiple successors s.t. if a specific one is taken then X must necessarily execute, and if it is not taken then X will definitely not execute---in other words, X is control dependent on Y
+
+- algorithm:
+
+    + step 1: compute post-dominator tree (i.e., flip the edges of the CFG and compute the dominator tree on that)
+
+    + step 2: compute post-dominance frontiers (i.e., compute dominance frontiers but using the reversed CFG and the post-dominator tree)
+
+- that's it: each block X is control dependent on any block in its post-dominance frontier
+
+- [demonstrate on example 2 above]
+
+  POST-DOMINATOR TREE:
+  ```
+          G
+          |
+          F
+        / | \
+       /  |  \
+      C   E   B
+          |   |
+          D   A
+  ```
+
+  POST-DOMINANCE FRONTIERS:
+  ```
+  A: { }
+  B: { F }
+  C: { B }
+  D: { B, E }
+  E: { B, E }
+  F: { F }
+  G: { }
+  ```
 
 # ===== OLD ============================================================================
 
@@ -2776,364 +3079,6 @@ P2 -> { ref(d) }
     + store[lhs] = {inst}
 
     + for each def in WEAK_DEFS: store[def] += {inst}
-
-## control analysis
-### intro
-
-- the subject of this analysis is control dominance and control dependence: how the execution of the basic blocks depend on each other. it is conducted on the CFG, and while there is a relatively simple DFA-based algorithm for computing dependence info it will be convenient to use a more optimized version.
-
-    + this optimized version is from Cooper et al, "A Simple, Fast Dominance Algorithm".
-
-- for this analysis we don't care about individual instructions, just entire basic blocks---because of the way we defined basic blocks, if one instruction is executed all the others in the same block necessarily must be executed as well.
-
-### control dominance
-#### definitions:
-
-- the DOM relation: `x DOM y iff every path from function entry to y must pass through x`
-
-   + that is, we can't get to y without going through x first
-
-   + reflexive, transitive, anti-symmetric (i.e., a partial order)
-
-- strict dominance: `x DOM! y iff x DOM y and x != y`
-
-   + that is, the irreflexive version of DOM
-
-- immediate dominance: `x IDOM y iff x DOM! y and x is dominated by all other strict dominators of y`
-
-   + intuitively, this is the "closest" strict dominator of y
-
-- post-dominance: `x PDOM y iff every path from y to the function exist must pass through x`
-
-   + the dual of dominance; just reverse the CFG and PDOM becomes DOM (and vice-versa).
-
-#### examples
-
-- EXAMPLE 1
-
-  CFG:
-  ```
-  A --> B ----> C --> E
-          \          /
-           \__> D __/
-  ```
-
-  RELATIONS:
-  ```
-  A DOM { A, B, C, D, E }
-  B DOM { B, C, D, E }
-  C DOM { C }
-  D DOM { D }
-  E DOM { E }
-
-  A DOM! { B, C, D, E }
-  B DOM! { C, D, E }
-  C DOM! {}
-  D DOM! {}
-  E DOM! {}
-
-  A IDOM { B }
-  B IDOM { C, D, E }
-  C IDOM {}
-  D IDOM {}
-  E IDOM {}
-  ```
-
-- EXAMPLE 2:
-
-  CFG:
-  ```
-          +-----+
-          |     |
-          v     |
-  A ----> B --> C
-    \       \
-     \       \
-      \_> D --> E
-  ```
-
-  RELATIONS:
-  ```
-  A DOM { A, B, C, D, E }
-  B DOM { B, C }
-  C DOM { C }
-  D DOM { D }
-  E DOM { E }
-
-  A DOM! { B, C, D, E }
-  B DOM! { C }
-  C DOM! {}
-  D DOM! {}
-  E DOM! {}
-
-  A IDOM { B, D, E }
-  B IDOM { C }
-  C IDOM {}
-  D IDOM {}
-  E IDOM {}
-  ```
-
-#### why do we care?
-
-- we'll show how it's useful for program slicing in a bit, but it's useful information even by itself:
-
-    + security: every use of user input is dominated by a sanitizer
-    + concurrency: every lock is post-dominated by an unlock
-
-#### dominator tree
-
-- a convenient data structure to represent dominance information is a `dominator tree`:
-
-    + a node for each basic block
-
-    + an edge x --> y iff x IDOM y
-
-- given a dominator tree, we can easily compute DOM and DOM! info
-
-- notice that this representation only works if we're guaranteed that no node can be IDOM by more than one other node (otherwise this wouldn't be a tree).
-
-    + we want to prove that if a IDOM c and b IDOM c, then a = b
-    + by definition of IDOM, a DOM! c and b DOM! c
-    + by definition of DOM!, all strict dominators of c must dominate a (which includes b)
-    + by definition of DOM!, all strict dominators of c must dominate b (which includes a)
-    + therefore a DOM b and b DOM a
-    + since DOM is anti-symmetric, a = b
-
-- example 1: [show dominator tree for example 1 above]
-
-- example 2: [show dominator tree for example 2 above]
-
-- note that the DOM relation is a partial order, and the dominator tree is essentially the Hasse diagram of that partial order.
-
-#### computing dominance
-
-- there is a simple, straightforward DFA analysis for dominance, but it is very slow and also makes computing control-dependence information (which we'll get to soon) somewhat annoying.
-
-- this algorithm is taken from Cooper et al, "A Simple, Fast Dominance Algorithm", which is as advertised and also makes computing control-dependence information easy.
-
-- instead of computing dominance directly, it computes the dominator tree (from which dominance information can be extracted very easily).
-
-- given: the CFG as a graph of basic blocks, with entry point `entry`. let `idom` be a map from a basic block to its immediate dominator basic block (i.e., it represents the dominator tree, mapping a block to its parent in the tree).
-
-- worklist algorithm (slightly different than the one in the paper, which round-robins all basic blocks instead of using a worklist):
-
-  ```
-  idom[entry] = entry
-  push successors of entry onto worklist
-
-  while worklist is not empty:
-    pop bb from worklist
-
-    // A predecessor meeting this requirement must necessarily exist.
-    let bb_idom = some predecessor of bb s.t. idom[bb_idom] exists
-
-    // Computes the intersection of the immediate dominators of all predecessors. Some
-    // predecessors may not have been computed yet; we'll revisit bb when they are in order to
-    // update bb's information.
-    for pred in predecessors of bb:
-      if idom[pred] doesn't exist, skip
-      bb_idom = intersect(bb_idom, pred)
-
-    // The immediate dominator of bb is the computed intersection.
-    if idom[bb] doesn't exist OR idom[bb] != bb_idom:
-      idom[bb] = bb_idom
-      push successors of bb into worklist
-  ```
-
-- the slightly tricky part is the intersection algorithm: given the current `idom`, how do we compute the immediate dominator intersection of two basic blocks bb1 and bb2 in the tree?
-
-    + the idea is to place two `fingers` on the dominator tree, one at bb1 and one at bb2, and then move the fingers up the tree to find the least common ancestor of both bb1 and bb2. [show on some made-up tree]
-
-    + remember that dominance is a partial order and the dominator tree is its hasse diagram; then this 'intersection' operation is just the join operation on the partial order (as long as there is one basic block that dominates all others, the join is guaranteed to exist).
-
-    + to make this fast and simple, number each basic block in the CFG using post-order:
-
-      ```
-      let index = 0
-      call DFS(entry) where:
-
-      define DFS(bb) {
-        mark bb visited
-        for each successor succ of bb:
-          if succ is not yet visited, call DFS(succ)
-        postorder[bb] = index
-        index++
-      }
-      ```
-
-    + now we can define the intersection algorithm:
-
-      ```
-      define intersect(bb1, bb2) {
-        finger1 = bb1
-        finger2 = bb2
-
-        while finger1 != finger2:
-          while postorder[finger1] < postorder[finger2]:
-            finger1 = idom[finger1]
-          while postorder[finger2] < postorder[finger1]:
-            finger2 = idom[finger2]
-
-        return finger1
-      }
-      ```
-
-- examples: [use examples 1 and 2 above]
-
-### control dependence
-#### intro
-
-- dominance tells us what basic blocks _must_ be executed before (or after for post-dominance) other blocks, but it can also be used to tell us what blocks are _control dependent_ on what other blocks.
-
-- intuitively, block X is control dependent on block Y if the execution of block Y directly determines whether block X will be executed or not (including how many times it will be executed, for loops).
-
-#### examples
-
-- EXAMPLE 1
-
-  ```
-  entry:
-    secret:int = $call boolean_input()
-    $branch secret:int bb2 bb3
-
-  bb2:
-    public:int = $copy 1
-    $jump exit
-
-  bb3:
-    public:int = $copy 0
-    $jump exit
-
-  exit:
-    d:int = $call output(public:int)
-    $ret 0
-  ```
-
-    + bb2 and bb3 are both control dependent on bb1; entry and exit are _not_ control dependent on any other blocks
-
-    + this also shows one reason why control dependence is interesting (other than for slicing which we'll show later): notice that the value of `public` is equal to the value of `secret` even though there is no explicit assignment between them. it can only leak one bit of information, but if we put something like this in a loop we could leak arbitrary bits.
-
-- EXAMPLE 2
-
-  ```
-        +-----------+
-        |           |
-        V           |
-  A --> B --> C --> F --> G
-        |           ^
-        |           |
-        + --> D --> E
-              ^     |
-              |     |
-              +-----+
-  ```
-
-  CONTROL DEPENDENCIES:
-  ```
-  A: { }
-  B: { F }
-  C: { B }
-  D: { B, E }
-  E: { B, E }
-  F: { F }
-  G: { }
-  ```
-
-    + B is control dependent on F because F controls how often B is executed; similarly for (D, E), (E, E), and (F, F).
-
-#### dominance frontiers
-
-- to compute control dependence info we need something called _dominance frontiers_.
-
-- the dominance frontier of block X is the set of all blocks Y s.t. X dominates a predecessor of Y but does not strictly dominate Y.
-
-    + intuitively, the dominance frontier is the set of blocks that are _almost_ dominated by X, but just outside its control. or, its the set of blocks that are the earliest point where some competing control-flow path may reach that block.
-
-- given the dominator tree, computing dominance frontiers is simple:
-
-  ```
-  for all blocks X:
-    if the number of predecessors of X >= 2:
-      for all predecessors P of X:
-        runner = P
-        while runner != idom[X]:
-          add X to runner's dominance frontier
-          runner = idom[runner]
-  ```
-
-- intuitively:
-
-    + X cannot be in a dominance frontier if it doesn't have at least two predecessors (because that's the only way it can "escape" from another block's dominance).
-
-    + X cannot be in the dominance frontier of its immediate dominator (by definition of dominance frontier).
-
-    + otherwise, X is in the dominance frontier of Y if Y dominates a predecessor of X (recall that we can compute dominance from the dominator tree by following the path from a leaf to the root).
-
-- [demonstrate on example 2 above]
-
-  DOMINATOR TREE:
-  ```
-          A
-          |
-          B
-        / | \
-       /  |  \
-      C   D   F
-          |   |
-          E   G
-  ```
-
-  DOMINANCE FRONTIERS:
-  ```
-  A: { }
-  B: { B }
-  C: { F }
-  D: { D, F }
-  E: { D, F }
-  F: { B }
-  G: { }
-  ```
-
-#### computing control dependence
-
-- X is control dependent on Y iff Y is in the post-dominance frontier of X
-
-    + remember that post-dominance (and post-dominance frontiers) are exactly the same as dominance (and dominance frontiers) except on a reversed CFG.
-
-    + if Y is in the post-dominance frontier of X, then that means Y has multiple successors s.t. if a specific one is taken then X must necessarily execute, and if it is not taken then X will definitely not execute. in other words, X is control dependent on Y.
-
-- algorithm:
-
-    + step 1: compute post-dominator tree (i.e., flip the edges of the CFG and compute the dominator tree on that).
-
-    + step 2: compute post-dominance frontiers (i.e., compute dominance frontiers but using the reversed CFG and the post-dominator tree).
-
-- that's it: each block X is control dependent on any block in its post-dominance frontier.
-
-- [demonstrate on example 2 above]
-
-  POST-DOMINATOR TREE:
-  ```
-          G
-          |
-          F
-        / | \
-       /  |  \
-      C   E   B
-          |   |
-          D   A
-  ```
-
-  POST-DOMINANCE FRONTIERS:
-  ```
-  A: { }
-  B: { F }
-  C: { B }
-  D: { B, E }
-  E: { B, E }
-  F: { F }
-  G: { }
-  ```
 
 ## pdg
 
