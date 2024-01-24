@@ -39,7 +39,7 @@
 - week 1.2: through `intro to dfa` -> `abtract semantics`; stopped 10 minutes early
 - week 2.1: through `defining...integer-based analysis` -> `MFP algorithm`
 - week 2.2: through all of `defining...integer-based analysis` (had to skim the examples)
-- week 3.1: ???
+- week 3.1: through `second-order DFA` -> `reaching definitions` -> `abstract domain`
 - week 3.2: ???
 - week 4.1: ???
 - week 4.2: ???
@@ -1731,39 +1731,40 @@ exit:
   E IDOM {}
   ```
 
-#### dominator tree
-
-- FIXME: my implementation doesn't use a dominator tree; how do we get it from the analysis solution? do we need this?
-
-- a convenient data structure to represent dominance information is a `dominator tree`:
-
-    + a node for each basic block
-
-    + an edge `x --> y` iff `x IDOM y`
-
-- given a dominator tree, we can easily compute `DOM` and `DOM!` info by starting at a node and working our way up the tree
-
-- notice that this representation only works if we're guaranteed that no node can be `IDOM` by more than one other node (otherwise this wouldn't be a tree)
-
-    + we want to prove that if `a IDOM c` and `b IDOM c`, then `a = b`
-    + by definition of `IDOM`, `a DOM! c` and `b DOM! c`
-    + by definition of `DOM!`, all strict dominators of `c` must dominate `a` (which includes `b`)
-    + by definition of `DOM!`, all strict dominators of `c` must dominate `b` (which includes `a`)
-    + therefore `a DOM b` and `b DOM a`
-    + since `DOM` is anti-symmetric, `a = b`
-
-- example 1: [show dominator tree for example 1 above]
-
-- example 2: [show dominator tree for example 2 above]
-
 #### computing dominance
 ##### abstract domain
 
-- TODO:
+- what are the potential analysis solution? sets of basic blocks, thus these are the abstract values
+
+- therefore, abstract domain is 𝒫(BasicBlock)
+
+- what is the most and least precise safe answers (i.e., ⊥ and ⊤)?
+
+    - remember that we want to be safe: if we say that bb1 dominates bb2 then it definitely does
+    - ⊥ = BasicBlock
+    - ⊤ = {}
+
+- what is join?
+
+    - set intersection
+
+- notice that this is flipped from reaching defs, where we had a powerset abstract domain but ⊥ = {} and ⊤ = PP
+
+    - this is because our notion of "safe" (the guarantee we want to provide) is different
+
+    - for reaching defs, we wanted to know all defs that _may_ reach this point
+
+    - for dominance, we want to know all basic blocks that _must_ dominate this one
 
 ##### abstract semantics
 
-- TODO:
+- the semantics are trivial because we don't care about the actual instructions, just the edges of the CFG
+
+- the abstract store is _not_ a mapping from variables to abstract values because variables are irrelevant to dominance; it's just a single abstract value (the set of dominating basic blocks)
+
+- to "execute" basic block bb, just insert it into the abstract store (because every basic block dominates itself)
+
+- everything else is handled by the fixpoint worklist algorithm
 
 ##### examples 
 
@@ -1839,41 +1840,26 @@ exit:
 
     + intuitively, the dominance frontier is the set of blocks that are _almost_ dominated by X, but just outside its control; or, its the set of blocks that are the earliest point where some competing control-flow path may reach that block
 
-- given the dominator tree, computing dominance frontiers is simple:
-
-    - FIXME: my implementation doesn't use a dominator tree; how do we get it from the analysis solution? should we just use the method i used in the implementation?
+- given DOM for each basic block, we can compute the dominance frontiers by:
 
   ```
-  for all blocks X in the CFG:
-    if the number of predecessors of X >= 2:
-      for all predecessors P of X:
-        runner = P
-        while runner != idom[X]:
-          add X to runner's dominance frontier
-          runner = idom[runner]
+  // this will be the solution
+  let frontiers : BasicBlock -> 𝒫(BasicBlock) = {}
+
+  for (bb, bb_doms) in dominators:
+    // strict dominators of bb
+    let strict_bb_doms = bb_doms - {bb}
+
+    // for each predecessor of bb
+    for pred in cfg_preds(bb):
+      // for each dominator of pred that doesn't strictly dominate bb
+      for pred_dom in dominators[pred] - strict_bb_doms
+        // pred_dom dominates a predecessor of bb but doesn't strictly
+        // dominate bb, thus by definition frontier[pred_dom] includes bb
+        frontiers[pred_dom] ∪= bb
   ```
-
-- intuitively:
-
-    + X cannot be in a dominance frontier if it doesn't have at least two predecessors (because that's the only way it can "escape" from another block's dominance)
-
-    + X cannot be in the dominance frontier of its immediate dominator (by definition of dominance frontier)
-
-    + otherwise, X is in the dominance frontier of Y if Y dominates a predecessor of X (recall that we can compute dominance from the dominator tree by following the path from a leaf to the root)
 
 - [demonstrate on example 2 above]
-
-  DOMINATOR TREE:
-  ```
-          A
-          |
-          B
-        / | \
-       /  |  \
-      C   D   F
-          |   |
-          E   G
-  ```
 
   DOMINANCE FRONTIERS:
   ```
@@ -1886,7 +1872,7 @@ exit:
   G: { }
   ```
 
-#### computing control dependence
+#### computing control dependence from dominance frontiers
 
 - X is control dependent on Y iff Y is in the post-dominance frontier of X
 
@@ -1896,27 +1882,15 @@ exit:
 
 - algorithm:
 
-    + step 1: compute post-dominator tree (i.e., flip the edges of the CFG and compute the dominator tree on that)
+    + step 1: compute post-dominators (i.e., flip the edges of the CFG and compute the dominators on that)
 
-    + step 2: compute post-dominance frontiers (i.e., compute dominance frontiers but using the reversed CFG and the post-dominator tree)
+    + step 2: compute post-dominance frontiers (i.e., compute dominance frontiers but using the reversed CFG and the post-dominators)
 
-- that's it: each block X is control dependent on any block in its post-dominance frontier
+    + step 3: each block X is control dependent on any block in its post-dominance frontier
 
 - [demonstrate on example 2 above]
 
-  POST-DOMINATOR TREE:
-  ```
-          G
-          |
-          F
-        / | \
-       /  |  \
-      C   E   B
-          |   |
-          D   A
-  ```
-
-  POST-DOMINANCE FRONTIERS:
+  POST-DOMINANCE FRONTIERS (and thus CONTROL DEPENDENCIES):
   ```
   A: { }
   B: { F }
