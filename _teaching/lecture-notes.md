@@ -95,7 +95,7 @@
 
     - manually create mutants of the analysis, then a tool that creates random valid programs and runs them on the real solution and each mutant, saving the programs that kill at least one mutant; keep going until there are a minimum number of test cases that kill each mutant
 
-    - create a list of properties for test cases and then a tool that creates random valid programs and filters out those that don't have interesting properties
+    - create a list of properties for test cases and then a tool that creates random valid programs and filters out those that don't have interesting
 
 ### additional materials
 
@@ -1533,6 +1533,8 @@
     - `∀v ∈ WDEF, σ[v] = σ[v] ∪ { pp }`
     - `σ[x] = { pp }` (if `x` exists)
 
+    - the order here is important, handle the strong def _after_ the weak defs (in case `x` is address-taken and included in the weak defs too)
+
     - we have to assume that a callee function could define and/or use any variable reachable from its arguments or from a global, and also define/or use any global
 
     - FIXME: we make the same notes below about external calls in the integer-based analysis abstract semantics; i'm copying them here because i inserted those notes _after_ i already did that lecture in class so i need to make them here instead---once i do, i can replace them with a pointer to the previous notes instead
@@ -1544,8 +1546,6 @@
         - in the case where the external code really does do something like that, we can keep our analysis sound by stubbing those external functions as internal functions that summarize their behavior wrt the analysis we're implementing (this is a common technique in program analysis)
 
     - we also assume that external calls can access our internal globals; this is consistent with languages like C and C++ which can declare globals as extern
-
-    - the order is important, handle the strong def _after_ the weak defs (in case `x` is address-taken and included in the weak defs too)
 
 ```
     EXAMPLE:
@@ -1629,7 +1629,9 @@ exit:
 ## second analysis example: control analysis
 ### intro
 
-- the subject of this analysis is control dominance and dependence: how the execution of the basic blocks depend on each other
+- the subject of this analysis is control-flow: how the executions of the basic blocks depend on each other
+
+    - e.g., "basic block A must always execute before basic block B" or "if basic block A executes, then basic block B must execute", etc
 
     - some potential uses of this analysis:
 
