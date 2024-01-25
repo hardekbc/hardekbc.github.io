@@ -91,6 +91,12 @@
 
 - assignment 1: now that we've figured out the autograder i could streamline the assignment description (things like what arguments are passed to the script, etc)
 
+- develop tools for creating interesting test suites:
+
+    - manually create mutants of the analysis, then a tool that creates random valid programs and runs them on the real solution and each mutant, saving the programs that kill at least one mutant; keep going until there are a minimum number of test cases that kill each mutant
+
+    - create a list of properties for test cases and then a tool that creates random valid programs and filters out those that don't have interesting properties
+
 ### additional materials
 
 - create a tool to automatically log an analysis execution and play it back for the students, in order to more easily go through examples in lecture
