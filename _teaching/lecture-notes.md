@@ -9,21 +9,7 @@
 
     - for taint analysis there was a discrepancy between my lecture notes and my implementation on how the pointer-typed return value of a source was handled; make sure the new notes conform to the new implementation
 
-- provide documentation on cflat programs for the students? they don't really need to write cflat programs, but it might be nicer than writing lir directly
-
 - for interprocedural analyses (pointer analysis, taint analysis) need to specify that the output variable names are qualified by the function they were defined in
-
-- can i create a single autograder for all assignments?
-
-    - or at least a single 'library' they all use for common stuff
-
-    - notes from last time:
-
-        - change DiffSolution in grader.py to eliminate all whitespace, maybe eliminate newlines
-
-        - enforce that no binaries can be submitted
-
-        - implement security restrictions (see mehmet's efforts)
 
 ## reminders for myself
 
@@ -40,7 +26,7 @@
 - week 2.1: through `defining...integer-based analysis` -> `MFP algorithm`
 - week 2.2: through all of `defining...integer-based analysis` (had to skim the examples)
 - week 3.1: through `second-order DFA` -> `reaching definitions` -> `abstract domain`
-- week 3.2: ???
+- week 3.2: through `reaching definitions`; stopped 20 minutes early
 - week 4.1: ???
 - week 4.2: ???
 - week 5.1: ???
