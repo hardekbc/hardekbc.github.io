@@ -69,11 +69,19 @@
 
 - in general for `intro to DFA` i feel like i'm throwing a lot of abstract concepts at them, maybe too fast and without sufficient context; is there a way for me to get to the actual analysis process more quickly before going into the ideas of abstract domains, abstract semantics, etc? maybe it would be sufficient to preface this stuff with a concrete program example and set of sign invariants that i want to infer, just to set the stage?
 
+- for `intro to widening`:
+
+    - i say to use it whenever we're propagating to a loop header, but really to be more precise we should use it only when propagating along a back-edge; the extra complexity probably isn't worth it though
+
+    - using widening does now mean that the order we visit basic blocks in matters---it can change the output of the analysis (simple example: two edges into a loop header, one that propagates `a -> [0,0]` and one `a -> [1,1]`; depending on which one propagates first we'll get either `[0, ∞)` or `(-∞, 1]`)
+
 ### assignments
 
 - maybe only give them the JSON format instead of giving them a choice?
 
     - TODO: check student submissions and see how many ended up using the LIR format directly and how many used the JSON version
+
+- update the autograders to give each test case a timeout, so that if the student submission goes into an infinite loop it gets reported as an error instead of forcing the autograder itself to timeout and giving the student no feedback
 
 - assignment 1: now that we've figured out the autograder i could streamline the assignment description (things like what arguments are passed to the script, etc)
 
