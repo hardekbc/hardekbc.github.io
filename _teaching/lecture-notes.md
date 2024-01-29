@@ -1531,16 +1531,6 @@
 
     - we have to assume that a callee function could define and/or use any variable reachable from its arguments or from a global, and also define/or use any global
 
-    - FIXME: we make the same notes below about external calls in the integer-based analysis abstract semantics; i'm copying them here because i inserted those notes _after_ i already did that lecture in class so i need to make them here instead---once i do, i can replace them with a pointer to the previous notes instead
-
-    - note that we're making an important assumption that external calls are independent, i.e., that they do not influence each other (e.g., by using their own globals that are invisible to us)
-
-        - if we don't make this assumption then, for example, `$call_ext foo(x)` where `x` is a pointer to a local or global could store the value of `x` in an invisible global, then `$call_ext bar()` could modify that local/global even though it didn't get any arguments, or `$call_ext foo(y)` could do the same even though it isn't getting `x` this time---this would force us to be very conservative about handling external calls
-
-        - in the case where the external code really does do something like that, we can keep our analysis sound by stubbing those external functions as internal functions that summarize their behavior wrt the analysis we're implementing (this is a common technique in program analysis)
-
-    - we also assume that external calls can access our internal globals; this is consistent with languages like C and C++ which can declare globals as extern
-
 ```
     EXAMPLE:
 
