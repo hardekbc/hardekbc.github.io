@@ -1937,25 +1937,11 @@ exit:
 
     - anti-symmetric: `∀a,b ∈ S, (a, b) and (b, a) implies a = b`
 
-### PREORDER
-
-- a binary relation that is _reflexive_ and _transitive_
-
-- example: reachability relation on a directed graph (note that it can contain cycles)
-
-- counterexample: "person X likes person Y"
-
-    + a person may not like themselves (not reflexive) and if X likes Y and Y likes Z, X does not necessarily like Z (not transitive)
-
-- recall that a preorder that is also symmetric is an _equivalence relation_
-
-    + (ℤ, =)
-
-    + "has same birthday as"
-
 ### PARTIAL ORDER aka POSET
 
-- a preorder that is _anti-symmetric_
+- a binary relation that is _reflexive_, _transitive_, and _anti-symmetric_
+
+    - if it were _symmetric_ instead then it would be an _equivalence relation_: (ℤ, =), "has same birthday as"
 
 - examples:
 
