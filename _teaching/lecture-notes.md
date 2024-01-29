@@ -3,8 +3,6 @@
 
 - update lecture notes
 
-    - for DFA, maybe abbreviate the math definitions and theorems for DFA; instead of building up gradually i could just go straight to lattices and kleene's theorem
-
     - for constraint-based analysis i could speed things up by skipping the general constraint language and going straight to inclusion constraints (just mention that we can make more complicated languages but it quickly becomes undecidable)
 
     - for taint analysis there was a discrepancy between my lecture notes and my implementation on how the pointer-typed return value of a source was handled; make sure the new notes conform to the new implementation
@@ -71,17 +69,13 @@
 
 - for `intro to widening`:
 
-    - i say to use it whenever we're propagating to a loop header, but really to be more precise we should use it only when propagating along a back-edge; the extra complexity probably isn't worth it though
-
-    - using widening does now mean that the order we visit basic blocks in matters---it can change the output of the analysis (simple example: two edges into a loop header, one that propagates `a -> [0,0]` and one `a -> [1,1]`; depending on which one propagates first we'll get either `[0, ∞)` or `(-∞, 1]`)
+    - i say to use it whenever we're propagating to a loop header, but really to be more precise we should use it only when propagating along a back-edge---the extra complexity probably isn't worth it though; think about whether i want to do this
 
 ### assignments
 
 - maybe only give them the JSON format instead of giving them a choice?
 
     - TODO: check student submissions and see how many ended up using the LIR format directly and how many used the JSON version
-
-- update the autograders to give each test case a timeout, so that if the student submission goes into an infinite loop it gets reported as an error instead of forcing the autograder itself to timeout and giving the student no feedback
 
 - assignment 1: now that we've figured out the autograder i could streamline the assignment description (things like what arguments are passed to the script, etc)
 
@@ -1238,13 +1232,19 @@
 
 - [redo previous example, using the widening operator at the loop header]
 
-- small point: how do we identify loop headers in the CFG?
+- how do we identify loop headers in the CFG?
 
     - just do a post-order labeling on the CFG; if you ever reach a node that you have already visited but not yet labeled then it's a loop header
 
     - [demo using the previous example's CFG]
 
-- we'll look at when we need widening operators and what makes a valid widening operator shortly when we look at the math behind DFA
+- IMPORTANT NOTE: this widening operator isn't commutative, so it matters what order we visit the basic blocks in during out fixpoint computation
+
+    - example: two edges into a loop header, one that propagates `a -> [0, 0]` and one `a -> [1, 1]`; depending on which one propagates first we'll get either `[0, ∞)` or `(-∞, 1]`
+
+    - the assignment description tells you what you need to ensure you get the same solution as the autograder
+
+- we'll look at exactly when we need widening operators and what makes a valid widening operator soon when we look at the math behind DFA
 
 - EXAMPLE 2 (exercise for students)
 
@@ -1903,33 +1903,39 @@ exit:
   G: { }
   ```
 
-# ===== OLD ============================================================================
-
 # the math behind DFA
 ## preliminaries
 
-- we've been really hand-wavy so far. how can we guarantee that the analysis is decidable (i.e., terminates)? and can we be more generous with how precise the abstract domains are (e.g., can we allow infinite domains safely)?
+- we've been really hand-wavy so far---how can we guarantee that the analysis is decidable (i.e., terminates)? we saw that some domains guarantee termination (e.g., signs) and some don't (e.g., intervals), and being infinite doesn't tell the whole story (e.g., constants terminates while intervals does not without widening)
 
-- to make guarantees about computability we can't allow arbitrary abstract domains; instead we need to impose an algebraic structure to them that will allow us to prove computability.
+- to make guarantees about computability we can't allow arbitrary abstract domains; instead we need to impose an algebraic structure to them that will allow us to prove computability
 
-- we'll go into a bunch of definitions and theorems in abstract algebra, and then afterwards connect it back to abstract domains and computability.
+- we'll go into a bunch of definitions and theorems in abstract algebra, and then afterwards connect it back to abstract domains and computability
 
-- these definitions are about _ordering_: given a set S, an ordering is a binary relation on that set which meets certain requirements.
+- these definitions are about _ordering_: given a set S, an ordering is a binary relation on that set which meets certain requirements
 
-    + examples of well-known orderings: (ℤ, ≤), (Strings, ≤).
+    + examples of well-known orderings: (ℤ, ≤), (Strings, ≤)
 
-    + we often use the notation ⊑ for an arbitrary ordering.
+    + we often use the notation ⊑ for an arbitrary ordering
 
 ## definitions
 ### BINARY RELATION
 
-- a binary relation on set S ⊆ P(S × S)
+- a binary relation on set `S ⊆ 𝒫(S × S)`
 
-- example: ({1, 2, 3, 6}, ⊑) where ⊑ means 'divides evenly'. the binary relation ⊑ is {(1,1), (1,2), (1,3), (1,6), (2,2), (2,6), (3,3), (3,6), (6,6)}
+- example: `({1, 2, 3, 6}, ⊑)` where ⊑ means 'divides evenly'; the binary relation ⊑ is {(1,1), (1,2), (1,3), (1,6), (2,2), (2,6), (3,3), (3,6), (6,6)}
 
-- instead of saying '(1,3) ∈ ⊑' we usually say '1 ⊑ 3'
+- instead of saying `(1,3) ∈ ⊑` we usually say `1 ⊑ 3`
 
-- [review reflexive, transitive, symmetric, anti-symmetric]
+- a relation may have some of the following properties:
+
+    - reflexive: `∀a ∈ S, (a, a)`
+
+    - transitive: `∀a,b,c ∈ S, (a, b) and (b, c) implies (a, c)`
+
+    - symmetric: `∀a,b ∈ S, (a, b) implies (b, a)`
+
+    - anti-symmetric: `∀a,b ∈ S, (a, b) and (b, a) implies a = b`
 
 ### PREORDER
 
@@ -1955,7 +1961,7 @@ exit:
 
     + reachability on a DAG (anti-symmetric because no cycles)
     + ℕ and divisibility: (ℕ, |)
-    + P(S) and ⊆
+    + 𝒫(S) and ⊆
 
 - counterexample:
 
@@ -1963,7 +1969,7 @@ exit:
 
 - we can visualize partial orders as Hasse diagrams:
 
-    + example: P({1, 2, 3}), ⊆
+    + example: 𝒫({1, 2, 3}), ⊆
 
     + example: ({1, 2, 3, 5, 6, 10, 15, 30}, "divides into")
 
@@ -1975,21 +1981,21 @@ exit:
 
 ### LEAST UPPER BOUND, aka JOIN, aka ⊔
 
-- for D ⊆ S, the least x ∈ S s.t. ∀d ∈ D, d ⊑ x.
+- for D ⊆ S, the least x ∈ S s.t. ∀d ∈ D, d ⊑ x
 
-- denoted ⊔D or (if D = {x, y}) x ⊔ y
+- denoted `⊔D` or (if D = {x, y}) `x ⊔ y`
 
 - examples: use posets from above
 
 ### GREATEST LOWER BOUND, aka MEET, aka ⊓
 
-- the dual of ⊔
+- the dual of ⊔: for D ⊆ S, the greatest x ∈ S s.t. ∀d ∈ D, x ⊑ d
 
 - examples: taken from the above partial and total orders
 
 - note that ⊔ and ⊓ are not guaranteed to exist
 
-    + DAG reachability [e.g., isolated nodes]
+    + DAG reachability [e.g., nodes in isolated graph components]
 
     + (ℤ, ≤), join(D) where D = the set of even integers [no least integer greater than all even integers]
 
@@ -2010,12 +2016,12 @@ exit:
         - join(x, y) == least common multiple
         - meet(x, y) == greatest common divisor [BOT = 1]
 
-    + (P({1, 2, 3}), ⊆) [BOT = {}, TOP = {1,2,3}]
+    + (𝒫({1, 2, 3}), ⊆) [BOT = {}, TOP = {1,2,3}]
 
         - join = union
         - meet = intersection
 
-- QUIZ: lattice or not? draw Hasse diagram.
+- QUIZ: lattice or not? [draw Hasse diagrams]
 
   1. ({1, 2, 3}, |)             [NO]
   2. ({1, 2, 3, 6}, |)          [YES]
@@ -2024,7 +2030,7 @@ exit:
 
 ### NOETHERIAN LATTICE
 
-- a lattice s.t. the length of any ascending chain must be finite.
+- a lattice s.t. the length of any ascending chain must be finite
 
     + aka 'meets the finite ascending chain condition'
 
@@ -2049,7 +2055,7 @@ exit:
 
         - just take join/meet of each element in turn
 
-    + (P(ℕ), ⊆)
+    + (𝒫(ℕ), ⊆)
 
         - join = union
         - meet = intersection
@@ -2058,7 +2064,7 @@ exit:
 
 - counterexamples:
 
-    + ({ S ∈ P(ℕ) | S is finite }, ⊆)
+    + ({ S ∈ 𝒫(ℕ) | S is finite }, ⊆)
 
         - no join/meet for infinite set
 
@@ -2071,96 +2077,101 @@ exit:
 ```
 binary relation
   --> preorder
-    --> equivalence relation
-    --> partial order (includes total order)
-      --> lattice (may or may not be noetherian)
-        --> complete lattice (also may or may not be noetherian)
+      --> equivalence relation
+      --> partial order (includes total order)
+          --> lattice (may or may not be noetherian)
+              --> complete lattice (also may or may not be noetherian)
 ```
 
 ## relation to program analysis
 
-- we will require our abstract domains to be (complete) lattices with a partial order based on precision (more advanced versions can use less retrictive structures, but we'll stick with lattices)
+- we will require our abstract domains to be complete noetherian lattices with a partial order based on precision
 
-  + examples: +/0/- (more than one possibility); even/odd
+    + examples: parity, sign, constants, reaching defs
 
-  + example: tainted strings to track user input
+    + recall that each abstract value represents a set of concrete values, and the abstract domain partial order reflects the subset relation between the concrete sets---a smaller concrete set of possible values means a more precise abstract value
 
-- so when we've said "the most precise abstract value", what we mean is the lowest possible element of the lattice that still over-approximates the given concrete values.
+- so when we've said "the most precise abstract value", what we mean is the lowest possible element of the lattice that still over-approximates the given concrete values
 
-- note that traditionally DFA actually flips the lattices, so the most precise element is on the top and the least precise is on the bottom; a.i. does it like we're doing it here. i'm keeping it consistent to make our lives easier, but it can be confusing when reading both the dfa and a.i. literature.
+- note that traditionally DFA actually flips the lattices: the most precise element is on the top and the least precise is on the bottom, while a.i. does it like we're doing it here; it can be confusing when reading both the dfa and a.i. literature
 
-- why is all this math useful? because we can formally define when the MFP exists and is computable.
+    + the a.i. version matches the math better, but really it doesn't matter as long as we're consistent
+
+- why is all this math useful? because we can formally define when the MFP exists and is computable
 
 ## computability
 ### FIXPOINTS
 
 - recall:
 
-    + a fixpoint of F is an input x s.t. F(x) = x
+    + a fixpoint of `F` is an input `x` s.t. `F(x) = x`
 
-    + lfp_x F = u s.t. x ⊑ u, F(u) = u, ∀y. F(y) = y ⇒ u ⊑ y
+    + `lfp_x F = u` s.t. `x ⊑ u`, `F(u) = u`, `∀y. F(y) = y ⇒ u ⊑ y`
 
-    + pre-fixpoint: x ⊑ F(x)
+    + pre-fixpoint: `x ⊑ F(x)`
 
-    + post-fixpoint: F(x) ⊑ x
+    + post-fixpoint: `F(x) ⊑ x`
 
-- notice that these last three definitions only make sense for an ordered set (and now we know exactly what that means).
+- notice that these last three definitions only make sense for an ordered set (and now we know exactly what that means)
 
-- note that a function may have 0—∞ fixpoints, and just because there's more than one _doesn't_ mean that there's a least one.
+- note that a function may have 0—∞ fixpoints, and just because there's more than one _doesn't_ mean that there's a least one
 
-    + f(x) = x + 2  [0]
+    + f(x) = x + 2  [0 fixpoints]
 
-    + f(x) = x² - x [2]
+    + f(x) = x² - x [2 fixpoints (0 and 1)]
 
-    + f(x) = x² ÷ x [∞]
+    + f(x) = x² ÷ x [∞ fixpoints; no least fixpoint if x ∈ 𝐙]
 
 - our worklist algorithm for computing the MFP is trying to compute this, but how can we be sure that it exists and is computable?
 
 ### MONOTONICITY
 
-- function F is monotone iff x ⊑ y ⇒ f(x) ⊑ f(y), or equivalently f(x) ⊔ f(y) ⊑ f(x ⊔ y)
+- function `F` is _monotone_ iff `x ⊑ y ⇒ f(x) ⊑ f(y)`, or equivalently `f(x) ⊔ f(y) ⊑ f(x ⊔ y)`
 
 - [SKIP] PROOF (1st direction; 2nd direction left as exercise):
 
-    1. f(x) ⊔ f(y) ⊑ f(x ⊔ y) [given]
-    2. x ⊑ y ⇒ x ⊔ y = y [by def.]
+    1. f(x) ⊔ f(y) ⊑ f(x ⊔ y)      [given]
+    2. x ⊑ y ⇒ x ⊔ y = y           [by definition]
     3. x ⊑ y ⇒ f(x) ⊔ f(y) ⊑ f(y) [by 1, 2]
-    4. f(x) ⊑ f(x) ⊔ f(y) [by def.]
-    5. x ⊑ y ⇒ f(x) ⊑ f(y) [by 3,4]
+    4. f(x) ⊑ f(x) ⊔ f(y)          [by definition]
+    5. x ⊑ y ⇒ f(x) ⊑ f(y)        [by 3,4]
 
-- example: f(x) = x - 1
+- example: `f(x) = x - 1`
 
-- counterexample: f(x) = x+2 if x ≤ 0, x else
+- counterexample: `f(x) = x+2 if x ≤ 0, else x`
 
-- an _extensive_ function is one for which x ⊑ F(x). note that monotone and extensive are orthogonal properties; people often confuse them.
+- an _extensive_ function is one for which x ⊑ F(x); note that monotone and extensive are orthogonal properties (people often confuse them)
 
 ### FIXPOINT THEOREMS
 
-- TARSKI: let L be a complete lattice and F:L→L be monotone; then the
-  set of fixpoints of F is a complete lattice (and thus there exists a
-  least fixpoint). however, it doesn't tell us how to find the least
-  fixpoint.
+- `TARSKI`: let `L` be a complete lattice and `F:L→L` be monotone; then the set of fixpoints of `F` is a complete lattice (and thus there exists a least fixpoint)
 
-- KLEENE: let L be a complete _noetherian_ lattice and F:L→L be monotone
-  and x be a pre-fixpoint of F; then ∃n ≥ 0 s.t. Fⁿ(x) is stationary
-  and lfp_x F = Fⁿ(x)
+    + so we know a least fixpoint exists, since our abstract domains are complete lattices
 
-    + KLEENE ITERATIONS: ⊥ ⊑ F(⊥) ⊑ F(F(⊥)) ⊑ ... ⊑ Fⁿ(⊥) ⊑ ...
+    + however, it doesn't tell us how to _find_ the least fixpoint
 
-    + it turns out that this is what we're doing when we use our worklist algorithm (though in a rather optimized way).
+- `KLEENE`: let `L` be a complete _noetherian_ lattice and `F:L→L` be monotone and `x` be a pre-fixpoint of `F`; then ∃n ≥ 0 s.t. `Fⁿ(x)` is stationary and `lfp_x F = Fⁿ(x)`
+
+    + so start from a solution that is less than the fixpoint, then keep applying `F` over and over; eventually we'll reach a fixpoint and it will be the least fixpoint
+
+    + `KLEENE ITERATIONS`: ⊥ ⊑ F(⊥) ⊑ F(F(⊥)) ⊑ ... ⊑ Fⁿ(⊥) ⊑ ...
+
+    + it turns out that this is what we're doing when we use our worklist algorithm (though in an optimized way because we only re-evaluate the parts that have changed, rather than re-evaluating everything every time)
 
 ### ABSTRACT SEMANTICS
 
-- these theorems tell us that if (1) our abstract domains are noetherian lattices, and (2) our transfer functions are monotone, then the least fixpoint exists and is computable, and our worklist algorithm will compute it.
+- these theorems tell us that if (1) our abstract domains are noetherian lattices, and (2) our transfer functions are monotone, then the least fixpoint exists and is computable, and our worklist algorithm will compute it
 
-    + note that the worklist is an optimization of kleene iterations that avoids computing transfer functions that are guaranteed to have not changed their values.
+    + note that the worklist is an optimization of kleene iterations that avoids computing transfer functions that are guaranteed to have not changed their values
 
-    + give the generic DFA functions:
+    + for us, our function `F` is a system of equations based on the program being analyzed:
 
       ```
       IN_k = ⊔ { OUT_i | i→k ∈ CFG }
       OUT_k = F♯(IN_k)
       ```
+
+    + here `F♯` is the abstract execution of a basic block and its argument is the initial abstract store for that basic block
 
 ### EXAMPLES
 
@@ -2168,40 +2179,25 @@ binary relation
 
 #### signedness {-, 0, +}
 
--  [show lattice, abstract +]
+- [show abstract domain, abstract `+`]
 
-- monotone if: a ⊑ a' and b ⊑ b' => a + b ⊑ a' + b'
+- is the abstract domain a noetherian lattice? YES
 
-    + case 1: a' or b' = ⊥. then a or b = ⊥, a + b = ⊥, a' + b' = ⊥, thus a + b = a' + b'.
+- abstract `+` is monotone if: `a ⊑ a'` and `b ⊑ b'` => `a + b ⊑ a' + b'`
 
-    + case 2: a' or b' = ⊤. then a' + b' = ⊤, thus a + b ⊑ a' + b'.
+    + case 1: `a' or b' = ⊥`; then `a or b = ⊥` and thus `a + b = ⊥` and also `a' + b' = ⊥`, thus `a + b = a' + b'`
 
-    + case 3: a' \in {+,0,-}, b' \in {+,0,-}, a,b != ⊥. then a = a', b = b', thus a + b = a' + b'.
+    + case 2: `a' or b' = ⊤`; then `a' + b' = ⊤` and thus `a + b ⊑ a' + b'`
+
+    + case 3: `a' ∈ {+,0,-}`, `b' ∈ {+,0,-}`, `a, b ̸= ⊥`; then `a = a'` and `b = b'` thus `a + b = a' + b'`
 
 #### constant lattice
 
-- note that this lattice is infinite
+- [show abstract domain, abstract `+`]
 
-- [show abstract +, sketch monotonicity proof]
+- is the abstract domain a noetherian lattice? YES
 
-#### [SKIP] parity
-
-- [generalize to modular arithmetic?]
-
-#### [SKIP] finite-size interval lattice:
-
-                    [-∞, ∞]
-                   /   |   \
-            [-∞, -1]   |    [0, ∞]
-            /          |         \
-           /        [-9, 9]       \
-          /         /     \        \
-    [-∞, -10]  [-9, -1] [0, 9] [10, ∞]
-            \         | |      /
-             ---------\ /------
-                       ⊥
-
-- however, note that the general integer interval lattice is infinite but _not_ noetherian, and thus cannot be used with DFA. there are techniques that would allow us to use non-noetherian lattices safely; these are the realm of abstract interpretation rather than DFA.
+- is the abstract `+` function monotone? [similar to proof for sign abstract `+`]
 
 # widening redux
 ## context
@@ -2212,6 +2208,8 @@ binary relation
 
     - example: the integer interval abstract domain
 
+    - however, since the integer interval lattice is _not_ noetherian it cannot be used with DFA without some additional trickery
+
 - we saw that there is a way around this problem that allows us to use non-noetherian abstract domains but still guarantees computability: _widening_
 
     - previously we looked at it intuitively
@@ -2220,69 +2218,91 @@ binary relation
 
 ## definition
 
-- recall that while complete lattices with monotone functions are guaranteed to have a fixpoint, the only way we're guaranteed to be able to _find_ the fixpoint is if the lattice is noetherian (i.e., no infinite ascending chains).
+- recall that while complete lattices with monotone functions are guaranteed to have a fixpoint (TARSKI), the only way we're guaranteed to be able to _find_ the fixpoint is if the lattice is noetherian (i.e., no infinite ascending chains)
 
-    + essentially, if the function is monotone then we can only stay in one place (we've found a fixpoint) or go up the lattice; if the lattice is noetherian we can only go up the lattice a finite number of times before we reach TOP.
+    + essentially, if the function is monotone then we can only stay in one place (we've found a fixpoint) or go up the lattice; if the lattice is noetherian we can only go up the lattice a finite number of times before we reach ⊤
 
 - but what if we want to use an abstract domain that isn't noetherian, in order to get greater precision?
 
-    + we've seen two examples already: integer intervals and regular expressions.
+- what we want is a way to accelerate/guarantee convergence, i.e., if the normal fixpoint computation is working up along the abstract lattice in a chain, what we need to is leap-frog up that chain past potentially an infinite number of lattice elements
 
-- what we want is a way to accelerate/guarantee convergence, i.e., if the normal fixpoint computation is working up along the abstract lattice in a chain, what we need to is leap-frog up that chain past potentially an infinite number of lattice elements.
+- solution: _widening_. we replace the lattice join operator with a _widening operator_, then apply the usual worklist algorithm for computing a fixpoint
 
-- solution: _widening_. we replace the lattice join operator with a _widening operator_, then apply the usual worklist algorithm for computing a fixpoint.
+    + this comes with a cost: the fixpoint we reach is not guaranteed to be the least fixpoint of the original lattice (or even a fixpoint of the original lattice at all); all we know for sure is that `lfp_orig ⊑ lfp_widened`
 
-    + this comes with a cost: the fixpoint we reach is not guaranteed to be the least fixpoint of the original lattice (or even a fixpoint of the original lattice at all); all we know for sure is that `lfp_orig <= lfp_widened`.
+    + the idea is that while we aren't getting as precise an answer as we could be getting for that abstract domain, since the abstract domain itself is more precise than one that is noetherian, hopefully we're getting a more precise answer than we would be getting with that noetherian lattice (this isn't a guarantee, though)
 
-    + the idea is that while we aren't getting as precise an answer as we could be getting for that abstract domain, since the abstract domain itself is more precise than one that is noetherian, hopefully we're getting a more precise answer than we would be getting with that noetherian lattice (this isn't a guarantee, though).
+        - example: we need to use widening for integer intervals, but we'll still often get a better solution than using the constant abstract domain
 
-        - example: we need to use widening for integer intervals, but we'll still often get a better solution than using the constant abstract domain.
+    + an additional cost is that before, we had a simple checklist for proving our analysis is computable: we have a noetherian lattice and monotone transfer functions; now we need to prove that the widening operator we choose is, in fact, a proper widening operator (there are many possible operators, and we need to prove this fact for each one we want to use)
 
-    + an additional cost is that before, we had a simple checklist for proving our analysis is computable: we have a complete lattice and monotone transfer functions. now we need to prove that the widening operator we choose is, in fact, a proper widening operator (there are many possible operators, and we need to prove this fact for each one we want to use).
+- an operator `▽ ∈ DxD -> D` over some poset `D` is a widening operator iff:
 
-- an operator ▽ ∈ DxD -> D over some poset D is a widening operator iff:
+    + `x ⊑ (x ▽ y)` and `y ⊑ (x ▽ y)`
 
-    + x ⊑ (x ▽ y)
+    + for all ascending chains `x₀ ⊑ x₁ ⊑ x₂ ⊑ ...`, the following chain stabilizes in a finite number of steps:
 
-    + y ⊑ (x ▽ y)
+        - `acc₀ = x₀`
+        - `acc_{n+1} = accₙ ▽ x_{n+1}`
 
-    + for all ascending chains x_0 ⊑ x_1 ⊑ x_2 ⊑ ..., the following chain stabilizes in a finite number of steps:
+- the first condition says that the widening operator overapproximates its inputs
 
-        - acc_0 = x_0
-        - acc_{n+1} = acc_n ▽ x_{n+1}
+- the second condition says that if we apply the widening operator to an ascending chain, then the result is a finite ascending chain
 
-- the first two conditions say that the widened result overapproximates the two original values.
-
-- the last condition says that if we use the widening operator to accumulate the value of an ascending chain, then we reach a fixpoint.
-
-    + recall that our worklist algorithm is essentially computing kleene iterations (F^n(BOTTOM)), which is computing an ascending chain. so if we use widening instead of join for the worklist algorithm, we're guaranteed to reach a fixpoint and terminate.
+    + recall that our worklist algorithm is essentially computing kleene iterations (`Fⁿ(⊥)`), which is computing an ascending chain; so if we use widening instead of join for the worklist algorithm we're guaranteed to reach a fixpoint and terminate
 
 ## example: integer intervals
 
 - recall the integer interval abstract domain
 
-- this is a complete lattice, but non-noetherian.
+- this is a complete lattice, but non-noetherian
 
-- one possible widening operator:
+- our example widening operator (one out of many possible):
 
-    + for all x ∈ L: BOTTOM ▽ x = x ▽ BOTTOM = x
+    + `∀x ∈ L: ⊥ ▽ x = x ▽ ⊥ = x`
 
-    + [a1, b1] ▽ [a2, b2] = [a', b'] s.t.
+    + `[a1, b1] ▽ [a2, b2] = [a', b']` s.t.
 
-        - if a1 <= a2, a' = a1, else a' = -INF
-        - if b1 >= b2, b' = b1, else b' = INF
+        - if `a1 <= a2` then `a' = a1`, else `a' = -∞`
+        - if `b1 >= b2` then `b' = b1`, else `b' = ∞`
 
-    + essentially, if we're growing down jump straight to -INF and if we're growing up jump straight to INF.
+    + essentially, if we're growing down jump straight to -∞ and if we're growing up jump straight to ∞
 
-## strategic use of widening
+- note again that this widening operator is _not_ commutative (unlike join, which is commutative)
 
-- widening loses precision, so we'd like to use it as little as possible. fortunately, we only really need it under specific circumstances to prevent nontermination.
+    - this means that the order we apply the widening operator in matters, thus the order we visit basic blocks in matters (which it didn't when we used ⊔)
 
-    + [ask students: what are they?]
+    - example: two edges into a loop header, one that propagates `a -> [0, 0]` and one `a -> [1, 1]`; depending on which one propagates first we'll get either `[0, ∞)` or `(-∞, 1]`
 
-    + it's when we have loops.
+# [IF TIME] practice designing analyses
 
-- to improve precision for our analysis use join everywhere except loop headers, where we use widening.
+- [go through designing a string constant analysis with the class as a warm-up, then give the prefix and regex analyses as exercises; see the pdfs in `docs/` for details]
+
+- for each analysis give:
+
+    + the elements of the lattice
+    + which element is ⊤, which is ⊥
+    + the join and meet operators and the ordering relation
+    + whether the lattice is finite, infinite but noetherian, or non-noetherian
+    + the alpha and gamma functions
+    + the definitions of `+`
+    + proof that `+` is monotone
+
+- prefix:
+
+    + the cases are handling various cells in the `+` table: case 1 is the leftmost column and the top row; case 2 is the middle cell; case 3 is rightmost middle cell; case 4 is the bottom middle and rightmost cells
+
+    + for case 3 we're saying that `b <= b'` which means all the strings in `b` are contained in `b'`, and all we're doing is sticking the same prefix to both sides, so `a . b <= a . b'`
+
+    + for case 4 we're saying that `a <= a'`, which means all strings starting with `a` are in `a'`, so no matter what `b` is it must be the case that `a . b <= a'`
+
+- regex:
+
+    + remember that it's only a lattice if we use normalized regexes
+
+    + while a lattice, it isn't a _complete_ lattice (e.g., the least upper bound of the chain `01 <= 0011 <= 000111 <= ...` is the language `0{n}1{n}`, which is context-free, and there is no _least_ regex that contains it); this is a problem, but since the lattice is non-noetherian it doesn't really matter---we can't guarantee finding a fixpoint anyway
+
+# ===== OLD ============================================================================
 
 # set constraint-based analysis
 ## intro
@@ -2381,7 +2401,7 @@ binary relation
 
     + let H = the set of all constructor calls
 
-    + a solution is an assignment σ ∈ Variable → P(H) that maps each set variable to a set of constructor calls s.t. all constraints are satisfied.
+    + a solution is an assignment σ ∈ Variable → 𝒫(H) that maps each set variable to a set of constructor calls s.t. all constraints are satisfied.
 
 - for the above example, a valid solution would be:
 
@@ -4118,42 +4138,6 @@ P2 -> { ref(d) }
 - example revisited: if we use a context-sensitive heap model, we get more precise results by separating the different contexts in our heap model.
 
 - as always, there's a cost: a context-sensitive heap model is more precise, but can be much more expensive.
-
-# PRACTICE designing analyses
-
-- [go through designing a string constant analysis with the class as a warm-up, then give the prefix and regex analyses as exercises; see the pdf docs for details]
-
-    + [motivate the prefix analysis with the browser addon analysis example, i.e., figuring out what network domains are being communicated with.]
-
-- for each analysis give:
-
-    + the elements of the lattice
-
-    + which element is TOP, which is BOTTOM
-
-    + the join and meet operators and the ordering relation
-
-    + whether the lattice is finite, infinite but noetherian, or non-noetherian
-
-    + the alpha and gamma functions
-
-    + the definitions of `+`
-
-    + proof that `+` is monotone
-
-- prefix:
-
-    + the cases are handling various cells in the `+` table: case 1 is the leftmost column and the top row; case 2 is the middle cell; case 3 is rightmost middle cell; case 4 is the bottom middle and rightmost cells.
-
-    + for case 3 we're saying that `b <= b'` which means all the strings in `b` are contained in `b'`, and all we're doing is sticking the same prefix to both sides, so `a . b <= a . b'`.
-
-    + for case 4 we're saying that `a <= a'`, which means all strings starting with `a` are in `a'`, so no matter what `b` is it must be the case that `a . b <= a'`.
-
-- regex:
-
-    + remember that it's only a lattice if we use normalized regexes.
-
-    + while a lattice, it isn't a _complete_ lattice (e.g., the least upper bound of the chain `01 <= 0011 <= 000111 <= ...` is the language `0{n}1{n}`, which is context-free, and there is no _least_ regex that contains it. this is a problem, but since the lattice is non-noetherian it doesn't really matter---we can't guarantee finding a fixpoint anyway.
 
 # sparse analysis and SSA
 ## problem with standard DFA
