@@ -1,21 +1,11 @@
 # WINTER 2024
-## TODO:
-
-- update lecture notes
-
-    - for constraint-based analysis i could speed things up by skipping the general constraint language and going straight to inclusion constraints (just mention that we can make more complicated languages but it quickly becomes undecidable)
-
-    - for taint analysis there was a discrepancy between my lecture notes and my implementation on how the pointer-typed return value of a source was handled; make sure the new notes conform to the new implementation
-
-- for interprocedural analyses (pointer analysis, taint analysis) need to specify that the output variable names are qualified by the function they were defined in
-
 ## reminders for myself
 
 - when going over analysis details in lecture, make it an exercise first then go over it myself (something to make the lecture more interactive and make the students think)
 
 - remind students that they can answer a lot of their own questions about output format and analysis behavior for the assignments by using the solution that i provide
 
-- if i need to update my solution on CSIL, remember to tell students that if they've copied the solution to their local machine then they need to re-copy it
+- if i need to update my solution on CSIL, remember to tell students that if they've copied the solution to their local machine then they need to re-copy it [this doesn't apply if i'm using `chmod =x` on the CSIL solution]
 
 ## lecture timing
 
@@ -24,8 +14,8 @@
 - week 2.1: through `defining...integer-based analysis` -> `MFP algorithm`
 - week 2.2: through all of `defining...integer-based analysis` (had to skim the examples)
 - week 3.1: through `second-order DFA` -> `reaching definitions` -> `abstract domain`
-- week 3.2: through `reaching definitions`; stopped 20 minutes early
-- week 4.1: ???
+- week 3.2: through `second-order DFA` -> `reaching definitions`; stopped 20 minutes early
+- week 4.1: through `second-order DFA` -> `control analysis`; stopped 10 minutes early
 - week 4.2: ???
 - week 5.1: ???
 - week 5.2: ???
@@ -2281,6 +2271,11 @@ binary relation
 # ===== OLD ============================================================================
 
 # set constraint-based analysis
+
+- [NOTE: COULD SAVE TIME BY SKIPPING GENERAL CONSTRAINT LANGUAGE, GOING STRAIGHT TO SUBSETS]
+
+- [NOTE: FOR ASSIGNMENT, NEED TO QUALIFY VARIABLE NAMED WITH SCOPE]
+
 ## intro
 
 - we're going to use the problem of pointers to explore a totally different method for program analysis: set constraint-based analysis.
@@ -3205,6 +3200,11 @@ P2 -> { ref(d) }
 - now on to something new!
 
 # taint analysis (interprocedural dfa; icfg; context sensitivity)
+
+- [NOTE: DISCREPANCY BETWEEN NOTES AND IMPLEMENTATION FOR HANDLING POINTER-TYPED RETURN VALUE OF SOURCE; CHECK MY CURRENT IMPLEMENTATION]
+
+- [NOTE: FOR ASSIGNMENT, NEED TO QUALIFY VARIABLE NAMED WITH SCOPE]
+
 ## intro
 
 - we've seen applications of program analysis for optimization and debugging, and we've seen how to overcome the difficulty of pointers. let's explore how to deal with function calls and interprocedural analysis at the same time as we expand our applications to include security.
