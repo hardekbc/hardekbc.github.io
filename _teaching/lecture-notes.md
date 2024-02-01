@@ -2240,7 +2240,7 @@ binary relation
 
     - example: two edges into a loop header, one that propagates `a -> [0, 0]` and one `a -> [1, 1]`; depending on which one propagates first we'll get either `[0, ∞)` or `(-∞, 1]`
 
-# [IF TIME] practice designing analyses
+# [IF TIME] practice designing DFA analyses
 
 - [go through designing a string constant analysis with the class as a warm-up, then give the prefix and regex analyses as exercises; see the pdfs in `docs/` for details]
 
@@ -2268,150 +2268,133 @@ binary relation
 
     + while a lattice, it isn't a _complete_ lattice (e.g., the least upper bound of the chain `01 <= 0011 <= 000111 <= ...` is the language `0{n}1{n}`, which is context-free, and there is no _least_ regex that contains it); this is a problem, but since the lattice is non-noetherian it doesn't really matter---we can't guarantee finding a fixpoint anyway
 
-# ===== OLD ============================================================================
-
 # set constraint-based analysis
-
-- [NOTE: COULD SAVE TIME BY SKIPPING GENERAL CONSTRAINT LANGUAGE, GOING STRAIGHT TO SUBSETS]
-
-- [NOTE: FOR ASSIGNMENT, NEED TO QUALIFY VARIABLE NAMED WITH SCOPE]
-
 ## intro
 
-- we're going to use the problem of pointers to explore a totally different method for program analysis: set constraint-based analysis.
+- we're going to use the problem of pointers to explore a totally different method for program analysis: set constraint-based analysis
 
-- we've had to treat pointers conservatively, and this has really hurt precision. pointers allow indirect data- and control-flow: we can't tell syntactically what is being used/defined by an instruction or where control is going (e.g., function pointers). if we want useful, non-trivial analysis information we really need to deal with pointers somehow.
+- we've had to treat pointers conservatively, and this has really hurt precision; pointers allow indirect data- and control-flow: we can't tell syntactically what is being used/defined by an instruction or where control is going (e.g., function pointers)---if we want useful, non-trivial analysis information we really need to deal with pointers somehow
 
-- in theory we can use DFA to analyze pointer information, using our standard formula: abstract domain, abstract transfer functions, abstract execution. in practice, it turns out that the domain is large enough and transfer functions complex enough that this isn't really scalable (we'd be lucky to be able to analyze programs with just 10,000 LOC).
+- in theory we can use DFA to analyze pointer information, using our standard formula: abstract domain, abstract semantics, abstract execution; in practice, it turns out that the domain is large enough and semantics complex enough that this isn't really scalable (we'd be lucky to be able to analyze programs with just 10,000 LOC)
 
-    + it's possible to make it more scalable (part of my phd dissertation was about how to make DFA-based pointer analysis two orders of magnitude more scalable), but (1) it isn't commonly used because it's still expensive; and (2) doing so is complex and requires set constraint-based analysis as a sub-procedure anyway.
+    + it's possible to make it more scalable (part of my phd dissertation was about how to make DFA-based pointer analysis two orders of magnitude more scalable), but (1) it isn't commonly used because it's still expensive; and (2) doing so is complex and requires set constraint-based analysis as a sub-procedure anyway
 
-- to be clear, set constraint-based analysis isn't specifically for pointer analysis, it can be used for many different things (just like DFA). we're going to be using pointers as the motivating example because it turns out that it's probably the most common technique for doing pointer analysis in current use.
+- to be clear, set constraint-based analysis isn't specifically for pointer analysis, it can be used for many different things (just like DFA); we're going to be using pointers as the motivating example because it turns out that it's probably the most common technique for doing pointer analysis in current use
 
-- recall that DFA gives us a `flow-sensitive` analysis (one solution per program point); set constraint-based analysis is going to give us a `flow-insensitive` analysis (one solution over the entire program).
+- recall that DFA gives us a `flow-sensitive` analysis (one solution per program point); set constraint-based analysis is going to give us a `flow-insensitive` analysis (one solution over the entire program)
 
-    + a flow-sensitive sign analysis: at this program point `x` is ZERO, at this other program point `x` is POS.
+    + a flow-sensitive sign analysis: at this program point `x` is ZERO, at this other program point `x` is POS
 
-    + a flow-insensitive sign analysis: over the entire program, `x` is NON-NEG (or TOP if we're using the simple sign abstract domain as in assignment 1).
+    + a flow-insensitive sign analysis: over the entire program, `x` is TOP
 
-- flow-insensitive analysis is clearly less precise because it can't give different answers per program point but instead must give a single answer that is sound over the entire program. the tradeoff is that it is usually must more scalable than flow-sensitive analysis.
+- flow-insensitive analysis is clearly less precise because it can't give different answers per program point but instead must give a single answer that is sound over the entire program; the tradeoff is that it is usually much more scalable than flow-sensitive analysis
 
-- we'll begin by talking about set constraint-based analysis in general, then show how to apply it to pointer analysis.
+- we'll begin by talking about set constraint-based analysis in general, then show how to apply it to pointer analysis
 
-## general set constraint language
+## inclusion set constraint language
 
-- language of set constraints:
+- there are a number of possible set constraint languages with various tradeoffs in expressiveness and computability (the most general set constraint language is undecidable)
 
-  ```
-  0 = empty set
-  1 = universal set
-
-  X ∈ Variable
-  c ∈ Constructor
-
-  E ∈ Expr ::= X | 0 | 1 | ¬E | E1 ∪ E2 | E1 ∩ E2 | c(E1,...,En) | c^-i(E)
-  S ∈ Stmt ::= E1 ⊆ E2 | S1 ∧ S2
-  ```
-
-- what are constructors? think of them as _uninterpreted functions_ that take sets and return sets. the analysis doesn't care what they mean; it's up to us to give them a meaningful interpretation when we're defining an analysis.
-
-    + example: type constructors
-
-        - nullary constructors: int, string, bool
-        - unary constructors: Set[·], List[·]
-        - binary constructors: ·→·, Map[·,·]
-
-    + characteristics:
-
-        - _arity_: the number of arguments it takes
-        - _variance_: each argument position is either:
-
-            + _covariant_ (the constructor is monotone wrt that position)
-            + _contravariant_ (it is antitone wrt that position)
-
-- variance is the same as type variance if you've dealt with that before. basically, consider a constructor `foo` with arity 1. let's consider two cases, one where `foo`'s argument is covariant and one where it's contravariant:
-
-    + `foo's argument is covariant`: then `foo(A) ⊆ foo(B)` iff `A ⊆ B`. notice that the direction of the subset is preserved.
-
-    + `foo's argument is contravariant`: then `foo(A) ⊆ foo(B)` iff `B ⊆ A`. notice that the direction of the subset is reversed.
-
-    + we need to have this information specified because remember that the constructors are essentially uninterpreted functions---what they really _mean_ is up to us when we design our analyses. we need to explicitly specify this piece of information to allow the set constraints to be correctly solved wrt what the constructors really stand for.
-
-    + for now we'll just assume everything is covariant; we'll need contravariant things later but we'll talk more about it then.
-
-- what does projection do? take the constructors denoted by the given expression, filter out the ones that don't match the given constructor, take the i'th argument of each remaining constructor, and put all of them in a set.
-
-    + we'll number positions starting from 0.
-
-    + example projection: suppose that
-
-      ```
-      X -> { a(b, C), a(D, e), f(g), h(i, j, k) }
-      C -> { l, m }
-      D -> { n, o, p }
-      ```
-
-    + then `a^-1(X) = { e, l, m }`
-
-- example set constraint system:
-
-  ```
-        a ⊆ X        ∧
-        a ⊆ Y ∪ X    ∧
-        b ⊆ Y ∪ X    ∧
-        c ⊆ Y ∪ X    ∧
-    X ∩ Y ⊆ b        ∧
-        Z ⊆ ¬(X ∩ Y)
-  ```
-
-    + X, Y, Z are set variables.
-
-    + a, b, c are _nullary constructors_ (aka constants, usually written without parentheses).
-
-- what is a solution to a set constraint system?
-
-    + let H = the set of all constructor calls
-
-    + a solution is an assignment σ ∈ Variable → 𝒫(H) that maps each set variable to a set of constructor calls s.t. all constraints are satisfied.
-
-- for the above example, a valid solution would be:
-
-  ```
-  X -> { a, b }
-  Y -> { b, c }
-  Z -> { a, c }
-  ```
-
-- unfortunately, finding solutions for the general set constraint language is undecidable. therefore we can only use fragments of that language, restricted to ensure decidability. the complexity of solving set constraints is determined by what restrictions we put on the language (not by the particular analysis that we're doing).
-
-## restricted set constraint language
-
-- one possible restricted language is the _inclusion constraint language_:
+- one useful point in this space is the _inclusion constraint language_:
 
   ```
   X ∈ Variable
   c ∈ Constructor
 
   T ∈ Term ::= X | c(T1,...,Tn)
-  E ∈ Expr ::= T | c^-i(X)
-  S ∈ Stmt ::= E1 ⊆ E2 | S1 ∧ S2
+  E ∈ Expr ::= T | c⁻ⁱ(X)
+  S ∈ Stmt ::= E1 ⊆ E2 | S1 ∧ S2  // (E1 and E2 cannot both be projections)
   ```
 
-- where E1 and E2 cannot both be projections. also note that projections cannot be call arguments according to the grammar. these rules don't actually restrict the language at all---it's simple to put the result of a projection in a set variable and use that set variable as the call argument or as one side of a constraint with another projection. The rules just make implementing a solver for the constraint language simpler, with fewer cases to worry about.
+- what are constructors? think of them as _uninterpreted functions_ that take sets as arguments and return sets as results
 
-- this is not the only possible restricted language that yields a decidable analysis, but this one has two nice properties:
+    + the analysis doesn't care what they mean---it's up to us to give them a meaningful interpretation when we're defining an analysis
+
+    + example: type constructors (think of a type as representing a set of values)
+
+        - nullary constructors: `int`, `string`, `bool`
+        - unary constructors: `Set[·]`, `List[·]`
+        - binary constructors: `·→·`, `Map[·,·]`
+
+    + characteristics of constructors:
+
+        - _arity_: the number of arguments it takes
+        - _variance_: each argument position is either:
+
+            + _covariant_ (the constructor is monotone wrt that position)
+            + _contravariant_ (the constructor is antitone wrt that position)
+
+- variance is answering the question "if i know `A ⊆ B`, what do i know about the relation between `c(A)` and `c(B)` (or vice versa)?
+
+    + as an example consider a constructor `foo` with arity 2 where `foo`'s first argument is covariant and its second is contravariant, and suppose `foo(A, B) ⊆ foo(C, D)`; what can we determine about the relations between `A` and `C` and between `B` and `D`?
+
+        - `foo`'s first argument (`A` and `C` here) is covariant, therefore `A ⊆ C` (notice that the direction of the subset is preserved)
+
+        - `foo`'s second argument (`B` and `D` here) is contravariant, therefore `D ⊆ B` (notice that the direction of the subset is reversed)
+
+    + we need specify variance explicitly because the constructors are essentially uninterpreted functions---what they really _mean_ is up to us when we design our analyses and so we need to explicitly specify this piece of information to allow the set constraints to be correctly solved wrt what the constructors really stand for
+
+    + for now we'll just assume everything is covariant; we'll need contravariance later but we'll talk more about it then
+
+- what does projection do? take the constructors denoted by the given expression, filter out the ones that don't match the given constructor, take the i'th argument of each remaining constructor, and put all of them in a set
+
+    + we'll number positions starting from 0
+
+    + example projection: suppose
+
+>     X -> { a(b, C), a(D, e), f(g), h(i, j, k) }
+>     C -> { l, m }
+>     D -> { n, o, p }
+
+    + then `a⁻¹(X)` = `{ e, l, m }`
+
+- example set constraint system:
+
+  ```
+  f(X,Y) ⊆ A
+  A ⊆ B
+  B ⊆ C
+  C ⊆ E
+  g ⊆ D
+  h ⊆ D
+  h ⊆ f⁻¹(B)
+  D ⊆ f⁻⁰(C)
+  f⁻⁰(C) ⊆ E
+  f⁻¹(B) ⊆ F
+  ```
+
+- what is a solution to a set constraint system?
+
+    + let H = the set of all constructor calls
+
+    + a solution is an assignment `σ ∈ Variable → 𝒫(H)` that maps each set variable to a set of constructor calls s.t. all constraints are satisfied
+
+- for the above example, a valid solution would be:
+
+  ```
+  A -> { f(X,Y) }
+  B -> { f(X,Y) }
+  C -> { f(X,Y) }
+  D -> { g, h }
+  E -> { f(X,Y), g, h }
+  F -> { h }
+  X -> { g, h }
+  Y -> { h }
+  ```
+
+- this is not the only possible set constraint language that yields a decidable analysis, but this one has two nice properties:
 
     1. it is guaranteed to have a minimal solution
     2. it is guaranteed to have cubic complexity
 
-- analyses defined using this particular restricted set constraint language are called _inclusion-based analyses_.
+- analyses defined using this particular restricted set constraint language are called _inclusion-based analyses_
 
-    + as a sidenote, another common class of analyses is _equality-based analyses_, which uses the same language except with `E1 = E2` instead of `E1 ⊆ E2`. this is even less precise than inclusion-based, but can run in near-linear time complexity. an equality-based pointer analysis is also often called _steensgaard-style_ pointer analysis, after the person who first described it. we probably won't have time to go into any more detail about this class of analyses, unfortunately.
+    + as a sidenote, another common class of analyses is _equality-based analyses_, which uses the same language except with `E1 = E2` instead of `E1 ⊆ E2`; this is even less precise than inclusion-based, but can run in near-linear time complexity
 
 ## solving inclusion constraints
 ### representing constraints as a graph
 
-- it will be convenient for solving the constraints to represent them as a graph.
+- it will be convenient for solving the constraints to represent them as a graph
 
     + a node for each set variable, projection, and constructor call
     + an edge for each constraint from the lhs to the rhs
@@ -2426,9 +2409,9 @@ binary relation
     + any edge from a constructor call is a predecessor edge
     + any edge to a projection is a predecessor edge
     + all other edges are successor edges
-    + [we disallow edges between projections]
+    + [there cannot be any edges between projections]
 
-- why we do this will become evident when we show how to solve the constraints.
+- why we do it this way will become evident when we show how to solve the constraints
 
 - example:
 
@@ -2439,27 +2422,32 @@ binary relation
   C ⊆ E
   g ⊆ D
   h ⊆ D
-  h ⊆ f^-1(B)
-  D ⊆ f^-0(C)
-  f^-0(C) ⊆ E
-  f^-1(B) ⊆ F
+  h ⊆ f⁻¹(B)
+  D ⊆ f⁻⁰(C)
+  f⁻⁰(C) ⊆ E
+  f⁻¹(B) ⊆ F
   ```
 
   ```
+  [--> == predecessor edge]
+  [==> == successor edge]
+
   f(X,Y) --> A ==> B ==> C
                           \\
-  g --> D --> f^-0(C) =======> E
+  g --> D --> f⁻⁰(C) =======> E
        /
   h --<
        \
-        f^-1(B) ==> F
+        f⁻¹(B) ==> F
   ```
 
 ### solving the constraint graph
 
-- solving the constraints corresponds to computing the dynamic transitive closure of the graph. the predecessor edges from the constructor calls to the set variables are the solution to the constraints.
+- solving the constraints corresponds to computing the dynamic transitive closure of the graph
 
-    + remember that a solution maps set variables to sets of constructors, so we map each set variable to the set of constructors that have a predecessor edge to that set variable.
+    + the predecessor edges from the constructor calls to the set variables are the solution to the constraints
+
+    + remember that a solution maps set variables to sets of constructors, so we map each set variable to the set of constructors that have a predecessor edge to that set variable
 
 - [solve above example]
 
@@ -2474,34 +2462,38 @@ binary relation
   Y -> { h }
   ```
 
-- initialize worklist with all variables that have a predecessor edge (i.e., all variables that currently have something in their solution set). the worklist will only contain set variables.
+- initialize worklist with all variables that have a predecessor edge (i.e., all variables that currently have something in their solution set); the worklist will only contain set variables
 
-- perform the usual worklist algorithm. when popping set variable X:
+- perform the usual worklist algorithm (i.e., loop as long as the worklist is non-empty); when popping set variable X:
 
-    1. propagate X's predecessor edges along all of X's successor edges. if the predecessor edges of the destination node changed, put it onto the worklist.
+    1. propagate X's predecessor edges along all of X's successor edges; if the predecessor edges of the destination node changed, put it onto the worklist
 
-    2. if X has any projections, process each projection node:
+    2. if X has any projections, process each projection node P:
 
-        + compute the given projection of X (which can be different for each projection node) to get a set of variables and/or constructor calls; call that set Y.
+        + let Y = the value of P's projection (i.e., a set of variables and/or constructor calls from projecting X)
 
-        + for each y_i ∈ Y and predecessor p_i and successor s_i of the projection node, add edges p_i -> y_i -> s_i (using the standard rules for pred vs succ edges).
+        + for each predecessor p_i of P and successor s_i of P and each y_i ∈ Y, add edges p_i -> y_i -> s_i (using the standard rules for pred vs succ edges)
 
-        + if a node has a new pred or succ edge added to it, add that node to the worklist.
+        + if a node has a new pred or succ edge added to it, add that node to the worklist
 
-- what if we add an edge between two constructors? e.g., `c(T1,...,Tn) ⊆ c(T1',...,Tn')`. this is where knowing the variance of each constructor argument position matters:
+- what if we add an edge between two constructors (e.g., `c(T1,...,Tn) ⊆ c(T1',...,Tn')`)? this is where knowing the variance of each constructor argument position matters:
 
     + `c(T1,...,Tn) ⊆ c(T1',...,Tn')` =>
 
-        - Ti  ⊆ Ti' if position i of constructor c is covariant
-        - Ti' ⊆ Ti  if position i of constructor c is contravariant
+        - `Ti ⊆ Ti'` if position `i` of constructor `c` is covariant
+        - `Ti' ⊆ Ti` if position `i` of constructor `c` is contravariant
 
-    + what if the constructors don't match? technically this is an error, but in a practical implementation we usually just ignore mismatched constructors.
+    + what if the constructors don't match? technically this is an error, but in a practical implementation we usually just ignore mismatched constructors
 
-- when the worklist is empty, we've computed a solution to the original constraints: for each set variable, look at its predecessor edges to get its solution.
+- when the worklist is empty, we've computed a solution to the original constraints: for each set variable, look at its predecessor edges to get its solution
 
 ### implementing the constraint graph and solver
 
-- define the following classes:
+- this is just a high-level suggestion for how to implement them---the details for how to best implement them depend on the language you're using
+
+    + feel free to implement them a different way in your solution, this is not mandatory
+
+- define the following data structures:
 
     + `Constructor`: containing name, arity, and variance info for that constructor
 
@@ -2511,15 +2503,19 @@ binary relation
 
     + `Projection`: containing a reference to the SetVariable the projection is being done on, a reference to the Constructor being projected, the position of the Constructor argument being projected, the list of predecessors, and the list of successors
 
-- SetVariables, ConstructorCalls, and Projections are the nodes of the constraint graph, and the lists of predecessors and successors are the edges of the constraint graph.
+- `SetVariables`, `ConstructorCalls`, and `Projections` are the nodes of the constraint graph, and the lists of predecessors and successors are the edges of the constraint graph
 
-- note that you need a way for the user of the constraint engine to register constructors, set variables, constructor calls, and projections. generally the easiest way to do this is to have the register function take all the relevant information (_except_ for edges) and return some handle to the created constructor or node (e.g., a pointer or an index into a vector); then there is a separate `add_edge` function that takes two handles and adds an edge between them (either predecessor or successor depending on what kind of nodes they are).
+- the specific set of constructors, constructor calls, set variables, and projections will vary with the problem being solved, so you also need a way for the _user_ of the constraint solver (in our case this will be the pointer analysis) to register specific constructors, set variables, constructor calls, and projections
+
+    + generally the easiest way to do this is to have a `register` function take all the relevant information (_except_ for edges) and return some handle to the created constructor or node (e.g., a pointer or an index into a vector)
+    
+    + then there is a separate `add_edge` function that takes two handles and adds an edge between them (either predecessor or successor depending on what kind of nodes they are)
 
 ## solver optimization
 
-- cubic time complexity is still not great; we can't make the complexity go down but we can still optimize the constraint solver to make it much faster in practice (e.g., reduce the n in O(n^3)).
+- cubic time complexity is still not great; we can't make the complexity go down but we can still optimize the constraint solver to make it much faster in practice (e.g., reduce the `n` in `O(n³)`)
 
-- there are a variety of known optimizations; we won't spend time on them here but there are a number of relevant papers that describe them (including some of mine).
+- there are a variety of known optimizations; we won't spend time on them here but there are a number of relevant papers that describe them (including some of mine)
 
 ## defining a program analysis
 
@@ -2529,272 +2525,291 @@ binary relation
 
     2. define constraint generation, mapping a program to a set of constraints whose solution will be the solution to the analysis
 
-- notice that we don't need to describe how to solve the analysis, because no matter what the analysis is they're always inclusion constraints and can be solved using the method we described earlier. that is, the only new thing we need to do to define an analysis is the two points above; we can always use the same solver for all analyses.
+- notice that we don't need to describe how to solve the analysis, because no matter what the analysis is they're always inclusion constraints and can be solved using the method we described earlier
+
+    + that is, the only new thing we need to do to define an analysis is the two points above; we can always use the same solver for all analyses
 
 - this process is easiest to explain by example; the example we'll be using henceforth is pointer analysis.
 
 # andersen-style pointer analysis
 ## intro
 
-- recall that pointer analysis is computing an overapproximation of program behavior wrt pointer; i.e., for a given pointer access (load, store, etc) what object might be accessed?
+- recall that pointer analysis is computing an overapproximation of program behavior wrt pointers
 
-- andersen-style pointer analysis is just pointer analysis defined using the inclusion set constraint language we defined earlier.
+    + i.e., for a given pointer access (load, store, indirect call, etc) what object/function might be accessed?
 
-    + this is perhaps the most common kind of pointer analysis in regular use.
+- andersen-style pointer analysis is just one form of pointer analysis, defined using the inclusion set constraint language
 
-- we need an abstraction for memory (which is conceptually infinite); that is, instead of (for example) abstract values that over-approximate integers we need abstract values that over-approximate memory addresses. a common choice is _static allocation site_.
+    + this is perhaps the most common kind of pointer analysis in regular use (e.g., in compilers)
 
-    + we'll create a fake 'variable' for each instruction where memory is allocated (aka static allocation site) and it will represent all concrete memory allocated by that instruction.
+    + there are many other kinds of pointer analysis, that explore various points in the precision/performance design space
 
-    + example: for `x:int* = $alloc` the object returned by the $alloc will be represented with a variable named `alloc.<function name>.<basic block label>.<index>`.
+- we need an abstraction for pointer values (i.e., memory addresses)
 
-    + note that a single such abstract value can actually represent an unbounded number of concrete values (e.g., if the instruction is located inside a loop); this is why it's called a _static_ allocation site.
+    + memory is conceptually infinite, so we need to make a finite abstraction: we need abstract values for pointers that over-approximate memory addresses
+    
+    + a common choice is _static allocation site_: we label the `$alloc` instruction that creates object on the heap and use that label to stand for all objects allocated by that instruction; since there are finite allocation instructions the abstract domain is finite
 
-    + there are other abstractions, but they tend to be much more expensive and hence not very scalable in practice.
+    + conveniently, LIR already gives every `$alloc` instruction its own unique label, so we'll just use that
 
-- recall that a program analysis is defined as a particular set of variables and constructors along with constraint generation (i.e., a way to map a program to a set of inclusion constraints).
+    + example: for `x = $alloc 1 [_alloc1]`, all addresses returned by the `$alloc` will be represented by `_a1`
 
-    + unlike a DFA, a set constraint-based analysis can be implemented using a single linear traversal of the program, e.g., using IrVisitor (assuming that we already have a solver available).
+    + note that a single abstract value can represent an unbounded number of concrete memory addresses (e.g., if the instruction is located inside a loop); this is why it's called a _static_ allocation site
+
+    + there are other abstractions, but they tend to be much more expensive and hence difficult to scale in practice
+
+- recall that an inclusion-based program analysis is defined as:
+
+    + a set of set variables
+    + a set of constructors
+    + a constraint generation scheme (i.e., a way to map a program to a set of inclusion constraints)
+    + then we just pass the generated constraints to the pre-existing constraint solver
+
+- contrast this with DFA, where we defined a program analysis as:
+
+    + abstract domain + abstract semantics + abstract execution
+    + we had to define the first two, then we could use the same abstract execution engine for any DFA
 
 ## start with no structs or calls
 ### setup
 
-- we'll assume for now programs that contain no struct definitions or function calls.
+- we'll assume for now that programs contain no struct definitions or function calls
 
-- remember that a solution is a map from set variables to sets of constructor calls. we want to define the analysis so that set variable solutions map to the information we're trying to compute, i.e., points-to sets.
+- remember that a solution is a map from set variables to sets of constructor calls; we want to define the analysis so that the constaint solution translates to the information we're trying to compute, i.e., points-to sets (in this case)
 
 - universe of discourse:
 
-    + a constant and set variable for each program variable and static allocation site
+    + a constant (i.e., nullary constructor) and set variable for each program variable and static allocation site
 
         - the constant represents the program variable / allocated object
 
         - the set variable represents the associated points-to set
 
-    + a `ref/2` constructor s.t. that first argument is a constant and the second argument is a set variable, connecting a program variable / allocated object with its points-to set.
+    + a `ref/2` constructor s.t. that first argument is a constant and the second argument is a set variable, connecting a program variable / allocated object with its points-to set
+
+        - `ref(x, X)` means that `X` is the points-to set of `x`, where, e.g., both the set variable `X` and constant `x` come from the program variable `x`
 
 ### constraint generation
 
-- [for all instructions with lhs, ignore them if the type of lhs is not a pointer; for $store ignore it if the type of the operand is not a pointer]
+- we only care about pointers for pointer analysis, so for all instructions with a lhs ignore it if the type of lhs is not a pointer and for `$store` instructions ignore it if the type of the operand is not a pointer
 
-- given a program variable `x`, we'll use the notation `[x]` to mean translate `x` into a set variable (creating it if it doesn't already exist) and return the set variable, and `const(x)` to mean translate `x` into a constant (creating it if it doesn't already exist) and return the constant.
+- we can also ignore null pointers (i.e., `0` instead of a pointer variable)
 
-- given an $alloc instruction, we'll use the notation `abstract(here)` to mean create a fake program variable named `alloc.<function name>.<basic block label>.<index>` (if it doesn't already exist).
+    - just don't generate a constraint involving null pointers
+
+    - this won't be true for indirect calls, but we'll get to that later
+
+- given a program variable `x`, we'll use the notation:
+
+    + `[x]` to mean translate `x` into a set variable (creating it if it doesn't already exist) and return the set variable
+    + `const(x)` to mean translate `x` into a constant (creating it if it doesn't already exist) and return the constant
 
 - `lhs = $copy var`
 
-    + [var] ⊆ [lhs]
+    + `[var] ⊆ [lhs]`
 
-- `lhs = $phi(vars...)`
+- `lhs = $alloc op [id]`
 
-    + for var in vars: [var] ⊆ [lhs]
+    + `ref(const(id), [id]) ⊆ [lhs]`
 
-- `lhs = $select op var2 var3`
-
-    + [var2] ⊆ [lhs]
-    + [var3] ⊆ [lhs]
-
-- `lhs = $alloc`
-
-    + ref(const(abstract(here)), [abstract(here)]) ⊆ [lhs]
-
-    + notice that since the left-hand side is a constructor call this constraint will be represented as a predecessor edge in the constraint graph---i.e., it will be part of the solution for the [lhs] set variable.
+    + notice that since the left-hand side is a constructor call this constraint will be represented as a predecessor edge in the constraint graph---i.e., it will be part of the solution for the `[lhs]` set variable
 
 - `lhs = $addrof var`
 
-    + ref(const(var), [var]) ⊆ [lhs]
+    + `ref(const(var), [var]) ⊆ [lhs]`
 
-    + same as $alloc, this call will be part of [lhs]'s solution.
+    + similarly to `$alloc`, this call will be part of `[lhs]`'s solution
 
 - `lhs = $gep src_ptr op`
 
-    + [src_ptr] ⊆ [lhs]
+    + `[src_ptr] ⊆ [lhs]`
 
-    + since there are no structs (for now), there can't be a fieldname argument to the $gep
-
-    + note that we're being 'array-insensitive', which is common in these kinds of analyses
+    + note that we're being 'array-insensitive', i.e., collapsing all elements of an array into one, which is common in these kinds of analyses
 
 - `lhs = $load src_ptr`
 
-    + ref^-1([src_ptr]) ⊆ [lhs]
+    + `ref⁻¹([src_ptr]) ⊆ [lhs]`
 
-    + why? we're asking for the current solution of [src_ptr] (which will be a set of ref calls representing what src_ptr points to), projecting out the second argument (which is the set variable representing the pointed-to variable's points-to set), and saying that those set variable flow into [lhs]. the projection is essentially modeling pointer dereference.
+    + why? the projection is modeling pointer dereference: concretely we get the value of `src_ptr` (an address), go to that address to get the value of what `src_ptr` points to (which is also an address, since `lhs` is a pointer), then copy that value to `lhs` [draw a picture]
+    
+    + this constraint gets the current solution for `[src_ptr]` (which is a set of `ref` calls representing the value of `src_ptr`), projects the second argument of those `ref` calls (which are the set variables representing the value of what `src_ptr` points to, i.e., their points-to sets), then copies their values to `[lhs]`
 
 - `$store dst_ptr var`
 
-    + [var] ⊆ ref^-1([dst_ptr])
+    + `[var] ⊆ ref⁻¹([dst_ptr])`
 
-    + why? similar to load except the information is flowing _into_ the pointed-to variables instead of _from_ them.
+    + why? similar to load except the information is flowing _into_ the pointed-to variables instead of _from_ them
 
 - we can ignore:
 
+    + `$gfp` (because there are no structs for now)
     + `$arith`, `$cmp` (because they don't affect pointer values)
-
     + `$jump`, `$branch` (because the analysis is flow-insensitive)
+    + `$call_*`, `$ret` (because we're not considering function calls for now)
 
-    + `$call`, `$icall`, `$ret` (because we're not considering function calls for now)
-
-### example
+### example 1
 
 CODE
 ```
-def function main() -> int {
+fn main() -> int {
+  let a:&&int, b:int, c:&int, d:&&int, e:&&int, f:&&int, g:&&int, h:&int, i:int
   entry:
-    a:int** = $alloc
-    b:int = $copy 42
-    c:int* = $addrof b:int
-    d:int** = $gep a:int** 42
-    $store d:int** c:int*
-    $branch b:int bb1 bb2
+    a = $alloc 1 [_alloc]
+    b = $copy 42
+    c = $addrof b
+    d = $gep a 42
+    $store d c
+    $branch b bb1 bb2
 
   bb1:
-    e:int** = $copy d:int**
+    e = $copy d
     $jump bb3
 
   bb2:
-    f:int** = $addrof c:int*
+    f = $addrof c
     $jump bb3
 
   bb3:
-    g:int** = $phi(e:int**, f:int**)
-    h:int* = $load g:int**
-    i:int = $load h:int*
-    $ret 0
+    g = $copy e
+    g = $copy f
+    h = $load g
+    i = $load h
+    $ret i
 }
 ```
 
-CONSTRAINTS
+CONSTRAINTS (we'll use lower case for constants, upper case for set variables)
 ```
-ref(alloc.main.entry.0, ALLOC.MAIN.ENTRY.O) ⊆ A
+ref(alloc, ALLOC) ⊆ A
 ref(b, B) ⊆ C
 A ⊆ D
-C ⊆ ref^-1(D)
+C ⊆ ref⁻¹(D)
 D ⊆ E
 ref(c, C) ⊆ F
 E ⊆ G
 F ⊆ G
-ref^-1(G) ⊆ H
+ref⁻¹(G) ⊆ H
 ```
 
 GRAPH
 ```
-ref(alloc) --> A ==> D ==> E ====> G
-ref(c) ------------> F =======//
-ref(b) --> C --> ref^-1(D)
-ref^-1(G) --> H
+ref(alloc, ALLOC) --> A ==> D ==> E ====> G
+ref(c, C) ------------> F ==============//
+ref(b, B) --> C --> ref⁻¹(D)
+ref⁻¹(G) --> H
 ```
 
 SOLUTION
 ```
-A -> { ref(alloc.main.entry.0, ALLOC.MAIN.ENTRY.0) }
+A -> { ref(alloc, ALLOC) }
 C -> { ref(b, B) }
-D -> { ref(alloc.main.entry.0, ALLOC.MAIN.ENTRY.0) }
-E -> { ref(alloc.main.entry.0, ALLOC.MAIN.ENTRY.0) }
+D -> { ref(alloc, ALLOC) }
+E -> { ref(alloc, ALLOC) }
 F -> { ref(c, C) }
-G -> { ref(alloc.main.entry.0, ALLOC.MAIN.ENTRY.0), ref(c, C) }
+G -> { ref(alloc, ALLOC), ref(c, C) }
 H -> { ref(b, B) }
-ALLOC.MAIN.ENTRY.0 -> { ref(b, B) }
+ALLOC -> { ref(b, B) }
 ```
 
 ## adding structs
 ### intro
 
-- what if we have structs in the program? recall that the $gep instruction is how we access the fields of a struct (and how we do all pointer arithmetic in general):
+- what if we have structs in the program? recall that the `$gfp` instruction is how we access the fields of a struct:
 
-    + `lhs = $gep src_ptr op fieldname`
-
+    + `lhs = $gfp src_ptr fieldname`
     + `src_ptr` is a pointer to the struct
-
-    + `op` is an array index (0 if this isn't an array)
-
     + `fieldname` is the name of the field we want to access
-
     + `lhs` is set to a pointer to the desired field
 
-- when a struct is allocated with $alloc it creates an object that has distinct fields and we need to decide how to represent that in the analysis.
+- when a struct is allocated using `$alloc` it creates a heap object that has distinct fields and we need to decide how to represent that in the analysis
 
-- we have three choices: field-insensitive, field-based, field-sensitive. the most common choices are field-insensitive or field-sensitive, that's what we'll cover.
+- we have three choices: field-insensitive, field-based, field-sensitive; the most common choices are field-insensitive or field-sensitive, that's what we'll cover
 
 ### field-insensitive
 
-- the simplest and easiest option: treat a struct object as if it doesn't have distinct fields, i.e., all fields are merged together into a single blob.
+- the simplest and easiest option: treat a struct object as if it doesn't have distinct fields, i.e., all fields are merged together into a single blob
 
-    + just keep the $gep constraint generation that we're already doing, ignoring any `fieldname` that it might specify.
+    + treat `$gfp` like a copy
+
+    + `lhs = $gep ptr field` ==> `[ptr] ⊆ [lhs]`
 
 - example:
 
-  ```
-  struct foo {
-    x: int*
-    y: int*
-  }
+>  struct foo {
+>    f1: &int
+>    f2: &int
+>  }
+>
+>  fn bar(i:int) -> &int {
+>    let p:&int, a:&foo, b:&&int, c:&&int, d:&int
+>    entry:
+>      p = $addof i
+>      a = $alloc 1 [_alloc]
+>      b = $gfp a f1
+>      c = $gfp a f2
+>      $store b p
+>      d = $load c
+>      $ret d
+>  }
 
-  def function main(i:int) -> int* {
-    entry:
-      p:int* = $addof i:int
-      a:foo* = $alloc
-      b:int** = $gep a:foo* 0 x
-      c:int** = $gep a:foo* 0 y
-      $store b:int** p:int*
-      d:int* = $load c:int**
-      $ret d:int*
-  }
-  ```
+    + the pointer analysis will treat the `f1` and `f2` fields as the same thing, so `b` and `c` will have the same abstract value (i.e., the pointer analysis says that both pointers can point to both fields)
 
-    + the pointer analysis will treat the `x` and `y` fields as the same thing, so `b:int**` and `c:int**` will have the same abstract value (i.e., the pointer analysis says that both pointers can point to both fields).
-
-    + it says that `d:int*` can point to `i:int` even though it really can't.
+    + the analysis result will say that `d` can point to `i` even though it really can't
 
 ### field-sensitive
 
-- the most complex and most precise option: treat each struct field independently.
+- the most complex and most precise option: treat each struct field independently
 
-- we need to define a constructor for each struct type, whose name is the struct type, arity is the number of fields, and variance is all covariant.
+- we need to define a constructor for each struct type, whose name is the struct type, arity is the number of fields, and variance is all covariant
 
-- $gep instructions that are accessing a field need to turn into projections of the correct field.
+- `$gfp` instructions that are accessing a field need to turn into projections of the correct field
 
-- this only works because we require the program to be strictly typed (and there's no inheritance); if we can have the same pointer point to structs with different numbers of fields things become more complicated.
+- this only works because we require the program to be strictly typed (and there's no inheritance); if we can have the same pointer point to structs with different numbers of fields things become more complicated
 
 ## adding direct calls
 ### constraint generation
 
-- our final analysis will be _interprocedural_, that is, we'll track how information flows back and forth between functions. this means we need to add constraint generation for $call (we'll ignore indirect calls for now).
+- our final version of the analysis will be _interprocedural_, that is, we'll track how information flows back and forth between functions; this means we need to add constraint generation for `$call_dir`
 
-    + we'll also ignore any $call instructions to an externally-defined function (i.e., one that is not defined in the program itself). these come up often in program analysis, and the typical method to handle them is to create _stub_ functions that approximate any effect the function might have wrt to the analysis being done.
+    + we'll ignore `$call_idr` for now, but add it in next
 
-- let the notation `retval(func)` mean to the variable operand of the $ret instruction inside function `func` (undefined if the operand is not a variable or if there is more than one $ret instruction).
+    + we'll also ignore `$call_ext`; there's no source code to analyze so we can't do anything---we'll assume that any relevant external calls have been transformed into stubs that are called using `$call_dir` instead
 
-- `lhs = $call <function>(args...)`
+- we'll use the notation `retval(func)` to mean the variable operand of the `$ret` instruction inside function `func`
 
-    + if `<function>` is not defined in the program, ignore this instruction
+- `[lhs =] $call_dir <function>(args...) then bb`
 
-    + if lhs is pointer-typed: [retval(`<function>`)] ⊆ [lhs]
+    + if `lhs` is pointer-typed: `[retval(<function>)] ⊆ [lhs]` (unless `<function>` returns the null pointer)
 
-    + for arg in args if arg is pointer-typed: [arg] ⊆ [parameter] s.t. parameter is the corresponding parameter of `<function>`.
+    + ∀arg ∈ args, if arg is pointer-typed: `[arg] ⊆ [parameter]` s.t. parameter is the corresponding parameter of `<function>`
 
-- these constraints account for pointer-related information being passed to the callee via the call arguments and back from the callee via the return instruction.
+- these constraints account for pointer-related information being passed to the callee via the call arguments and back from the callee via the return instruction
 
-### example
+### example 2
 
 CODE
 ```
-def function main() -> int {
+fn main() -> int {
+  let a:int, b:&int, c:int, d:&int, e:&&int, f:&int, g:int
   entry:
-    a:int = $copy 42
-    b:int* = $addrof a:int
-    c:int = $copy 12
-    d:int* = $addrof c:int
-    e:int** = $addrof d:int*
-    f:int* = $call foo(b:int*, e:int**)
-    g:int = $load f:int*
-    $ret g:int
+    a = $copy 42
+    b = $addrof a
+    c = $copy 12
+    d = $addrof c
+    e = $addrof d
+    f = $call foo(b, e) then exit
+
+  exit:
+    g = $load f
+    $ret g
 }
 
-def function foo(p1:int*, p2:int**) -> int* {
+fn foo(p1:&int, p2:&&int) -> &int {
+  let h:&int
   entry:
-    h:int* = $load p2:int**
-    $store p2:int** p1:int*
-    $ret h:int*
+    h = $load p2
+    $store p2 p1
+    $ret h
 }
 ```
 
@@ -2806,103 +2821,182 @@ ref(d, D) ⊆ E
 B ⊆ P1
 E ⊆ P2
 H ⊆ F
-ref^-1(P2) ⊆ H
-P1 ⊆ ref^-1(P2)
+ref⁻¹(P2) ⊆ H
+P1 ⊆ ref⁻¹(P2)
 ```
 
 GRAPH
 ```
-ref(a) --> B ==> P1 --> ref^-1(P2) ==> H ==> F
-ref(c) --> D
-ref(d) --> E ==> P2
+ref(a,A) --> B ==> P1 --> ref⁻¹(P2) ==> H ==> F
+ref(c,C) --> D
+ref(d,D) --> E ==> P2
 ```
 
 SOLUTION
 ```
  A -> {}
- B -> { ref(a) }
+ B -> { ref(a,A) }
  C -> {}
- D -> { ref(a), ref(c) }
- E -> { ref(d) }
- F -> { ref(a), ref(c) }
- H -> { ref(a), ref(c) }
-P1 -> { ref(a) }
-P2 -> { ref(d) }
+ D -> { ref(a,A), ref(c,C) }
+ E -> { ref(d,D) }
+ F -> { ref(a,A), ref(c,C) }
+ H -> { ref(a,A), ref(c,C) }
+P1 -> { ref(a,A) }
+P2 -> { ref(d,D) }
 ```
 
 ## adding indirect calls
 ### setup
 
-- unlike direct calls, we can't generate constraints that link a call with its callee and the callee return value with the lhs of the call (because we don't know what the callee is). instead we need to generate constraints that can somehow figure out these links dynamically during constraint solving.
+- unlike direct calls, we can't generate constraints that link a call with its callee and the callee return value with the lhs of the call because we don't know what the callee is; instead we need to generate constraints that can somehow figure out these links dynamically during constraint solving
 
-- we'll define a constructor `lam_X` for each function type `X` of an address-taken function; constructor calls to this constructor will represent address-taken functions of type `X` (i.e., for each such function its parameters and return value) and also any indirect calls via a function pointer to type `X`.
+- we'll define a constructor `lamₓ` for each function type `X` (or really, just the ones that have a corresponding function pointer global)
 
-### example
+    + it will have arity |P| + |R| where |P| is the number of pointer-typed parameters and |R| is the number of pointer-typed return values (which will be 0 or 1)
 
-- we'll start with an example:
+    + if |R| = 1 then the first argument position of `lamₓ` is covariant; all other argument positions are contravariant (we'll see why momentarily)
+
+    + constructor calls to `lamₓ` will represent:
+    
+        - functions of type `X` (tracking the function's parameters and return value)
+        - indirect calls via a pointer to functions of type `X`
+
+### example 3
+
+- we'll start with an example to see how this will work
 
   CODE:
   ```
-  def function foo(p1:int*, p2:int, p3:int*) -> int* {
+  foo: &(&int,int,&int)->&int
+
+  fn foo(p1:&int, p2:int, p3:&int) -> &int {
+    let r:&int
     entry:
-      p1:int* = $copy p3:int*
-      $ret p1:int*
+      r = $copy p3
+      $ret r
   }
 
-  def function main() -> int {
+  fn main() -> int {
+    let a:&int, b:&int, c:&int, f:&(&int,int,&int)->&int
     entry:
-      a:int* = $alloc
-      b:int* = $alloc
-      f:int*[int*,int,int*]* = $copy @foo:int*[int*,int,int*]*
-      c:int* = $icall f:int*[int*,int,int*]*(a:int*, 42, b:int*)
+      a = $alloc 1 [_alloc1]
+      b = $alloc 1 [_alloc2]
+      f = $copy foo
+      c = $call_idr f(a, 42, b) then exit
+
+    exit:
       $ret 0
   }
   ```
 
   CONSTRAINTS:
   ```
-  let X = int*[int*,int,int*]
-  define lam_X/3
+  define lam_{&(&int,int,&int)->&int}/3 where position 0 is covariant and positions 1,2 are contravariant
+  - [for convenience, let's call this lamₓ]
 
-  lam_X(P1, _P1_, _P3_) ⊆ @FOO
-
-  ref(alloc.main.entry.0, ALLOC.MAIN.ENTRY.0) ⊆ A
-  ref(alloc.main.entry.1, ALLOC.MAIN.ENTRY.1) ⊆ B
-  @FOO ⊆ F
-  F ⊆ lam_X(C, _A_, _B_)
+  lamₓ(R, _P1_, _P3_) ⊆ FOO // using _X_ to mean contravariant
+  ref(alloc1, ALLOC1) ⊆ A
+  ref(alloc2, ALLOC2) ⊆ B
+  FOO ⊆ F
+  F ⊆ lamₓ(C, _A_, _B_)
   ```
+
+- notice that during solving, we eventually get `lamₓ(R, _P1_, _P3_) ⊆ lamₓ(C, _A_, _B_)`; then:
+
+    + `R ⊆ C` (i.e., the return value of `foo` goes to the left-hand side of the indirect call)
+    + `A ⊆ P1` (i.e., the first pointer argument to the indirect call goes to the first pointer parameter of `foo`)
+    + `B ⊆ P3` (i.e., the second pointer argument to the indirect call goes to the second pointer parameter of `foo`)
+
+- by making the return value position covariant and the parameter positions contravariant, we can have the call information passing in both directions at once to correctly model function call/return semantics
 
 ### constraint generation
 
-- for each global function pointer `@<func>:X*` (e.g., `@foo:int*[int,int]*`):
+- for each global function pointer `<func>:&X` (e.g., `foo: &(int,int)->&int`):
 
-    + let N = (number of pointer-typed parameters) + (number of pointer-typed return values). note that the latter will always be 0 or 1.
+    + let `N` = (number of pointer-typed parameters) + (number of pointer-typed return values); note that the latter will always be 0 or 1
 
-    + create a constructor `lam_X/N` if it doesn't already exist. if there is a pointer-type return value then the first position must be covariant; all remaining positions must be contravariant.
+    + create a constructor `lamₓ/N` if it doesn't already exist
+    
+        - if there is a pointer-type return value then the first position must be covariant; all other positions must be contravariant
 
-    + for `<func>`s pointer-typed parameters `param1`, `param2`, ... (i.e., ignoring any non-pointer-typed parameters):
+    + let `<func>` have pointer-typed parameters `param1`, `param2`, ... (i.e., ignore any non-pointer-typed parameters):
 
-        + if `<func>` returns a pointer `retval`: let args = ([retval], [param1], [param2], ...)
+        - if `<func>` returns a pointer `retval`, let `args` = `([retval], [param1], [param2], ...)`, otherwise let `args` = `([param1], [param2], ...)`
 
-        + otherwise let args = ([param1], [param2], ...)
+    + generate constraint `lamₓ(args) ⊆ [<func>]`
+    
+        - this says that the global function pointer points to a function of the given type
 
-    + generate constraint `lam_X([args]) ⊆ [@<func>]`; this says that the global function pointer points to a function of the given type.
-
-- for each indirect call instruction `lhs = $icall func_ptr(args...)`:
+- for each indirect call instruction `[lhs =] $call_idr func_ptr(args...) then bb`:
 
     + let the pointer-typed arguments be `arg1`, `arg2`, ...
 
-    + if lhs is pointer-typed let args be the list ([lhs], [arg1], [arg2], ...)
+        - if any arguments are, according to the function pointer type, supposed to be pointers, but are instead `0` (representing the null pointer), then use a dummy variable `nil` with set variable `[nil]` instead; we'll use the same `[nil]` set variable any time this happens
 
-    + otherwise let args = ([arg1], [arg2], ...)
+        - we can't just ignore null pointers like before because we need to have an argument for each position in the `lamₓ` constructor call
 
-    + generate constraint `[func_ptr] ⊆ lam_X(args)`; this says that anything `func_ptr` points to should flow into the given constructor call.
+    + if the type of the function being called returns a pointer but there is no `lhs`, create a dummy `[lhs]` set variable called `DUMMY` and act as if there is a pointer-typed `lhs`; we'll use this same `DUMMY` set variable for all such calls
 
-- if we generate constraints this way, then eventually the `lam_X` constructor calls containing the retval and parameters of an address-taken function will flow into the `lam_X` constructor call containing the lhs and arguments of the indirect call.
+    + if `lhs` is pointer-typed let `args` = `([lhs], [arg1], [arg2], ...)`, otherwise let `args` = `([arg1], [arg2], ...)`
 
-    + since the retval position (if it exists) is covariant, retval will flow into lhs.
+    + generate constraint `[func_ptr] ⊆ lamₓ(args)`
+    
+        - this says that anything `func_ptr` points to should flow into the given constructor call
 
-    + since the remaining positions are contravariant, the arguments will flow into the parameters.
+- if we generate constraints this way, then eventually the `lamₓ` constructor calls containing the retval and parameters of an address-taken function will flow into the `lamₓ` constructor call containing the lhs and arguments of the indirect call
+
+    + since the retval position (if it exists) is covariant, retval will flow into lhs
+
+    + since the remaining positions are contravariant, the arguments will flow into the parameters
+
+# current summary and roadmap
+
+- covered basics of DFA: abstract domain + abstract semantics + abstract execution (MOP vs MFP; worklist algorithm)
+
+    + flow-sensitive
+    + intraprocedural
+    + no pointer info
+
+- saw several examples thereof:
+
+    + sign analysis
+    + constant propagation
+    + interval analysis
+    + reaching definitions
+    + control analysis
+
+- looked at the math behind DFA: neotherian lattices, monotone functions, fixpoint theorems
+
+    + make the abstract domain a noetherian lattice
+    + make the abstract semantics monotone
+    + then the worklist algorithm is guaranteed to terminate with the most precise answer
+
+- then covered basics of set constraint-based analysis:
+
+    + picking a constraint language (specifically, inclusion constraints)
+    + implementing a constraint solver
+    + analysis = constraint generation
+    + example: andersen-style pointer analysis (flow-insensitive, field-insensitive)
+
+- now what?
+
+    - going back to DFA, but using pointer analysis results to get better results
+
+        + revisit reaching defs, but using pointer info
+        + reaching defs + control analysis to do program slicing
+    
+    - extending DFA to interprocedural analysis
+
+        + taint analysis
+        + context sensitivity
+
+    - if time:
+
+        - sparse analysis and SSA
+        - a little abstract interpretation
+        - maybe more...
+
+# ===== OLD ============================================================================
 
 # program slicing (using pointer info; control analysis; pdg)
 ## intro
@@ -3162,42 +3256,6 @@ P2 -> { ref(d) }
 
     + notice that we're missing some $jump instructions; that's because they are unconditional and so there is no control dependence on them.
 
-# SUMMARY SO FAR
-
-- [this can go wherever it makes sense to put it; i'm putting it here for now because i need to buy some time for my prep to catch up to the class]
-
-- basics of DFA: abstract domain + abstract semantics (transfer functions) + abstract execution (MOP vs MFP; worklist algorithm)
-
-    + flow-sensitive
-    + intraprocedural
-    + no pointer info
-
-- two examples thereof:
-
-    + sign analysis (a stand-in for constant propagation)
-    + reaching definitions
-
-- the math behind DFA: neotherian lattices, monotone functions, fixpoint theorems
-
-    + make the abstract domain a noetherian lattice
-    + make the abstract transfer functions monotone
-    + then the worklist algorithm is guaranteed to terminate with the most precise answer
-
-- set constraint-based analysis:
-
-    + picking a constraint language (specifically, inclusion constraints)
-    + implementing a constraint solver
-    + analysis = constraint generation
-    + example: andersen-style pointer analysis (flow-insensitive, field-insensitive)
-
-- using pointer info: program slicing (still intraprocedural for DFA)
-
-    + revisiting reaching definitions, now with pointer info
-    + control analysis: dominance and dependence
-    + program dependence graph (PDG)
-    + backwards slicing
-
-- now on to something new!
 
 # taint analysis (interprocedural dfa; icfg; context sensitivity)
 
