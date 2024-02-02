@@ -2244,7 +2244,7 @@ binary relation
 
     - example: two edges into a loop header, one that propagates `a -> [0, 0]` and one `a -> [1, 1]`; depending on which one propagates first we'll get either `[0, ∞)` or `(-∞, 1]`
 
-# [IF TIME] practice designing DFA analyses
+# practice designing DFA analyses
 
 - [go through designing a string constant analysis with the class as a warm-up, then give the prefix and regex analyses as exercises; see the pdfs in `docs/` for details]
 
