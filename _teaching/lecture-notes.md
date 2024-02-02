@@ -16,7 +16,7 @@
 - week 3.1: through `second-order DFA` -> `reaching definitions` -> `abstract domain`
 - week 3.2: through `second-order DFA` -> `reaching definitions`; stopped 20 minutes early
 - week 4.1: through `second-order DFA` -> `control analysis`; stopped 10 minutes early
-- week 4.2: ???
+- week 4.2: through `widening redux`
 - week 5.1: ???
 - week 5.2: ???
 - week 6.1: ???
