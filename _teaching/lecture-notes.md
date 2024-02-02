@@ -1472,6 +1472,10 @@
     - DEF = `{ x }`
     - USE = `{ y } ∪ { var ∈ addr_taken | type(var) = type(*y) }`
 
+        + if `x` is a struct, we also need to add in the variables that represent its fields (but just the fake variables, not local or global variables since they cannot be struct fields)
+
+        + USE ∪= `{ var ∈ addr_taken | fld ∈ fields(x.type()), type(var) = type(fld), var is a fake variable }`
+
     - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
     - `σ[x] = { pp }`
 
