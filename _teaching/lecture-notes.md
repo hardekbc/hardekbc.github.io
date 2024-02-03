@@ -57,6 +57,8 @@
 
 - in general for `intro to DFA` i feel like i'm throwing a lot of abstract concepts at them, maybe too fast and without sufficient context; is there a way for me to get to the actual analysis process more quickly before going into the ideas of abstract domains, abstract semantics, etc? maybe it would be sufficient to preface this stuff with a concrete program example and set of sign invariants that i want to infer, just to set the stage?
 
+- for reaching defs, allowing struct-type variables makes things pretty complicated for little benefit---currently the lecture notes describe how to handle them, but i think it's best to just skip this and make sure the assignment tests don't have them
+
 - for `intro to widening`:
 
     - i say to use it whenever we're propagating to a loop header, but really to be more precise we should use it only when propagating along a back-edge---the extra complexity probably isn't worth it though; think about whether i want to do this
@@ -68,6 +70,8 @@
     - TODO: check student submissions and see how many ended up using the LIR format directly and how many used the JSON version
 
 - assignment 1: now that we've figured out the autograder i could streamline the assignment description (things like what arguments are passed to the script, etc)
+
+- assignments 2 and 4 (both reaching defs): handling struct-type locals gets complicated, just avoid having them in the assignment tests
 
 - develop tools for creating interesting test suites:
 
@@ -1408,9 +1412,8 @@
 
         - here's how we create the fake variables the represent objects in the heap:
 
-            - for type τ, let `reachable_types(τ)` be the set of types 'reachable' via pointer dereferences and/or struct field accesses from τ, excluding struct and function types
+            - for type τ, let `reachable_types(τ)` be the set of types 'reachable' via pointer dereferences and/or struct field accesses from τ, excluding function types
 
-                - we don't include struct types (e.g., `foo`) because reading/writing a struct type is effectively reading/writing its fields
                 - we don't include function types (e.g., `(int) -> int)`) because functions aren't allocated on the heap
                 - example:
 
@@ -1426,15 +1429,15 @@
 >
 >                 g: &foo
 >
->                 // reachable_types(g) = { &bar, &&int, &int, int, &(int)->int }
+>                 // reachable_types(&foo) = { foo, &bar, bar, &&int, &int, int, &(int)->int }
 
-            - let `PTRS` = all pointer-typed globals, parameters, and locals of the function being analyzed
+            - let `PTRS` = all pointer-typed globals, parameters, and locals of the function being analyzed, and `PTRS_τ` be the set of types of these variables
 
-            - for `τ ∈ reachable_types(PTRS)` create a fake variable to represent all heap-allocated objects of type `τ`, then put all the fake variables in `addr_taken`
+            - for `τ ∈ reachable_types(PTRS_τ)` create a fake variable to represent all heap-allocated objects of type `τ`, then put all the fake variables in `addr_taken`
 
     - later we'll see a version of reaching defs that treats pointers and function calls much more precisely
 
-### abstract semantics
+### abstract semantics [assuming no variables with struct type]
 
 - now we need to create abstract semantics to replace the program's concrete semantics, but in this case we don't care about the _values_ of the variables, just whether they are being defined or not by a given instruction
 
@@ -1470,11 +1473,7 @@
 - pp: `x = $load y`
 
     - DEF = `{ x }`
-    - USE = `{ y } ∪ { var ∈ addr_taken | type(var) = type(*y) }`
-
-        + if `x` is a struct, we also need to add in the variables that represent its fields (but just the fake variables, not local or global variables since they cannot be struct fields)
-
-        + USE ∪= `{ var ∈ addr_taken | fld ∈ fields(x.type()), type(var) = type(fld), var is a fake variable }`
+    - USE = `{ y } ∪ { var ∈ addr_taken | type(var) = type(x) }`
 
     - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
     - `σ[x] = { pp }`
@@ -1546,6 +1545,38 @@
 
     - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
     - no change to σ
+
+### abstract semantics [adding in variables with struct type---SKIP]
+
+- if a variable is a struct, then defining or using it also defines/uses its fields (which we're representing with the fake variables)
+
+- assume in the following that `x` has a struct type, and let `FLDS` = `{ var ∈ addr_taken | fld ∈ fields(x.type()), type(var) = type(fld), var is a fake variable }`
+
+- pp: `x = $copy y`
+
+    - SDEF = `{ x }`
+    - WDEF = `FLDS`
+    - USE = `{ y } ∪ FLDS`
+
+- pp: `x = $load y`
+
+    - DEF = `{ x }`
+    - WDEF = `FLDS`
+    - USE = `{ y } ∪ { var ∈ addr_taken | type(var) = type(x) } ∪ FLDS`
+
+- pp: `$store y x`
+
+    - DEF = `{ var ∈ addr_taken | type(var) = type(x) } ∪ FLDS`
+    - USE = `{ x, y } ∪ FLDS`
+
+- pp: `[x =] $call_{dir, idr, ext} id/<fp>(<arg_op>...)`
+
+    - FIXME: ??? (dealing with struct-type arguments?)
+
+ - pp: `$ret x`
+
+    - DEF = `{}`
+    - USE = `{ x } ∪ FLDS`
 
 ### abstract execution
 
