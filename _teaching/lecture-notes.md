@@ -57,7 +57,9 @@
 
 - in general for `intro to DFA` i feel like i'm throwing a lot of abstract concepts at them, maybe too fast and without sufficient context; is there a way for me to get to the actual analysis process more quickly before going into the ideas of abstract domains, abstract semantics, etc? maybe it would be sufficient to preface this stuff with a concrete program example and set of sign invariants that i want to infer, just to set the stage?
 
-- for reaching defs, allowing struct-type variables makes things pretty complicated for little benefit---currently the lecture notes describe how to handle them, but i think it's best to just skip this and make sure the assignment tests don't have them
+- having struct-type variables (globals, parameters, locals) makes several analyses rather complicated without a lot of benefit: reaching defs (with and without pointers), pointer analysis (constraint generation, specifically), slicing (because it relies on the two previous analyses), and taint analysis. the lecture notes don't handle this case, and neither do the analysis implementations. for now my solution is to just assume there are no struct-type variables, but i need to think whether this is a long-term solution
+
+    - the basic difficulty is that any def/use of the struct-type variable should also be a def/use of its fields---this is possible, it just makes the analyses complicated to explain and more difficult for students
 
 - for `intro to widening`:
 
@@ -71,7 +73,7 @@
 
 - assignment 1: now that we've figured out the autograder i could streamline the assignment description (things like what arguments are passed to the script, etc)
 
-- assignments 2 and 4 (both reaching defs): handling struct-type locals gets complicated, just avoid having them in the assignment tests
+- assignments 2--5: avoid having struct-type variables in the assignment tests; the valid cflat program generator can be tuned to not have struct-typed variables pretty easily, but when lowering to lir they can still be introduced so we need to apply a post-lowering filter to eliminate them from the test cases
 
 - develop tools for creating interesting test suites:
 
@@ -1078,7 +1080,7 @@
 
         - in the case where the external code really does do something like that, we can keep our analysis sound by stubbing those external functions as internal functions that summarize their behavior wrt the analysis we're implementing (this is a common technique in program analysis)
 
-    - we also assume that external calls can access our internal globals; this is consistent with languages like C and C++ which can declare globals as extern
+    - for convenience we treat external calls the same as internal calls (including how they can effect globals) even though they don't have access to the globals; this is correct though conservative
 
 - `$ret [op]`
 
@@ -1522,7 +1524,7 @@
 
     - the order here is important, handle the strong def _after_ the weak defs (in case `x` is address-taken and included in the weak defs too)
 
-    - we have to assume that a callee function could define and/or use any variable reachable from its arguments or from a global, and also define/or use any global
+    - we have to assume that a callee function could define and/or use any variable reachable from its arguments or from a global, and also define/or use any global (again we're treating external calls the same as internal calls, which is overly conservative but convenient)
 
 ```
     EXAMPLE:
@@ -2746,7 +2748,7 @@ H -> { ref(b, B) }
 ALLOC -> { ref(b, B) }
 ```
 
-## adding structs
+## adding structs [but no struct-typed variables]
 ### intro
 
 - what if we have structs in the program? recall that the `$gfp` instruction is how we access the fields of a struct:
@@ -2766,7 +2768,7 @@ ALLOC -> { ref(b, B) }
 
     + treat `$gfp` like a copy
 
-    + `lhs = $gep ptr field` ==> `[ptr] ⊆ [lhs]`
+    + `lhs = $gfp ptr field` ==> `[ptr] ⊆ [lhs]`
 
 - example:
 
@@ -3297,6 +3299,8 @@ P2 -> { ref(d,D) }
 - [NOTE: DISCREPANCY BETWEEN NOTES AND IMPLEMENTATION FOR HANDLING POINTER-TYPED RETURN VALUE OF SOURCE; CHECK MY CURRENT IMPLEMENTATION]
 
 - [NOTE: FOR ASSIGNMENT, NEED TO QUALIFY VARIABLE NAMED WITH SCOPE]
+
+- [NOTE: ASSUMING NO STRUCT-TYPE VARIABLES]
 
 ## intro
 
