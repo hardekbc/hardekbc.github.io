@@ -2577,7 +2577,7 @@ binary relation
 
 - andersen-style pointer analysis is just one form of pointer analysis, defined using the inclusion set constraint language
 
-    + this is perhaps the most common kind of pointer analysis in regular use (e.g., in compilers)
+    + this is one of the most common kinds of pointer analysis in regular use (e.g., in compilers)
 
     + there are many other kinds of pointer analysis, that explore various points in the precision/performance design space
 
@@ -2589,7 +2589,7 @@ binary relation
 
     + conveniently, LIR already gives every `$alloc` instruction its own unique label, so we'll just use that
 
-    + example: for `x = $alloc 1 [_alloc1]`, all addresses returned by the `$alloc` will be represented by `_a1`
+    + example: for `x = $alloc 1 [_a1]`, all addresses returned by the `$alloc` will be represented by `_a1`
 
     + note that a single abstract value can represent an unbounded number of concrete memory addresses (e.g., if the instruction is located inside a loop); this is why it's called a _static_ allocation site
 
@@ -2634,7 +2634,7 @@ binary relation
 
     - just don't generate a constraint involving null pointers
 
-    - this won't be true for indirect calls, but we'll get to that later
+    - this won't be sufficient for indirect calls, but we'll get to that later
 
 - given a program variable `x`, we'll use the notation:
 
@@ -2818,7 +2818,7 @@ ALLOC -> { ref(b, B) }
 
     + if `lhs` is pointer-typed: `[retval(<function>)] ⊆ [lhs]` (unless `<function>` returns the null pointer)
 
-    + ∀arg ∈ args, if arg is pointer-typed: `[arg] ⊆ [parameter]` s.t. parameter is the corresponding parameter of `<function>`
+    + `∀arg ∈ args`, if arg is pointer-typed: `[arg] ⊆ [prm]` s.t. `prm` is the corresponding parameter of `<function>` (unless `arg` is the null pointer)
 
 - these constraints account for pointer-related information being passed to the callee via the call arguments and back from the callee via the return instruction
 
@@ -2889,14 +2889,15 @@ P2 -> { ref(d,D) }
 
 - we'll define a constructor `lamₓ` for each function type `X` (or really, just the ones that have a corresponding function pointer global)
 
-    + it will have arity |P| + |R| where |P| is the number of pointer-typed parameters and |R| is the number of pointer-typed return values (which will be 0 or 1)
+    + it will have arity 1 + |P| + |R| where |P| is the number of pointer-typed parameters and |R| is the number of pointer-typed return values (which will be 0 or 1)
 
-    + if |R| = 1 then the first argument position of `lamₓ` is covariant; all other argument positions are contravariant (we'll see why momentarily)
+    + we'll call a lam constructor in two places:
 
-    + constructor calls to `lamₓ` will represent:
-    
-        - functions of type `X` (tracking the function's parameters and return value)
-        - indirect calls via a pointer to functions of type `X`
+        - when creating a global function pointer: position 1 is the name, position 2 is the return variable (if the function returns a pointer), the remaining positions are parameters
+
+        - when generating a constraint for an indirect call: position 1 is a set variable, position 2 is the lhs of the call, the remaining positions are arguments
+
+    + the first argument position is covariant; if |R| = 1 then the second argument position is covariant; all other argument positions are contravariant (we'll see why momentarily)
 
 ### example 3
 
@@ -2928,21 +2929,22 @@ P2 -> { ref(d,D) }
 
   CONSTRAINTS:
   ```
-  define lam_{&(&int,int,&int)->&int}/3 where position 0 is covariant and positions 1,2 are contravariant
+  define lam_{&(&int,int,&int)->&int}/4 where positions 0,1 are covariant and positions 2,3 are contravariant
   - [for convenience, let's call this lamₓ]
 
-  lamₓ(R, _P1_, _P3_) ⊆ FOO // using _X_ to mean contravariant
+  lamₓ(foo, R, _P1_, _P3_) ⊆ FOO // using _X_ to mean contravariant
   ref(alloc1, ALLOC1) ⊆ A
   ref(alloc2, ALLOC2) ⊆ B
   FOO ⊆ F
-  F ⊆ lamₓ(C, _A_, _B_)
+  F ⊆ lamₓ(_DUMMY, C, _A_, _B_)
   ```
 
-- notice that during solving, we eventually get `lamₓ(R, _P1_, _P3_) ⊆ lamₓ(C, _A_, _B_)`; then:
+- notice that during solving, we eventually get `lamₓ(foo, R, _P1_, _P3_) ⊆ lamₓ(_DUMMY, C, _A_, _B_)`; then:
 
-    + `R ⊆ C` (i.e., the return value of `foo` goes to the left-hand side of the indirect call)
-    + `A ⊆ P1` (i.e., the first pointer argument to the indirect call goes to the first pointer parameter of `foo`)
-    + `B ⊆ P3` (i.e., the second pointer argument to the indirect call goes to the second pointer parameter of `foo`)
+    + `foo ⊆ _DUMMY`, i.e., `foo` is recorded in `_DUMMY` as the function being called (we use a dummy variable because this is redundant info)
+    + `R ⊆ C`, i.e., the return value of `foo` goes to the left-hand side of the indirect call
+    + `A ⊆ P1`, i.e., the first pointer argument to the indirect call goes to the first pointer parameter of `foo`
+    + `B ⊆ P3`, i.e., the second pointer argument to the indirect call goes to the second pointer parameter of `foo`
 
 - by making the return value position covariant and the parameter positions contravariant, we can have the call information passing in both directions at once to correctly model function call/return semantics
 
@@ -2950,15 +2952,23 @@ P2 -> { ref(d,D) }
 
 - for each global function pointer `<func>:&X` (e.g., `foo: &(int,int)->&int`):
 
-    + let `N` = (number of pointer-typed parameters) + (number of pointer-typed return values); note that the latter will always be 0 or 1
+    + let `N` = 1 + (number of pointer-typed parameters) + (number of pointer-typed return values); note that the latter will always be 0 or 1
 
     + create a constructor `lamₓ/N` if it doesn't already exist
     
-        - if there is a pointer-type return value then the first position must be covariant; all other positions must be contravariant
+        - first position covariant; if there is a pointer-type return value then second position covariant; all other positions contravariant
 
-    + let `<func>` have pointer-typed parameters `param1`, `param2`, ... (i.e., ignore any non-pointer-typed parameters):
+    + let `<func>` have pointer-typed parameters `param1`, `param2`, ... (i.e., ignore any non-pointer-typed parameters)
 
-        - if `<func>` returns a pointer `retval`, let `args` = `([retval], [param1], [param2], ...)`, otherwise let `args` = `([param1], [param2], ...)`
+    + if `<func>`'s return type is a pointer:
+
+        + if the operand of `$ret` is a variable, let `retval` be that variable
+        + otherwise if the operand of `$ret` is null (i.e., 0), let `retval` be `_nil`
+
+    + let `args` be:
+
+        - if `<func>` has a `retval` then `(const(<func>), [retval], [param1], [param2], ...)`
+        - otherwise `(const(<func>), [param1], [param2], ...)`
 
     + generate constraint `lamₓ(args) ⊆ [<func>]`
     
@@ -2968,22 +2978,24 @@ P2 -> { ref(d,D) }
 
     + let the pointer-typed arguments be `arg1`, `arg2`, ...
 
-        - if any arguments are, according to the function pointer type, supposed to be pointers, but are instead `0` (representing the null pointer), then use a dummy variable `nil` with set variable `[nil]` instead; we'll use the same `[nil]` set variable any time this happens
+        - if any arguments are, according to the function pointer type, supposed to be pointers, but are instead `0` (representing the null pointer), then use a dummy variable `_nil` with set variable `[_nil]` instead; we'll use the same `[_nil]` set variable any time this happens
 
         - we can't just ignore null pointers like before because we need to have an argument for each position in the `lamₓ` constructor call
 
-    + if the type of the function being called returns a pointer but there is no `lhs`, create a dummy `[lhs]` set variable called `DUMMY` and act as if there is a pointer-typed `lhs`; we'll use this same `DUMMY` set variable for all such calls
+    + if the type of the function being called returns a pointer but there is no `lhs`, create a dummy `[lhs]` set variable called `_DUMMY` and act as if there is a pointer-typed `lhs`
 
-    + if `lhs` is pointer-typed let `args` = `([lhs], [arg1], [arg2], ...)`, otherwise let `args` = `([arg1], [arg2], ...)`
+    + if `lhs` is pointer-typed let `args` = `(_DUMMY, [lhs], [arg1], [arg2], ...)`, otherwise let `args` = `(_DUMMY, [arg1], [arg2], ...)`
+
+        - we need a first argument to fill in all the constructor arguments, but we don't really need its value---we can get the same information just by looking at the points-to set of `func_ptr`
 
     + generate constraint `[func_ptr] ⊆ lamₓ(args)`
     
         - this says that anything `func_ptr` points to should flow into the given constructor call
 
-- if we generate constraints this way, then eventually the `lamₓ` constructor calls containing the retval and parameters of an address-taken function will flow into the `lamₓ` constructor call containing the lhs and arguments of the indirect call
+- if we generate constraints this way, then eventually the `lamₓ` constructor calls containing the name, retval, and parameters of an address-taken function will flow into the `lamₓ` constructor call containing the DUMMY, lhs, and arguments of the indirect call
 
-    + since the retval position (if it exists) is covariant, retval will flow into lhs
-
+    + since the first position is covariant, the name of the function being called will flow into `_DUMMY`
+    + since the retval position (if it exists) is covariant, `retval` will flow into `lhs`
     + since the remaining positions are contravariant, the arguments will flow into the parameters
 
 # current summary and roadmap
