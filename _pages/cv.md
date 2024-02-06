@@ -13,9 +13,8 @@ redirect_from:
 
 |  2022--now | Professor, UC Santa Barbara Computer Science Dept.                   |
 |-----------:|:---------------------------------------------------------------------|
-| 2018--2022 | Associate Professor, UC Santa Barbara Computer Science Dept.         |
+| 2016--2022 | Associate Professor, UC Santa Barbara Computer Science Dept.         |
 | 2016--2017 | Visiting Researcher, Google Inc.                                     |
-| 2015--2016 | Associate Professor, UC Santa Barbara Computer Science Dept.         |
 | 2009--2015 | Assistant Professor, UC Santa Barbara Computer Science Dept.         |
 | 2001--2009 | Graduate RA/TA, University of Texas at Austin Computer Science Dept. |
 | 1997--2001 | Lieutenant, United States Air Force                                  |
@@ -40,7 +39,7 @@ redirect_from:
 |                  Dates | Venue                                                                              |
 |-----------------------:|------------------------------------------------------------------------------------|
 | 2013, 2016, 2019, 2022 | Code Generation and Optimization (CGO)                                             |
-|             2015, 2021 | Programming Language Design and Implementation (PLDI)                              |
+|       2015, 2021, 2024 | Programming Language Design and Implementation (PLDI)                              |
 |                   2021 | International Conference on Code Quality (ICCQ)                                    |
 |                   2019 | Static Analysis Symposium (SAS)                                                    |
 |                   2018 | LLVM Student Research Competition                                                  |
@@ -70,6 +69,7 @@ redirect_from:
 |          Zach Sisco |           |
 |      Harlan Kringen |           |
 |     Hitomi Nakayama |           |
+|         Jingtao Xia |           |
 |         Mehmet Emre | 2022      |
 | Michael Christensen | 2021      |
 |      Lawton Nichols | 2019      |
@@ -81,7 +81,7 @@ redirect_from:
 
 |        Student | Graduated |
 |---------------:|-----------|
-|    Henry Zhang |           |
+|    Henry Zhang | 2023      |
 |       Bryan Xu | 2023      |
 | Jacqueline Mai | 2021      |
 | Ryan Schroeder | 2021      |
@@ -92,6 +92,7 @@ redirect_from:
 ### Undergraduate Research Students
 
 - Mike Wang
+- Ethan Mader
 - Aesha Parekh
 - Rory Zahedi
 - Ben Darnell
@@ -122,18 +123,29 @@ redirect_from:
 
 ## University Service
 
+### System-Level Committees
+
+|      Dates | Activity                                            |
+|-----------:|-----------------------------------------------------|
+| 2023--2024 | University Committee on Educational Policy (member) |
+
 ### Campus-Level Committees
 
-|     Dates | Activity              |
-|----------:|-----------------------|
-| 2021--now | Undergraduate Council |
+|      Dates | Activity                                         |
+|-----------:|--------------------------------------------------|
+| 2023--2024 | Undergraduate Council (chair)                    |
+| 2023--2024 | Executive Council (member)                       |
+| 2023--2024 | Faculty Legislature (member)                     |
+| 2023--2023 | Contingency Planning Group (member)              |
+| 2023--2023 | Task Force on Disabled Students Program (member) |
+| 2021--2023 | Undergraduate Council (member)                   |
 
 ### Department-Level Individual Positions
 
 |      Dates | Position                                             |
 |-----------:|------------------------------------------------------|
-|  2020--now | Undergraduate Vice Chair                             |
-|  2022--now | Computer Engineering Program Coordinator             |
+| 2020--2023 | Undergraduate Vice Chair                             |
+| 2022--2023 | Computer Engineering Program Coordinator             |
 | 2020--2021 | Undergraduate Advisor                                |
 |       2019 | Undergraduate Vice Chair                             |
 | 2015--2016 | Computer Engineering Program Associate Director      |
@@ -145,7 +157,7 @@ redirect_from:
 
 |      Dates | Committee                          |
 |-----------:|------------------------------------|
-|  2020--now | Undergraduate Curriculum Committee |
+| 2020--2023 | Undergraduate Curriculum Committee |
 |       2019 | Undergraduate Curriculum Committee |
 | 2018--2019 | CS Summit Committee                |
 | 2011--2012 | Colloquium Committee               |
@@ -154,11 +166,13 @@ redirect_from:
 
 |      Dates | Committee                                                       |
 |-----------:|-----------------------------------------------------------------|
-|  2020--now | Undergraduate Affairs Committee                                 |
+|  2023--now | Undergraduate Curriculum Committee                              |
 |  2019--now | College of Creative Studies: Computing, Program Committee       |
+| 2020--2023 | Undergraduate Affairs Committee                                 |
 | 2021--2023 | LSOE Faculty Recruiting Committee                               |
 |       2021 | College of Creative Studies Merit/Promotion Personnel Committee |
 | 2020--2022 | Phelps Covid-19 Building Committee                              |
+| 2020--2021 | Academic Program Review (PRP) Committee
 |       2020 | College of Creative Studies Merit/Promotion Personnel Committee |
 |       2020 | Undergraduate Curriculum Committee                              |
 |       2020 | Curriculum Assessment Task Force                                |
@@ -172,4 +186,4 @@ redirect_from:
 | 2009--2011 | Undergraduate Curriculum Committee                              |
 
 ---
-Last Updated: March 2023
+Last Updated: February 2024
