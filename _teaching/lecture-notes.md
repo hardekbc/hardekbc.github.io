@@ -17,7 +17,7 @@
 - week 3.2: through `second-order DFA` -> `reaching definitions`; stopped 20 minutes early
 - week 4.1: through `second-order DFA` -> `control analysis`; stopped 10 minutes early
 - week 4.2: through `widening redux`
-- week 5.1: ???
+- week 5.1: [remote due to weather] through `practice designing DFA` (skipped abstract semantics); stopped 10 minutes early
 - week 5.2: ???
 - week 6.1: ???
 - week 6.2: ???
@@ -67,13 +67,23 @@
 
 ### assignments
 
+- maybe just don't have external calls for any assignment tests except assignment 5 (the taint analysis)? then we don't need to worry about defining how the analysis treats external code (for assignment 5 we can just treat them specially)
+
 - maybe only give them the JSON format instead of giving them a choice?
 
     - TODO: check student submissions and see how many ended up using the LIR format directly and how many used the JSON version
 
 - assignment 1: now that we've figured out the autograder i could streamline the assignment description (things like what arguments are passed to the script, etc)
 
+- assignment 2: because the test programs are generated from cflat there will always be global function pointers in the lir because they're automatically inserted during lowering; this makes the "no global" test suites kind of pointless (they just refrain from adding explicit globals to the generated cflat program)
+
+    - if there are no indirect calls it would be nice to remove them so there are no globals period (this impacts the handling of function calls---since there are always globals, there are always def-use chains between calls)
+
+    - or change the lowerer so that the global function pointers are only generated when they are needed
+
 - assignments 2--5: avoid having struct-type variables in the assignment tests; the valid cflat program generator can be tuned to not have struct-typed variables pretty easily, but when lowering to lir they can still be introduced so we need to apply a post-lowering filter to eliminate them from the test cases
+
+    - or modify ast_gen.rs to prevent generating struct vars; see the ast_gen.rs in assign-3/test-gen for ideas
 
 - develop tools for creating interesting test suites:
 
