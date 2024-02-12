@@ -17,8 +17,8 @@
 - week 3.2: through `second-order DFA` -> `reaching definitions`; stopped 20 minutes early
 - week 4.1: through `second-order DFA` -> `control analysis`; stopped 10 minutes early
 - week 4.2: through `widening redux`
-- week 5.1: [remote due to weather] through `practice designing DFA` (skipped abstract semantics); stopped 10 minutes early
-- week 5.2: ???
+- week 5.1: through `practice designing DFA` (skipped abstract semantics); stopped 10 minutes early; remote due to weather
+- week 5.2: halfway through `set constraint-based analysis` -> `solving inclusion constraints` -> `solving the constraint graph`
 - week 6.1: ???
 - week 6.2: ???
 - week 7.1: ???
@@ -51,6 +51,11 @@
 
 - the initial example for sign analysis (`intro to DFA` -> `the basics` -> `high-level example`) confuses students because it refines the abstract values based on branch conditions and recognizes arithmetic identities like `x - x = 0`; i need to rewrite it to remove these elements and make it just like the version described later
 
+- maybe just don't introduce external calls at all (or at least not until taint analysis); this means fewer things to explain and less complicated implementations for the students
+
+    - TODO: YES, DO THIS
+    - TODO: also modify my implementations to be consistent: some treat externs as having the same possible effects as internal function calls, some ignore externs altogether, and some treat them as like internal calls except they can't access globals
+
 - there's a lot of redundancy between `intro to DFA` -> `the basics` and `intro to DFA` -> {`abstract domains`, `abstract semantics`}, i should collapse these together
 
 - in `intro to DFA` -> `abstract semantics` i had the students fill in the tables for addition and less-than, which worked great but came really late in the lecture; when i integrate the sections per the above note i should try to move the student interaction part earlier
@@ -69,17 +74,21 @@
 
 - maybe just don't have external calls for any assignment tests except assignment 5 (the taint analysis)? then we don't need to worry about defining how the analysis treats external code (for assignment 5 we can just treat them specially)
 
+    - which means i can remove the `$call_ext` case from lectures as well
+
 - maybe only give them the JSON format instead of giving them a choice?
 
     - TODO: check student submissions and see how many ended up using the LIR format directly and how many used the JSON version
 
-- assignment 1: now that we've figured out the autograder i could streamline the assignment description (things like what arguments are passed to the script, etc)
+- try to integrate all the autograders into one, or at least have a single library that they all call into
 
 - assignment 2: because the test programs are generated from cflat there will always be global function pointers in the lir because they're automatically inserted during lowering; this makes the "no global" test suites kind of pointless (they just refrain from adding explicit globals to the generated cflat program)
 
     - if there are no indirect calls it would be nice to remove them so there are no globals period (this impacts the handling of function calls---since there are always globals, there are always def-use chains between calls)
 
     - or change the lowerer so that the global function pointers are only generated when they are needed
+
+    - this is done in an ad-hoc way for assignment 3 by removing global pointers after the fact; maybe just backport this to assignment 2
 
 - assignments 2--5: avoid having struct-type variables in the assignment tests; the valid cflat program generator can be tuned to not have struct-typed variables pretty easily, but when lowering to lir they can still be introduced so we need to apply a post-lowering filter to eliminate them from the test cases
 
@@ -1562,33 +1571,35 @@
 
 - if a variable is a struct, then defining or using it also defines/uses its fields (which we're representing with the fake variables)
 
-- assume in the following that `x` has a struct type, and let `FLDS` = `{ var ∈ addr_taken | fld ∈ fields(x.type()), type(var) = type(fld), var is a fake variable }`
+- assume in the following that `x` has a struct type, and let `FLDS(x)` = `{ var ∈ addr_taken | fld ∈ fields(x.type()), type(var) = type(fld), var is a fake variable }`
 
 - pp: `x = $copy y`
 
     - SDEF = `{ x }`
-    - WDEF = `FLDS`
-    - USE = `{ y } ∪ FLDS`
+    - WDEF = `FLDS(x)`
+    - USE = `{ y } ∪ FLDS(y)`
 
 - pp: `x = $load y`
 
     - DEF = `{ x }`
-    - WDEF = `FLDS`
-    - USE = `{ y } ∪ { var ∈ addr_taken | type(var) = type(x) } ∪ FLDS`
+    - WDEF = `FLDS(x)`
+    - USE = `{ y } ∪ { var ∈ addr_taken | type(var) = type(x) } ∪ FLDS(x)`
 
 - pp: `$store y x`
 
-    - DEF = `{ var ∈ addr_taken | type(var) = type(x) } ∪ FLDS`
-    - USE = `{ x, y } ∪ FLDS`
+    - DEF = `{ var ∈ addr_taken | type(var) = type(x) } ∪ FLDS(x)`
+    - USE = `{ x, y } ∪ FLDS(x)`
 
 - pp: `[x =] $call_{dir, idr, ext} id/<fp>(<arg_op>...)`
 
-    - FIXME: ??? (dealing with struct-type arguments?)
+    - in addition to the previous sets for calls:
+    - WDEF ∪= `FLDS(x)`
+    - USE ∪= `FLDS(arg)` s.t. `arg` has a struct type
 
  - pp: `$ret x`
 
     - DEF = `{}`
-    - USE = `{ x } ∪ FLDS`
+    - USE = `{ x } ∪ FLDS(x)`
 
 ### abstract execution
 
@@ -3055,30 +3066,41 @@ P2 -> { ref(d,D) }
         - a little abstract interpretation
         - maybe more...
 
-# ===== OLD ============================================================================
-
 # program slicing (using pointer info; control analysis; pdg)
 ## intro
 
-- [the point is to (1) show why pointer info is useful now that we have it; (2) introduce a different application for program analysis than optimization; (3) describe some generally useful things like dominance and PDG]
+- the point is to:
 
-- now that we have a way to compute pointer information for our analyses, let's use it on a practical application: program slicing.
+    + show why pointer info is useful now that we have it
+    + introduce a different application for program analysis than optimization
+    + describe some generally useful things like the PDG
 
-    + problem statement: given a specific instruction I, return the set of instructions that influence the result of I. the name is inspired by the idea that we're computing a "slice" of the program that only contains relevant instructions.
+- now that we have a way to compute pointer information for our analyses, let's use it on a practical application: program slicing
 
-    + slicing is a well-known and heavily-used analysis and there are many variations; we're using one of the basic definitions here but there are many more possible versions.
+    + problem statement: given a specific instruction I, return the set of instructions that influence the result of I (aka a _backwards slice_)
 
-    + sign analysis was a stand-in for constant propagation (i used it instead of constant propagation because the abstract semantics are more interesting; for constant propagation it's just standard arithmetic), so that was exploring program analysis for program optimization. slicing is usually used for things like program understanding and debugging, so we're now exploring a different use-case for program analysis.
+    + could also ask for the set of instructions that I influences (aka a _forwards slice_)
+    
+    + the name is inspired by the idea that we're computing a "slice" of the program that only contains relevant instructions
+
+    + slicing is a well-known and heavily-used analysis and there are many variations; we're using one of the basic definitions here but there are many more possible versions
+
+    + slicing is usually used for things like program understanding and debugging, so we're now exploring a different use-case for program analysis
 
 - example:
 
   ```
-  main() {
-    int i, j, x = input(), y = 0, z = 1;
+  fn main() -> int {
+    let i:int, j:int, x:int = input(), y:int = 0, z:int = 1;
 
-    for (i = 0, j = 0; i < x; i++, j +=2) {
-      y += 2;
-      z *= j;
+    i = 0;
+    j = 1;
+
+    while i < x {
+        y = y + 2;
+        z = z * j;
+        i = i + 1;
+        j = j + 2;
     }
 
     return y;
@@ -3088,233 +3110,233 @@ P2 -> { ref(d,D) }
   SLICE WRT RETURN STATEMENT:
   ```
   main() {
-    int i, x = input(), y = 0;
+    let i:int, x:int = input(), y:int = 0;
 
-    for (i = 0; i < x; i++) {
-      y += 2;
+    i = 0;
+
+    while i < x {
+        y = y + 2;
+        i = i + 1;
     }
 
     return y;
   }
   ```
 
-- however, we can't go straight to slicing; we need to build up to it:
+- slicing is built on top of several analyses that we've already studied:
 
-    + reaching defs with pointer info + control analysis ==> PDG ==> slicing
+    + ((pointer analysis -> reaching defs with pointer info) + control analysis) -> PDG -> slicing
 
-    + remember that i said reaching definitions was more for follow-on analyses than for human consumption; this is the kind of thing i meant. also note that, as i promised earlier, assignment 1 is important to the remaining assignments (the above set of things will be assignment 3).
+    + remember that i said reaching definitions was more for follow-on analyses than for human consumption; this is the kind of thing i meant
 
-    + notice that if we treat pointers conservatively like in assignment 1 then slicing is pretty useless; the "slice" it computes will contain many irrelevant instructions and overwhelm the user with useless info.
+    + notice that if we treat pointers conservatively like in assignment 1 then slicing is pretty useless; the "slice" it computes will contain many irrelevant instructions and overwhelm the user with useless info
 
-    + also note that the PDG is a very useful data structure in its own right and can be used for things besides slicing; i'll talk more about that later.
+    + also note that the PDG is a very useful data structure in its own right and can be used for things besides slicing; i'll talk more about that later
 
-- to keep things simpler and more focused we'll stay with intraprocedural analysis for this problem; we'll move to interprocedural analysis after we're done with slicing.
+- to keep things simpler and more focused we'll stay with intraprocedural analysis for this problem; we'll move to interprocedural analysis after we're done with slicing
 
 ## reaching defs with pointer info
 ### intro
 
-- we'll revisit our old friend reaching defs, but now with pointer information. we'll keep it intraprocedural, but we'll use pointer information to improve precision for loads, stores, and calls.
+- we'll revisit our old friend reaching defs, but now with pointer information
 
-- we'll assume that we have the solution of a flow-insensitive pointer analysis available (i.e., it maps each program variable / static allocation site to its points-to set, which itself contains program variables and static allocation sites).
+    + we'll keep it intraprocedural, but we'll use pointer information to improve precision for loads, stores, and calls
 
-    + we'll assume a field-insensitive pointer analysis since that's what we implemented for assignment 2. this means that we can basically ignore structs altogether.
+- we'll assume that we have the solution of a flow-insensitive, field-insensitive pointer analysis available (i.e., it maps each program variable and heap object to its points-to set, which itself contains program variables and heap objects)
 
-- we'll also pre-process the program we're analyzing to compute "mod/ref" information: for each function, what set of inputs to the function can be defined by a $store ("mod") or used by a $load ("ref") either directly by that function or by some function that it transitively calls.
+- we'll also pre-process the program we're analyzing to compute "mod/ref" information: for each function, what set of inputs to the function can be defined by a `$store` ("mod") or used by a `$load` ("ref") either directly by that function or by some function that it transitively calls
 
-    + this mod/ref info will allow us to be less conservative when processing calls during our intraprocedural analysis.
+    + this mod/ref info will allow us to be less conservative when processing calls during our intraprocedural analysis
 
 ### mod/ref info
 
-- step 1: compute the call graph of the program.
+- note: we'll assume that any relevant externs have been stubbed as internal functions, so we can ignore `$call_ext` instructions
 
-    + a node for each function.
+- step 1: compute the call graph of the program
 
-    + an edge from function A to function B if A contains a call to B (via either $call or $icall; use the points-to solution for $icall).
+    + a node for each function
 
-    + this is an very common and useful data structure that a lot of program analysis tools use.
+    + an edge from function `A` to function `B` if `A` contains a call to `B` via `$call_{dir, idr}`
+    
+        - use the points-to solution to resolve targets of `$call_idr`
 
-- step 2: compute the transitive closure of the call graph.
+    + this is an very common and useful data structure that a lot of program analysis tools use
 
-    + augment the call graph so that there is an edge from A to B if A can directly or transitively reach B in the call graph.
+- step 2: compute the transitive closure of the call graph
 
-- step 3: compute initial mod/ref info.
+    + augment the call graph so that there is an edge from `A` to `B` if `A` can directly or transitively reach `B` in the call graph
 
-    + for each function `<func>`, compute (1) the set of pointed-to objects that can be defined by a $store in `<func>` (`Mods(<func>)`) and (2) the set of pointed-to objects that can be used by a $load in `<func>` (`Refs(<func>)`).
+    + you can use a worklist algorithm where the worklist contains all functions that have new incoming edges since they were last processed (initialized with all functions)
 
-- step 4: propagate the mod/ref info using the transitively closed call graph.
+- step 3: compute initial mod/ref info
 
-    + for `<func2>` s.t. `<func> --> <func2>` in the closed graph: `Refs(<func>) = Refs(<func>) \union Refs(<func2>)`; `Mods(<func>) = Mods(<func>) \union Mods(<func2>)`.
+    + for each function `<func>`, compute (1) the set of globals and pointed-to objects that can be defined in `<func>` (`Mods(<func>)`) and (2) the set of globals and pointed-to objects that can be used in `<func>` (`Refs(<func>)`)
 
-- what does this tell us? given a function `<func>`, `Refs(<func>)` is the set of objects that can be used by a $load in `<func>` or any function that `<func>` may call, and `Mods(<func>)` is the set of objects that can be defined by a $store in `<func>` or any function that `<func>` may call.
+- step 4: propagate the mod/ref info using the transitively closed call graph
 
-    + this info will help us be more precise when processing calls during the reaching defs analysis.
+    + for `<func2>` s.t. `<func> --> <func2>` in the closed graph: `Refs(<func>) = Refs(<func>) ∪ Refs(<func2>)`; `Mods(<func>) = Mods(<func>) ∪ Mods(<func2>)`
+
+- what does this tell us? given a function `<func>`, `Refs(<func>)` is the set of objects that can be used in `<func>` or any function that `<func>` may call, and `Mods(<func>)` is the set of objects that can be defined in `<func>` or any function that `<func>` may call
+
+    + this info will help us be more precise when processing calls during the reaching defs analysis
 
 ### the improved analysis
 
-- no more need for "fake variables"; that's handled by the pointer analysis (i.e., the static allocation sites) and we'll just use its results.
+- no more need for "fake variables"; that's handled by the pointer analysis (i.e., the static allocation sites) and we'll just use its results
 
-- all parameters still have a def of `external-def` (same as before); also all variables reachable via the parameters (per the points-to solution) have a def of `external-def` (this is new).
+- all the instructions stay the same except for `$load`, `$store`, and `$call_{dir, idr}`
 
-    + the second part was handled before by being conservative and assuming that any $load could be using an `external-def` object, but now the pointer analysis will allow us to be more precise.
+    + again, we assume relevant extern functions have been stubbed so we can ignore `$call_ext`
 
-    + as before, we record this info in the initial abstract store of the entry
-      basic block.
+- `x = $load y`:
 
-- all the instructions stay the same except for $load, $store, $call, $icall.
+    + USE = `{ y } ∪ points-to[y]`
+    + rest is the same
 
-- `lhs = $load src_ptr`:
+- `$store x <op>`:
 
-    + USES = { src_ptr } \union points-to[src_ptr]
+    + DEF = `points-to[x]`
+    + rest is the same
 
-    + for each use in USES: soln[inst] += store[use]
+- `[x =] $call_{dir, idr} id/<fp>(<arg_op>...)`:
 
-    + store[lhs] = {inst}
+    + CALLEES = `{ id }` (if `$call_dir`) OR `points-to[fp]` (if `$call_idr`)
+    + REACHABLE = globals + all objects reachable from the arguments or globals per the points-to solution
 
-- `$store dst_ptr op`:
+    + WDEF = `(⋃_{callee ∈ CALLEES} Mods(callee)) ∩ REACHABLE`
+    + USE = `{ <fp> } ∪ { <arg_op> | <arg_op> is a variable } ∪ ((⋃_{callee \in CALLEES} Refs(callee)) ∩ REACHABLE)`
+    + rest is the same
 
-    + USES = { dst_ptr } \union { op if it's a var }
+## control dependence
 
-    + DEFS = points-to[dst_ptr]
+- remember that block `X` is control dependent on block `Y` iff `Y` is in the post-dominance frontier of `X`
 
-    + for each use in USES: soln[inst] += store[use]
+- given a CFG:
 
-    + for each def in DEFS: store[def] += {inst}
-
-- `lhs = $[i]call <func/ptr>(args...)`:
-
-    + REACHABLE = all objects reachable from the arguments per the points-to solution
-
-    + CALLEES = all possible callee functions for this call (using the points-to solution if this is an $icall)
-
-    + REFS = (\Union_{callee \in CALLEES} Refs(callee)) \intersect REACHABLE
-
-        + all objects reachable from the arguments that are used by a $load in the callee directly or transitively.
-
-    + USES = { args that are variables } \union { ptr if this is an $icall } \union REFS
-
-    + WEAK_DEFS = (\Union_{callee \in CALLEES}: Mods(callee)) \intersect REACHABLE
-
-        + all objects reachable from the arguments that are defined by a $store in the callee directly or transitively.
-
-    + for each use in USES: soln[inst] += store[use]
-
-    + store[lhs] = {inst}
-
-    + for each def in WEAK_DEFS: store[def] += {inst}
+    + reverse the edges
+    + now the exit block is the entry block
+    + compute dominance frontiers (just like assignment 2)
+    + `X` c.d. on `Y` iff `Y` ∈ dom_frontier(`X`)
 
 ## pdg
 
-- the PDG is a data structure that embodies the reaching defs and control dependence information we computed earlier.
+- the PDG is a data structure that embodies the reaching defs (aka _data dependencies_) and control dependence information
 
-- a node for for each instruction.
+- a node for for each instruction
 
-- a _data dependence_ edge from A to B if the definition at A reaches a use at B.
+- a _data dependence_ edge from `A` to `B` if the definition at `A` reaches a use at `B`
 
-    + we get this directly from the reaching defs analysis.
+    + we get this directly from the reaching defs analysis
 
-- a _control dependence_ edge from A to B if B is control dependent on A.
+- a _control dependence_ edge from `A` to `B` if `B` is control dependent on `A`
 
-    + we expand the basic block control dependence info into individual instructions: if basic block X is control dependent on block Y, then all instructions in X have control dependence edges from the terminator instruction in Y.
+    + we expand the basic block control dependence info to individual instructions: if basic block `X` is control dependent on block `Y`, then all instructions in `X` have a control dependence edge from the terminator instruction in `Y`
 
-- it will be useful to have bi-directional edges so that we can go forwards or backwards in the PDG.
+- it will be useful to have bi-directional edges so that we can go forwards or backwards in the PDG
 
-- [demonstrate using the original example for program slicing]
+- example
 
-  ORIGINAL:
+  SOURCE:
   ```
-  main() {
-    int i, j, x = input(), y = 0, z = 1;
+  fn main() -> int {
+    let i:int, j:int, x:int = input(), y:int = 0, z:int = 1;
 
-    for (i = 0, j = 0; i < x; i++, j +=2) {
-      y += 2;
-      z *= j;
+    i = 0;
+    j = 1;
+
+    while i < x {
+        y = y + 2;
+        z = z * j;
+        i = i + 1;
+        j = j + 2;
     }
 
     return y;
   }
   ```
 
-  IR:
+  LIR:
   ```
+  fn main() -> int {
+  let i:int, j:int, x:int, y:int, z:int, tmp:int
+
   entry:
-    i:int = $copy 0
-    j:int = $copy 0
-    x:int = $call input()
-    y:int = $copy 0
-    z:int = $copy 1
+    x = $call_ext input()
+    y = $copy 0
+    z = $copy 1
+    i = $copy 0
+    j = $copy 1
     $jump loop_hdr
 
   loop_hdr:
-    tmp:int = $cmp lt i:int x:int
-    $branch tmp:int loop_body exit
+    tmp = $cmp lt i x
+    $branch tmp loop_body exit
 
   loop_body:
-    y:int = $arith add y:int 2
-    z:int = $arith mul z:int j:int
-    i:int = $arith add i:int 1
-    j:int = $arith add j:int 2
+    y = $arith add y 2
+    z = $arith mul z j
+    i = $arith add i 1
+    j = $arith add j 2
     $jump loop_hdr
 
   exit:
-    $ret y:int
+    $ret y
+  }
   ```
 
   PDG:
   ```
-  [12--16] control dependent on [10]
-
-   [9] data dependent on [2, 4, 14]
-  [10] data dependent on [9]
-  [12] data dependent on [5, 12]
-  [13] data dependent on [3, 6, 13, 15]
-  [14] data dependent on [2, 14]
-  [15] data dependent on [3, 15]
-  [18] data dependent on [5, 12]
+  [show reaching defs and control dependencies graphically]
   ```
 
 ## slicing
 
-- recall: a slice of a function for instruction X consists of all instructions that affect the behavior of X.
+- recall: a _backwards slice_ of a function for instruction `X` consists of all instructions that affect the behavior of `X`
 
-- if X is data dependent on Y, then clearly Y affects X's behavior...and so do the instructions that Y is data dependent on, and so on.
+- if `X` is data dependent on `Y` then clearly `Y` affects `X`'s behavior...and so do the instructions that `Y` is data dependent on, and so on
 
-    + this is the transitive closure of the data dependence edges in the PDG (going backwards from X).
+    + this is the transitive closure of the data dependence edges in the PDG (going backwards from `X`)
 
-- if Y controls whether X even executes or not, then clearly Y affect's X's behavior...and so do all the instructions that control whether Y executes or not, and so on.
+- if `Y` controls how many times `X` is executed then clearly `Y` affects `X`'s behavior...and so do all the instructions that control whether `Y` executes or not, and so on
 
-    + this is the transitive closure of the control dependence edges in the PDG (going backwards from X).
+    + this is the transitive closure of the control dependence edges in the PDG (going backwards from `X`)
 
-- if you think about it, if X is data dependent on Y and Y is control dependent on Z, then Z also affects X's behavior; and if X is control dependent on Y and Y is data dependent on Z, then same thing.
+- if you think about it, if `X` is data dependent on `Y` and `Y` is control dependent on `Z` then `Z` also affects `X`'s behavior; and if `X` is control dependent on `Y` and `Y` is data dependent on `Z` then same thing
 
-- so to compute a slice wrt X: compute the transitive closure of all data and control dependence edges from X (going backwards in the PDG).
+- so to compute a slice wrt `X`: compute the transitive closure of all data and control dependence edges from X going _backwards_ in the PDG
 
-    + this is called a _backwards slice_; we could also compute a _forwards slice_ by doing the same thing except going forwards in the PDG. this kind of slice tells us what instructions the execution of X can directly or indirectly affect.
+    + we could also compute a _forwards slice_ by doing the same thing except going forwards in the PDG; this kind of slice tells us what instructions the execution of `X` can directly or indirectly affect
 
-- for human consumption, rather than a simple set of instructions it's useful to present the slice as a new function that only contains the relevant instructions.
+- for human consumption, rather than a simple set of instructions it's useful to present the slice as a new function that only contains the relevant instructions
 
-- [demonstrate using the original example for program slicing (see pdg example)]
+- example: backwards slice from return instruction for the PDG example
 
   SLICED:
   ```
+  fn main() -> int {
+  let i:int, x:int, y:int, tmp:int
+
   entry:
-    i:int = $copy 0
-    x:int = $call input()
-    y:int = $copy 0
+    x = $call_ext input()
+    y = $copy 0
+    i = $copy 0
 
   loop_hdr:
-    tmp:int = $cmp lt i:int x:int
-    $branch tmp:int loop_body exit
+    tmp = $cmp lt i x
+    $branch tmp loop_body exit
 
   loop_body:
-    y:int = $arith add y:int 2
-    i:int = $arith add i:int 1
+    y = $arith add y 2
+    i = $arith add i 1
 
   exit:
-    $ret y:int
+    $ret y
+  }
   ```
 
-    + notice that we're missing some $jump instructions; that's because they are unconditional and so there is no control dependence on them.
+- notice that we're missing some `$jump` instructions; that's because they are unconditional and so there is no control dependence on them
 
+# ===== OLD ============================================================================
 
 # taint analysis (interprocedural dfa; icfg; context sensitivity)
 
