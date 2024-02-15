@@ -19,7 +19,7 @@
 - week 4.2: through `widening redux`
 - week 5.1: through `practice designing DFA` (skipped abstract semantics); stopped 10 minutes early; remote due to weather
 - week 5.2: halfway through `set constraint-based analysis` -> `solving inclusion constraints` -> `solving the constraint graph`
-- week 6.1: ???
+- week 6.1: through `andersen-style pointer analysis` -> `no structs or calls` -> `setup`; stopped 10 minutes early
 - week 6.2: ???
 - week 7.1: ???
 - week 7.2: ???
@@ -55,6 +55,8 @@
 
     - TODO: YES, DO THIS
     - TODO: also modify my implementations to be consistent: some treat externs as having the same possible effects as internal function calls, some ignore externs altogether, and some treat them as like internal calls except they can't access globals
+
+- we could also make things simpler by not using globals (except for the global function pointers needed for indirect calls, which we can just say to ignore); this may be going too far though (and this would require us to change the official analysis implementations to treat the global function pointers specially, to conform to the student solutions)
 
 - there's a lot of redundancy between `intro to DFA` -> `the basics` and `intro to DFA` -> {`abstract domains`, `abstract semantics`}, i should collapse these together
 
@@ -3066,7 +3068,7 @@ P2 -> { ref(d,D) }
         - a little abstract interpretation
         - maybe more...
 
-# program slicing (using pointer info; control analysis; pdg)
+# program slicing
 ## intro
 
 - the point is to:
@@ -3207,7 +3209,7 @@ P2 -> { ref(d,D) }
     + USE = `{ <fp> } ∪ { <arg_op> | <arg_op> is a variable } ∪ ((⋃_{callee \in CALLEES} Refs(callee)) ∩ REACHABLE)`
     + rest is the same
 
-## control dependence
+## control dependence reminder
 
 - remember that block `X` is control dependent on block `Y` iff `Y` is in the post-dominance frontier of `X`
 
