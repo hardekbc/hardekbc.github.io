@@ -20,7 +20,7 @@
 - week 5.1: through `practice designing DFA` (skipped abstract semantics); stopped 10 minutes early; remote due to weather
 - week 5.2: halfway through `set constraint-based analysis` -> `solving inclusion constraints` -> `solving the constraint graph`
 - week 6.1: through `andersen-style pointer analysis` -> `no structs or calls` -> `setup`; stopped 10 minutes early
-- week 6.2: ???
+- week 6.2: through `andersen-style pointer analysis`
 - week 7.1: ???
 - week 7.2: ???
 - week 8.1: ???
@@ -2664,39 +2664,39 @@ binary relation
     + `[x]` to mean translate `x` into a set variable (creating it if it doesn't already exist) and return the set variable
     + `const(x)` to mean translate `x` into a constant (creating it if it doesn't already exist) and return the constant
 
-- `lhs = $copy var`
+- `x = $copy y`
 
-    + `[var] ⊆ [lhs]`
+    + `[y] ⊆ [x]`
 
-- `lhs = $alloc op [id]`
+- `x = $alloc op [id]`
 
-    + `ref(const(id), [id]) ⊆ [lhs]`
+    + `ref(const(id), [id]) ⊆ [x]`
 
-    + notice that since the left-hand side is a constructor call this constraint will be represented as a predecessor edge in the constraint graph---i.e., it will be part of the solution for the `[lhs]` set variable
+    + notice that since the left-hand side is a constructor call this constraint will be represented as a predecessor edge in the constraint graph---i.e., it will be part of the solution for the `[x]` set variable
 
-- `lhs = $addrof var`
+- `x = $addrof y`
 
-    + `ref(const(var), [var]) ⊆ [lhs]`
+    + `ref(const(y), [y]) ⊆ [x]`
 
-    + similarly to `$alloc`, this call will be part of `[lhs]`'s solution
+    + similarly to `$alloc`, this call will be part of `[x]`'s solution
 
-- `lhs = $gep src_ptr op`
+- `x = $gep y <op>`
 
-    + `[src_ptr] ⊆ [lhs]`
+    + `[y] ⊆ [x]`
 
     + note that we're being 'array-insensitive', i.e., collapsing all elements of an array into one, which is common in these kinds of analyses
 
-- `lhs = $load src_ptr`
+- `x = $load y`
 
-    + `ref⁻¹([src_ptr]) ⊆ [lhs]`
+    + `ref⁻¹([y]) ⊆ [x]`
 
-    + why? the projection is modeling pointer dereference: concretely we get the value of `src_ptr` (an address), go to that address to get the value of what `src_ptr` points to (which is also an address, since `lhs` is a pointer), then copy that value to `lhs` [draw a picture]
+    + why? the projection is modeling pointer dereference: concretely we get the value of `y` (an address), go to that address to get the value of what `y` points to (which is also an address, since `x` is a pointer), then copy that value to `x` [draw a picture]
     
-    + this constraint gets the current solution for `[src_ptr]` (which is a set of `ref` calls representing the value of `src_ptr`), projects the second argument of those `ref` calls (which are the set variables representing the value of what `src_ptr` points to, i.e., their points-to sets), then copies their values to `[lhs]`
+    + this constraint gets the current solution for `[y]` (which is a set of `ref` calls representing the value of `y`), projects the second argument of those `ref` calls (which are the set variables representing the value of what `y` points to, i.e., their points-to sets), then copies their values to `[x]`
 
-- `$store dst_ptr var`
+- `$store x y`
 
-    + `[var] ⊆ ref⁻¹([dst_ptr])`
+    + `[y] ⊆ ref⁻¹([x])`
 
     + why? similar to load except the information is flowing _into_ the pointed-to variables instead of _from_ them
 
@@ -2776,10 +2776,10 @@ ALLOC -> { ref(b, B) }
 
 - what if we have structs in the program? recall that the `$gfp` instruction is how we access the fields of a struct:
 
-    + `lhs = $gfp src_ptr fieldname`
-    + `src_ptr` is a pointer to the struct
-    + `fieldname` is the name of the field we want to access
-    + `lhs` is set to a pointer to the desired field
+    + `x = $gfp y <fieldname>`
+    + `y` is a pointer to the struct
+    + `<fieldname>` is the name of the field we want to access
+    + `x` is set to a pointer to the desired field
 
 - when a struct is allocated using `$alloc` it creates a heap object that has distinct fields and we need to decide how to represent that in the analysis
 
@@ -2791,7 +2791,7 @@ ALLOC -> { ref(b, B) }
 
     + treat `$gfp` like a copy
 
-    + `lhs = $gfp ptr field` ==> `[ptr] ⊆ [lhs]`
+    + `x = $gfp y <field>` ==> `[y] ⊆ [x]`
 
 - example:
 
@@ -2837,9 +2837,9 @@ ALLOC -> { ref(b, B) }
 
 - we'll use the notation `retval(func)` to mean the variable operand of the `$ret` instruction inside function `func`
 
-- `[lhs =] $call_dir <function>(args...) then bb`
+- `[x =] $call_dir <function>(args...) then bb`
 
-    + if `lhs` is pointer-typed: `[retval(<function>)] ⊆ [lhs]` (unless `<function>` returns the null pointer)
+    + if `x` is pointer-typed: `[retval(<function>)] ⊆ [x]` (unless `<function>` returns the null pointer)
 
     + `∀arg ∈ args`, if arg is pointer-typed: `[arg] ⊆ [prm]` s.t. `prm` is the corresponding parameter of `<function>` (unless `arg` is the null pointer)
 
@@ -2997,7 +2997,7 @@ P2 -> { ref(d,D) }
     
         - this says that the global function pointer points to a function of the given type
 
-- for each indirect call instruction `[lhs =] $call_idr func_ptr(args...) then bb`:
+- for each indirect call instruction `[y =] $call_idr func_ptr(args...) then bb`:
 
     + let the pointer-typed arguments be `arg1`, `arg2`, ...
 
@@ -3005,9 +3005,9 @@ P2 -> { ref(d,D) }
 
         - we can't just ignore null pointers like before because we need to have an argument for each position in the `lamₓ` constructor call
 
-    + if the type of the function being called returns a pointer but there is no `lhs`, create a dummy `[lhs]` set variable called `_DUMMY` and act as if there is a pointer-typed `lhs`
+    + if the type of the function being called returns a pointer but there is no `y`, create a dummy `[y]` set variable called `_DUMMY` and act as if there is a pointer-typed `y`
 
-    + if `lhs` is pointer-typed let `args` = `(_DUMMY, [lhs], [arg1], [arg2], ...)`, otherwise let `args` = `(_DUMMY, [arg1], [arg2], ...)`
+    + if `y` is pointer-typed let `args` = `(_DUMMY, [y], [arg1], [arg2], ...)`, otherwise let `args` = `(_DUMMY, [arg1], [arg2], ...)`
 
         - we need a first argument to fill in all the constructor arguments, but we don't really need its value---we can get the same information just by looking at the points-to set of `func_ptr`
 
@@ -3018,7 +3018,7 @@ P2 -> { ref(d,D) }
 - if we generate constraints this way, then eventually the `lamₓ` constructor calls containing the name, retval, and parameters of an address-taken function will flow into the `lamₓ` constructor call containing the DUMMY, lhs, and arguments of the indirect call
 
     + since the first position is covariant, the name of the function being called will flow into `_DUMMY`
-    + since the retval position (if it exists) is covariant, `retval` will flow into `lhs`
+    + since the retval position (if it exists) is covariant, `retval` will flow into `y`
     + since the remaining positions are contravariant, the arguments will flow into the parameters
 
 # current summary and roadmap
@@ -3338,367 +3338,318 @@ P2 -> { ref(d,D) }
 
 - notice that we're missing some `$jump` instructions; that's because they are unconditional and so there is no control dependence on them
 
-# ===== OLD ============================================================================
-
 # taint analysis (interprocedural dfa; icfg; context sensitivity)
-
-- [NOTE: DISCREPANCY BETWEEN NOTES AND IMPLEMENTATION FOR HANDLING POINTER-TYPED RETURN VALUE OF SOURCE; CHECK MY CURRENT IMPLEMENTATION]
-
-- [NOTE: FOR ASSIGNMENT, NEED TO QUALIFY VARIABLE NAMED WITH SCOPE]
-
-- [NOTE: ASSUMING NO STRUCT-TYPE VARIABLES]
-
 ## intro
 
-- we've seen applications of program analysis for optimization and debugging, and we've seen how to overcome the difficulty of pointers. let's explore how to deal with function calls and interprocedural analysis at the same time as we expand our applications to include security.
+- we've seen applications of program analysis for optimization and debugging, and we've seen how to overcome the difficulty of pointers; now let's explore how to deal with function calls and interprocedural analysis at the same time as we expand our applications to include security
 
-- we'll look at _taint analysis_. the goal of taint analysis is to track "tainted" information (e.g., input from users) as it propagates through a program and to ensure that it doesn't influence sensitive operations.
+- we'll look at _taint analysis_: the goal of taint analysis is to track "tainted" information (e.g., input from users) as it propagates through a program and to ensure that it doesn't influence sensitive operations
 
-    + example: sql injection.
+    + example: sql injection
 
-    + we can also use taint analysis for the inverse: track sensitive information (e.g., from a user's private data) to ensure that it doesn't influence information output from the program (e.g., that a browser addon doesn't read a user's credit card info and send it out over the network).
+    + we can also use taint analysis for the inverse: track sensitive information (e.g., from a user's private data) to ensure that it doesn't influence information output from the program (e.g., that a browser addon doesn't read a user's credit card info and send it out over the network)
 
-- to make this analysis useful, it needs to be interprocedural---that is, it needs to track information across function call boundaries.
+- to make this analysis useful, it really needs to be interprocedural---that is, it needs to track information across function call boundaries
 
-    + andersen-style pointer analysis was interprocedural, but not in a DFA setting.
+    + andersen-style pointer analysis was interprocedural, but not in a DFA setting
 
-- when dealing with the intraprocedural CFG we had two choices: flow-sensitive vs flow-insensitive.
+- when dealing with the intraprocedural CFG we had two choices: flow-sensitive vs flow-insensitive
 
-    + flow-sensitive: respect the flow of control; a solution per program point. a variable can have a difference abstract value at different places in the program.
+    + flow-sensitive: respect the flow of control; a solution per program point; a variable can have a difference abstract value at different places in the program
 
-    + flow-insensitive: disregard the flow of control and assume any statement can execute at any time; one solution for the entire program. a variable must have one abstract value that over-approximates all possible concrete values it might have anywhere.
+    + flow-insensitive: disregard the flow of control and assume any statement can execute at any time; one solution for the entire program; a variable must have one abstract value that over-approximates all possible concrete values it might have anywhere
 
-- when dealing with interprocedural analysis we have a similar choice: context-insensitive vs context-sensitive.
+- when dealing with interprocedural analysis we have a similar choice: context-insensitive vs context-sensitive
 
-    + concretely during program execution, every function call results in a unique function instance (typically using stack frames). conceptually, this results in an infinite domain of possible function instances.
+    + concretely during program execution, every function call results in a unique function instance (typically using stack frames); conceptually, this results in an infinite domain of possible function instances
 
-    + for program analysis to be decidable, we need to abstract this infinite domain into something tractable while still over-approximating the conrete domain.
+    + for program analysis to be decidable, we need to abstract this infinite domain into something tractable while still over-approximating the conrete domain
 
-    + context-insensitive: we'll abstract all function instances of the same function into a single abstract function instance that over-approximates all of them. that is, the information for every call to the same function is merged together.
+    + context-insensitive: we'll abstract all function instances of the same function into a single abstract function instance that over-approximates all of them; that is, the information for every call to the same function is merged together
 
-    + context-sensitive: we'll partition the set of function instances for the same function into a set of different abstract function instances, treating each one as distinct. the different ways that we partition the set result in different context-sensitivity schemes.
+    + context-sensitive: we'll partition the set of function instances for the same function into a set of different abstract function instances, treating each one as distinct; the different ways that we partition the set result in different context-sensitivity schemes
 
-        - unlike flow-sensitivity (for which there is just one definition), there are many different versions of context-sensitivity.
+        - unlike flow-sensitivity (for which there is just one definition), there are many different versions of context-sensitivity
 
-- we'll look at these choices in more detail one at a time, starting with interprocedural context-insensitive taint analysis and then exploring a couple of different context-sensitivity strategies to make it more precise.
+- we'll start with intraprocedural taint analysis ignoring the possibility of function calls, then we'll look at interprocedural context-insensitive taint analysis, and then explore a couple of different context-sensitivity strategies
 
-## icfg
-
-- we need to revisit our old program representation of the CFG. now that we're propagating information to calls and back, we need something that shows the connections between functions.
-
-- Interprocedural Control-Flow Graph (ICFG): take the individual function CFGs and add edges:
-
-    + from a call instruction to the entry nodes of all callee functions.
-    + from a ret instruction to the callsites for that function.
-
-- problem: the call edges can be from the middle of a basic block and the return edges can be into the middle of a basic block.
-
-- solution 1: allow it to happen without changing anything. this is easy to implement because it doesn't involve changing anything but makes the analysis implementation more complex because we have to track whether we're making a call or returning from a call and do different things depending.
-
-    + the worklist has to contain program points, not basic blocks, because when you pop an entry off the worklist it could be the beginning of a basic block or it could be returning from a call inside the basic block.
-
-    + this is what i did, though you don't have to do the same thing as me.
-
-- solution 2: split the basic blocks at call instructions and separate each call instruction into two instances: (1) the actual call, placed at the end of the basic block; (2) the return site, placed at the beginning of a new basic block. this complicates things at the beginning because you have to transform the basic blocks, but it makes the analysis implementation simpler.
-
-    + the worklist can be the normal one on basic blocks, but you need to add a new instruction representing a 'call return' point.
-
-    + this is the more traditional way to do things.
-
-- example:
-
-  ```
-  def main() -> int {
-    entry:
-      x:int = $call input()
-      $branch x:int call_f1 call_f2
-
-    call_f1:
-      y:int = $call func1(x:int)
-      z:int = $arith add z:int 2
-      $jump exit
-
-    call_f2:
-      y:int = $call func2(x:int)
-      z:int = $arith mul z:int 4
-      $jump exit
-
-    exit:
-      $ret z:int
-  }
-
-  def func1(p1:int) -> int {
-    entry:
-      a:int = $call func3(p1:int)
-      a:int = $arith add a:int 1
-      $ret a:int
-  }
-
-  def func2(p2:int) -> int {
-    entry:
-      b:int = $call func3(p2:int)
-      b:int = $arith mul b:int 2
-      $ret b:int
-  }
-
-  def func3(p3:int) -> int {
-    entry:
-      $ret p3:int
-  }
-  ```
-
-## context-insensitive taint analysis
+## intraprocedural taint analysis
 ### intro
 
-- we'll suppose that there are a set of functions that create tainted information, called _sources_, and a set of functions that consume information, called _sinks_.
+- we'll suppose that there are a set of functions that create tainted information, called _sources_, and a set of functions that consume potentially tainted information, called _sinks_
 
-    + what these sets are will dependent on the specific program we're analyzing.
+    + what these functions are will depend on the specific program we're analyzing; for our purposes we'll say any external function starting with `src` is a source and any external function starting with `snk` is a sink (e.g., `src123` is a source and `snk_blah` is a sink)
 
-    + example: we could say that `user_input()` is a source, `database_query()` is a sink.
+    + we'll assume only external functions can be sources and sinks just to keep things simple; we can easily extend it to allow for internal sources and sinks if we wanted to but it adds complexity without any pedagogical benefit
 
-- the taint analysis solution should be a map from each sink to the set of sources that _reach_ that sink. that is, there is some path along which the information from some source can reach an argument to that sink without being sanitized.
+- a taint analysis solution is a map from each sink to the set of sources that _reach_ that sink; that is, there is some path along which information derived from or influenced by a source can be passed to the sink
 
-    + we'll only care about what sources and sinks are involved, not which specific call instructions were involved; e.g., if there are two calls to the same source `source()` and two calls to the same sink `sink()` and one source reaches each sink, the solution will just say `sink --> { source }`.
+    + we'll only care about which sources and sinks are involved, not which specific _objects_ or _call instructions_ were involved; e.g., if there are two different calls to the same source `src` and only one of them reaches a call to the sink `snk` (perhaps transmitted through some intermediate variable `x`), the solution will just say `snk --> { src }`
+
+    + this is like reaching defs, where the analysis tracked for each variable what defs reached each program point but the final solution just mapped uses to the reaching defs for those uses; here our analysis will actually track for each variable what sources they are tainted by but the final solution will just record what sources reached what sinks
+
+    + a more elaborate analysis can also take into account _sanitizers_ that kill taint, but we won't worry about that possibility here
+
+- we'll take the result of an interprocedural, flow-insensitive pointer analysis as input (e.g., from an Andersen-style pointer analysis)
+
+- an object (variable or heap object) becomes _tainted_ if it is (1) assigned the result of a call to a source; (2) reachable from a pointer returned from a source; or (3) reachable from a pointer passed to a call to the source
+
+- a tainted object _reaches_ a a sink if (1) it is an argument to a call to the sink; or (2) it is reachable from a pointer passed as an argument to a call to the sink
 
 - example
 
   ```
-  def main() -> int {
-    entry:
-      v1:int* = $alloc
-      v2:int* = $call foo(v1:int*)
-      _d:int  = $call sink1(v1:int*)
-      _d:int  = $call sink2(v2:int*)
-      $ret 0
-  }
+  extern src1: () -> int
+  extern src2: (&int) -> _
+  extern snk1: (int) -> _
+  extern snk2: (&int) -> _
+  
+  fn main() -> int {
+    let x:int, y:int, z:&int
 
-  function foo(p1:int*) -> int* {
     entry:
-      x:int   = $call source1(p1:int*)
-      y:int*  = $addof x:int
-      _e:int  = $call sink1(y:int*)
-      p2:int  = $call source2()
-      p3:int* = $addrof p2:int
-      $ret p3:int*
+      x = $call_ext src1()
+      z = $addrof y
+      $call_ext src2(z)
+      $branch x bb1 bb2
+
+    bb1:
+      y = $copy x
+      $call_ext snk1(y)
+      $jump exit
+
+    bb2:
+      $call_ext snk2(z)
+      $jump exit
+
+    exit:
+      $ret 0
   }
   ```
 
   SOLUTION
   ```
-  sink1 --> { source1 }
-  sink2 --> { source2 }
+  snk1 --> { src1 }
+  snk2 --> { src2 }
   ```
-
-### setup and assumptions
-
-- the sets of sources and sinks are given as input to the analysis; they are collectively known as `special functions`.
-
-    + they should be disjoint sets.
-
-    + special functions can be internal or external; either way we don't actually analyze them (we treat them as a black box that operates on taint).
-
-    + sources that return a pointer must be internal (so that the pointer analysis can work correctly).
-
-- all objects possibly reachable from a pointer passed as an argument or returned as a result from a source function, and all values returned from a source function, are considered to be tainted.
-
-- all arguments and all objects possibly reachable from an argument passed to a sink function are considered to reach that sink.
-
-- we'll be operating on the ICFG. unlike previous analyses which analyze each function in turn, here we always start at the entry to `main` and only analyze those functions that are reachable via call instructions.
-
-- we have the results of a field-insensitive andersen-style pointer analysis available; our analysis will also be field-insensitive.
 
 ### abstract domain
 
-- an abstract value will be a set of sources, signifying which sources may have contributed to the concrete value.
+- an abstract value will be a set of sources, signifying which sources may have contributed to the concrete value
 
-    + this is a second-order analysis like reaching defs; we don't care what the value is just where it came from.
+    + this is a second-order analysis like reaching defs; we don't care what the value is just where it came from
 
-    + the empty set means that this data hasn't been influenced by any source.
+    + ⊤ = set of all sources
 
-- the join operation is set union.
+    + ⊥ = empty set
 
-- the abstract store will map variables to abstract values as usual.
+    + ⊔ = set union
 
-### abstract semantics, no calls (except to special functions)
+- this domain is finite, hence necessarily complete and noetherian
+
+- the abstract store will map variables to abstract values as usual
+
+### abstract semantics
 
 - helpers:
 
-    + let `taint(op)` = store[op] if op is a variable, else {}
+    + let `taint(op)` = `store[op]` if `op` is a variable, else `{}`
 
-    + let `reachable(v...)` be the set of pointed-to objects reachable from the given arguments according to the points-to solution.
+    + let `reachable(v...)` be the set of pointed-to objects reachable from the given arguments according to the points-to solution
 
-- `lhs = $call <source>(args...)`
+- `x = $call_ext <source>(args...)`
 
-    + store[lhs] = {source}
+    + `store[x] = {<source>}`
+    + ∀v ∈ reachable(args), `store[v] = store[v] ∪ {<source>}`
 
-    + for v in (reachable(lhs) \union reachable(args)): store[v] |= {source}
+    + notice that even if `x` is a pointer we don't taint the objects it points to; why not? because the things it points to can't have come from the external function (since the pointer analysis ignores external calls) therefore the source can't have tainted them; it's sufficient that anything accessed _through_ the pointer returned from the source will be tainted with that source
 
-    + note the weak updates for pointed-to objects.
+    + also note that we're assuming the external call didn't change the pointer analysis solution---again, if it did we would have stubbed it as an internal function so the pointer analysis could analyze it
 
-- `lhs = $call <sink>(args...)`
+- `x = $call_ext <non-source>(args...)`
 
-    + store[lhs] = {}
+    + `store[x] = {}`
+    + we're replacing `x`'s value with something non-tainted (again, assuming that if the external function propagated taint we would have stubbed it as an internal function)
 
-    + for v in (args \union reachable(args)): soln[sink] |= store[v]
+- `x = $call <sink>(args...)`
 
-- `lhs = $icall fptr(args...)`
+    + this is a subset of the instruction above, during the analysis treat it like that
+    + we only need to do this once, after the analysis is finished (just like the reaching defs solution)
+    + ∀v ∈ (args ∪ reachable(args)), `soln[<sink>] = soln[<sink>] ∪ store[v]`
 
-    + process all sink callees then all source callees (unioning the taints for lhs).
+- `x = $copy op`
 
-    + sources need to be processed last because any taints from them shouldn't affect sink callees.
+    + `store[x] = taint(op)`
 
-- `lhs = $arith <operation> op1 op2`
+- `x = $arith <aop> op1 op2`
 
-    + store[lhs] = taint(op1) | taint(op2)
+    + `store[x] = taint(op1) ⊔ taint(op2)`
 
-- `lhs = $cmp <relation> op1 op2`
+- `x = $cmp <rop> op1 op2`
 
-    + store[lhs] = taint(op1) | taint(op2)
+    + `store[x] = taint(op1) ⊔ taint(op2)`
 
-- `lhs = $copy op`
+- `x = $addrof y`
 
-    + store[lhs] = taint(op)
+    + `store[x] = {}`
 
-- `lhs = $select op1 op2 op3`
+- `x = $alloc op [id]`
 
-    + store[lhs] = taint(op2) | taint(op3)
+    + `store[x] = {}`
+    + notice that `op` could have been tainted, but that doesn't taint `x` because `op`'s value can't influence `x`'s value (just the number of allocated objects)
 
-    + note that op1 does not contribute to the value of lhs even though it controls which value it gets---we're tracking data dependencies and this is a control dependence.
+- `x = $gep y op`
 
-- `lhs = $phi(ops...)`
+    + `store[x] = taint(y) ⊔ taint(op)`
+    + in this case we take `op`'s taint into account because it can influence what `x` points to
 
-    + store[lhs] = \union_{op \in ops} taint(op)
+- `x = $gfp y <field>`
 
-- `lhs = $alloc`
+    + `store[x] = taint(y)`
 
-    + store[lhs] = {}
+- `x = $load y`
 
-- `lhs = $addrof var`
+    + `store[x] = (⨆_{v ∈ ptsto(y)} taint(v)) ⊔ taint(y)`
 
-    + store[lhs] = {}
+- `$store x op`
 
-- `lhs = $gep src_ptr op [fieldname]`
-
-    + store[lhs] = taint(src_ptr) | taint(op)
-
-    + note that gep is basically pointer arithmetic, i.e., `src_ptr + op`.
-
-- `lhs = $load src_ptr`
-
-    + store[lhs] = taint(src_ptr) | \union_{v \in ptsto(src_ptr)} taint(v)
-
-- `$store dst_ptr op`
-
-    + for v in ptsto(dst_ptr): store[v] |= (taint(dst_ptr) | taint(op))
-
-    + note the weak update.
+    + ∀v ∈ ptsto(x), `store[v] = store[v] ⊔ (taint(x) ⊔ taint(op))`
 
 - `$jump` and `$branch`: propagate abstract store as normal
 
-- we're assuming no calls other than to special functions, so we can ignore other `$call` and `$icall` instructions and also `$ret`.
+### example
 
-### examples
-
-- example 1: with direct calls to special functions
+- [give students points-to solution, have them come up with final abstract store and solution]
 
   ```
-  def src1(s1:int*) -> int* {
-    entry:
-      s2:int* = $alloc
-      $ret s2:int*
-  }
+  extern src1: (&int) -> &int
+  extern src2: () -> int
+  extern snk1: (&int, &int) -> _
+  extern snk2: (int) -> _
+  extern snk3: (&int, &int) -> _
 
-  def main() -> int {
+  fn main() -> int {
+    let a:&int, b:&int, c:int, d:&int, e:&int, f:&int, g:int
     entry:
-      v1:int* = $alloc
-      v2:int* = $call src1(v1:int*)
-      v3:int  = $call src2()
-      v4:int* = $addrof v3:int
-      v5:int* = $gep v1:int* v3:int
-      v6:int* = $alloc
-      $store v6:int* v3:int
-      v7:int  = $load v5:int*
-      _x:int  = $call sink1(v1:int*, v4:int*)
-      _y:int  = $call sink2(v7:int)
-      _z:int  = $call sink3(v2:int*, v6:int*)
+      a = $alloc 1 [_a1]
+      b = $alloc 1 [_a2]
+      b = $call_ext src1(a)
+      c = $call_ext src2()
+      d = $addrof c
+      e = $gep a c
+      f = $alloc 1 [_a3]
+      $store f c
+      g = $load e
+      $call_ext snk1(a, d)
+      $call_ext snk2(g)
+      $call_ext snk3(b, f)
       $ret 0
   }
   ```
 
   POINTS-TO
   ```
-  v1 --> { main.entry.0 }
-  v2 --> { src1.entry.0 }
-  v4 --> { v3 }
-  v5 --> { main.entry.0 }
-  v6 --> { main.entry.5 }
+  a --> { _a1 }
+  b --> { _a2 }
+  d --> { c }
+  e --> { _a1 }
+  f --> { _a3 }
   ```
 
   FINAL ABSTRACT STORE
   ```
-  v1 --> {}
-  v2 --> { src1 }
-  v3 --> { src2 }
-  v4 --> {}
-  v5 --> { src2 }
-  v6 --> {}
-  v7 --> { src1, src2 }
-  main.entry.0 --> { src1 }
-  main.entry.5 --> { src2 }
-  src1.entry.0 --> { src1 }
+  a --> {}
+  b --> { src1 }
+  c --> { src2 }
+  d --> {}
+  e --> { src2 }
+  f --> {}
+  g --> { src1, src2 }
+  _a1 --> { src1 }
+  _a2 --> {}
+  _a3 --> { src2 }
   ```
 
   SOLUTION
   ```
-  sink1 --> { src1, src2 }
-  sink2 --> { src1, src2 }
-  sink3 --> { src1, src2 }
+  snk1 --> { src1, src2 }
+  snk2 --> { src1, src2 }
+  snk3 --> { src1, src2 }
   ```
 
-- example 2: with indirect calls to special functions
+## interprocedural analysis: icfg
+
+- we need to revisit our old program representation of the CFG: now that we're propagating information to calls and back, we need something that shows the connections between functions
+
+- Interprocedural Control-Flow Graph (ICFG): take the individual function CFGs and add edges
+
+    + from a `$call_{dir, idr}` instruction to the entry nodes of all callee functions (note that we need pointer info to handle `$call_idr`)
+    + from a `$ret` instruction back to the callsites for that function
+
+- unlike intraprocedural analyses where we picked which function to analyze, for interprocedural analyses we always start at `main`...which functions we end up analyzing will depend on which ones are reachable from `main` via function calls
+
+- note that we've already set up our CFG definition to make this easy by requiring direct and indirect calls to be terminals for basic blocks, so all we need to do is add the interprocedural edges (at least conceptually---you don't have to have an explicit representation of these edges as long as you can easily look up the callees for call instructions and the callsites for return instructions)
+
+    - many definitions of CFGs allow calls in the middle of basic blocks, which is fine for intraprocedural analysis (the most common type of analysis done in compilers) but makes interprocedural analysis difficult
+
+    - note that `$call_ext` isn't included in the ICFG, since we don't have any source code for the callee functions
+
+- example:
 
   ```
-  def src1(s1:int) -> int {
+  extern input: () -> int
+
+  fn main() -> int {
+    let x:int, y:int, z:int
     entry:
-      $ret 0
+      x = $call_ext input()
+      $branch x call_f1 call_f2
+
+    call_f1:
+      y = $call_dir func1(x) then ret_f1
+
+    ret_f1:
+      z = $arith add z 2
+      $jump exit
+
+    call_f2:
+      y = $call_dir func2(x) then ret_f2
+
+    ret_f2:
+      z = $arith mul z 4
+      $jump exit
+
+    exit:
+      $ret z
   }
 
-  def src2(s2:int) -> int {
+  def func1(p1:int) -> int {
+    let a:int
     entry:
-      $ret 0
+      a = $call_dir func3(p1) then exit
+
+    exit:
+      a = $arith add a 1
+      $ret a
   }
 
-  def sink1(p1:int) -> int {
+  def func2(p2:int) -> int {
+    let b:int
     entry:
-      $ret 0
+      b = $call_dir func3(p2) then exit
+
+    exit:
+      b = $arith mul b 2
+      $ret b
   }
 
-  def main() -> int {
+  def func3(p3:int) -> int {
     entry:
-      fptr:int[int]* = $copy @src1:int[int]*
-      fptr:int[int]* = $copy @src2:int[int]*
-      fptr:int[int]* = $copy @sink1:int[int]*
-      x:int = $call src1(42)
-      y:int = $icall fptr(x:int)
-      z:int = $call sink2(y:int)
-      $ret 0
+      $ret p3
   }
   ```
 
-  FINAL ABSTRACT STORE
-  ```
-  fptr --> {}
-  x --> { src1 }
-  y --> { src1, src2 }
-  z --> {}
-  ```
-
-  SOLUTION
-  ```
-  sink1 --> { src1 }
-  sink2 --> { src1, src2 }
-  ```
-
+## TODO: context-insensitive taint analysis
 ### adding calls
 
 - for simplicity of describing the analysis, we'll assume we're using an ICFG: basic blocks end at a call instruction and may begin with a call_return instruction (that has the same information as the corresponding call).
@@ -3862,7 +3813,7 @@ P2 -> { ref(d,D) }
   sink3 --> { src1 }
   ```
 
-## context-sensitivity
+## TODO: adding context-sensitivity
 ### intro
 
 - our interprocedural analysis on the ICFG does not follow the concrete semantics for how function calls concretely work. it essentially transforms calls and returns into gotos, so that values can flow into a callee from one callsite and return at another, losing precision.
@@ -4259,59 +4210,64 @@ P2 -> { ref(d,D) }
 - as always, there's a cost: a context-sensitive heap model is more precise, but can be much more expensive.
 
 # sparse analysis and SSA
-## problem with standard DFA
+## efficiency problem with standard DFA
 
-- the DFA algorithm we've been using is an efficiency problem: information is propagated indiscriminately throughout the CFG, delaying convergence.
+- the DFA algorithm we've been using has an efficiency problem: information is propagated indiscriminately throughout the CFG, delaying convergence
 
 - example (constant propagation):
 
   ```
-  function main(p:int) -> int {
+  fn foo(p:int) -> int {
+  let x:int, y:int, z:int
   entry:
-    x:int = $copy 4
-    y:int = $copy 1
-    $branch p:int if_true if_false
+    x = $copy 4
+    y = $copy 1
+    $branch p if_true if_false
 
   if_true:
-    y:int = $copy 3
-    z:int = $copy x
+    y = $copy 3
+    z = $copy x
     $jump exit
 
   if_false:
-    z:int = $copy 3
+    z = $copy 3
     $jump exit
 
   exit:
-    a:int = $arith add y:int z:int
-    $ret a:int
+    a = $arith add y z
+    $ret a
   }
   ```
 
-    + notice that `x` info is propagated to `if_false` and `exit` and `y` info is propagated to `if_true` and `if_false`, none of which actually use this info.
+- notice that the `x` info is propagated to `if_false` and `exit` and the `y` info is propagated to `if_true` and `if_false`, none of which actually use this info
 
-- this problem doesn't affect precision, but does impact performance. it would be better to propagate information only where it is actually needed and nowhere else.
+- this problem doesn't affect precision but does impact performance; it would be better to propagate information only where it is actually needed and nowhere else
+
+    + for large programs this can mean the difference between taking seconds and taking hours, or between taking hours and taking days
 
 ## def-use chains and sparse analysis
 
-- how do we know where information is needed? we already know how to figure this out: reaching definitions. the reaching definitions solution allows us to directly connect where information is _produced_ (defs) to where it is _needed_ (uses).
+- how do we know where information is needed? we already know how to figure this out: reaching definitions
 
-    + this is basically the PDG with only data dependence edges, no control dependence edges.
+- the reaching definitions solution allows us to directly connect where information is _produced_ (defs) to where it is _needed_ (uses)
+
+    + this is basically the PDG with only data dependence edges, no control dependence edges
 
 - replace the CFG with a "def-use graph":
 
     + nodes are statements (not basic blocks)
 
-    + there is an edge A-->B if a def at A reaches a use at B
+    + there is an edge `A-->B` if a def at instruction `A` reaches a use at instruction `B`
 
-- run the standard DFA worklist algorithm, but on the def-use graph instead of the CFG.
+- run the standard DFA worklist algorithm, but on the def-use graph instead of the CFG
 
-    + there is no single 'entry' point; the easiest thing to do is just initialize the worklist with all statements.
+    + there is no single 'entry' point; the easiest thing to do is just initialize the worklist with all statements
 
 - example: [reuse example from above]
 
 ## factoring def-use chains: SSA form
 
-- there's still a problem with the def-use graph: the number of def-use edges can be quadratic in the number of statements.
+- there's still a problem with the def-use graph: the number of def-use edges can be quadratic in the number of statements
 
 - example (using shorthand to remove irrelevant details):
 
@@ -4325,11 +4281,11 @@ P2 -> { ref(d,D) }
   else        _ = x
   ```
 
-    + [draw def-use graph]
+- [draw def-use graph]
 
-- the solution is to _factor_ the def-use edges, which will give us _SSA form_.
+- the solution is to _factor_ the def-use edges, which will give us _SSA form_
 
-- a program is in _Static Single Assignment_ (SSA) form if every variable is defined with exactly one program statement and every use of a variable has exactly one reaching definition.
+- a program is in _Static Single Assignment_ (SSA) form if every variable is defined with exactly one instruction and every use of a variable has exactly one reaching definition
 
 - example 1: renaming variables to transform into SSA
 
@@ -4347,13 +4303,11 @@ P2 -> { ref(d,D) }
   y2 = x2
   ```
 
-- why _static_ single assignment?
+- why _static_ single assignment? there is only a single textual assignment, but it can happen dynamically an arbitrary number of times
 
   ```
   while (_) x = x + 1
   ```
-
-    + there is only a single textual assignment, but it can happen dynamically an arbitrary number of times.
 
 - there's still one complexity: what if multiple defs reach a single use?
 
@@ -4367,9 +4321,9 @@ P2 -> { ref(d,D) }
   else        _ = x?
   ```
 
-- this is where phi functions come in: a phi function is a choice operator that multiplexes multiple defs together.
+- this is where _phi functions_ come in: a phi function is a choice operator that multiplexes multiple defs together
 
-    + `x1 = phi(x2, x3, ...)` _means_ that `x1` is assigned the value of whichever reaching def (one of `x2, x3, ...`) is appropriate.
+    + `x1 = phi(x2, x3, ...)` _means_ that `x1` is assigned the value of whichever reaching def (one of `x2, x3, ...`) is appropriate
 
   ```
   if (_)      x1 = _
@@ -4381,11 +4335,13 @@ P2 -> { ref(d,D) }
   else        _ = x4
   ```
 
-    + [draw the new def-use graph]
+- [draw the new def-use graph]
 
-    + note that the number of edges has gone from quadratic to linear.
+    + note that the number of edges has gone from quadratic to linear
 
 - SSA form renders some analyses trivial (e.g., reaching defs) and others much easier and more efficient (e.g., sign analysis, constant propagation, slicing, taint analysis)
+
+- to compute SSA form, we need to (1) insert phi functions, and (2) rename variables
 
 ## computing SSA form
 ### intro
@@ -4400,54 +4356,165 @@ P2 -> { ref(d,D) }
 
 - where should we put these new phi functions?
 
-- naive answer: at every join point in the CFG, put a phi function for every variable. this is way too many, most of them unneeded.
+- naive answer: at every join point in the CFG, put a phi function for every variable
 
-- better answer: for each variable `x`, if blocks A and B both define `x` and there are non-intersecting paths from A and B to block Z, then put a phi function for `x` in Z.
+    + this is way too many, most of them are unneeded
 
-    + this just says to find the earliest point in the CFG where multiple defs converge to one point, and put the phi function there.
+- better answer: for each variable `x`, if blocks `A` and `B` both define `x` and there are non-intersecting paths from `A` and `B` to block `Z`, then put a phi function for `x` at the top of block `Z`
 
-    + there are refinements that yield even fewer phi functions (e.g., require that variable `x` must be used at some point Z or later), but this answer is a pretty good one.
+    + this just says to find the earliest point in the CFG where multiple defs converge to one point, and put the phi function there
 
-- fortunately, we already know how to compute this information: dominance frontiers. recall:
+    + there are refinements that yield even fewer phi functions (e.g., require that variable `x` must be used at some point after `Z`), but this answer is a pretty good one
 
-    + the dominance frontier of block X is the set of all blocks Y s.t. X dominates a predecessor of Y but does not strictly dominate Y.
+- fortunately, we already know how to compute this information: dominance frontiers
 
-    + intuitively, the dominance frontier is the set of blocks that are _almost_ dominated by X, but just outside its control. or, its the set of blocks that are the earliest point where some competing control-flow path may reach that block.
+    + the dominance frontier of block `X` is the set of all blocks `Y` s.t. `X` dominates a predecessor of `Y` but does not strictly dominate `Y`
 
-- the dominance frontier of a variable definition is the set of blocks where we need to add phi functions for that variable according to the above answer.
+    + intuitively, the dominance frontier is the set of blocks that are _almost_ dominated by `X`, but just outside its control; or, it's the set of blocks that are the earliest point where some competing control-flow path may reach that block
 
-    + remember that we used _post-dominance_ for computing control dependence; now we're using _dominance_. same algorithm, just different direction of the CFG edges.
+- the dominance frontier of a variable definition is the set of blocks where we need to add phi functions for that variable
 
-    + note that when we add a phi function this is a new definition of the variable, which itself may require more phi functions to be added.
+    + remember that we used _post-dominance_ for computing control dependence; now we're using _dominance_: same algorithm, just different direction of the CFG edges
 
-    + iterated dominance frontier: DF+(S) = the limit of the sequence:
+    + note that when we add a phi function that this is a new definition of the variable, which itself may require more phi functions to be added
 
-        - DF_1(S) = DF(S)
-        - DF_{i+1}(S) = DF(S ∪ DF_I(S))
+    + iterated dominance frontier: `DF⁺(S)` = the limit of the sequence:
 
-    + let S be the set of definitions for variable `x`; then DF+(S) is exactly the set of blocks that require phi functions for `x`.
+        - `DF₁(S)` = `DF(S)`
+        - `DFᵢ₊₁(S)` = `DF(S ∪ DFᵢ(S))`
+
+    + let `S` be the set of definitions for variable `x`; then `DF⁺(S)` is exactly the set of blocks that require phi functions for `x`
 
 ### renaming variables
 
-- after phi functions have been placed, we need to rename all the variables.
+- after phi functions have been placed, we need to rename all the variables
 
 - simple method:
 
-    + compute reaching defs using the original variables names (but with phi functions in place). because of how we placed phi functions only one def will ever reach any use.
+    + compute reaching defs using the original variables names (but with phi functions in place); because of how we placed phi functions only one def will ever reach any use
 
-    + for each definition, give the defined variable a unique name.
+    + for each definition, give the defined variable a unique name
 
-    + for each use, replace that use with the unique name of the single reaching def.
+    + for each use, replace that use with the unique name of the single reaching def
 
-- this is easy but not as efficient as it could be. there's a more complicated but efficient version found in cytron et al, "efficiently computing static single assignment form and the control dependence graph".
+- this is easy but not as efficient as it could be; there's a more complicated but efficient version found in cytron et al, "efficiently computing static single assignment form and the control dependence graph"
+
+### example
+
+SOURCE
+```
+fn main() -> int {
+  let a:int = input(), b:int = 2, c:int;
+  if a > 0 {
+    while a < 100 {
+      a = a * 2;
+    }
+    c = a + b;
+  }
+  else {
+    c = a + b;
+  }
+  return c + a;
+}  
+```
+
+LIR
+```
+fn main() -> int {
+let a:int, b:int, c:int, t1:int, t2:int, t3:int
+entry:
+  a = $call_ext input()
+  b = $copy 2
+  t1 = $cmp gt a 0
+  $branch t1 else loop_hdr
+
+loop_hdr:
+  t2 = $cmp lt a 100
+  $branch t2 loop_body loop_exit
+
+loop_body:
+  a = $arith mul a 2
+  $jump loop_hdr
+
+loop_exit:
+  c = $arith add a b
+  $jump exit
+
+else:
+  c = $arith add a b
+  $jump exit
+
+exit:
+  t3 = $arith add c a
+  $ret t3
+}
+```
+
+DOM FRONTIERS
+```
+entry -> {}
+loop_hdr -> { exit }
+loop_body -> { loop_hdr }
+loop_exit -> { exit }
+else -> { exit }
+exit -> {}
+```
+
+ITERATED DOM FRONTIERS (a)
+```
+DF₁({entry, loop_body}) = { loop_hdr }
+DF₂({entry, loop_body, loop_hdr}) = { loop_hdr, exit }
+DF₃({entry, loop_body, loop_hdr, exit}) = { loop_hdr, exit }
+```
+
+ITERATED DOM FRONTIERS (c)
+```
+DF₁({else, loop_exit}) = { exit }
+DF₂({else, loop_exit, exit}) = { exit }
+```
+
+SSA
+```
+fn main() -> int {
+let a1:int, a2:int, a3:int, a4:int, b:int, c1:int, c2:int, c3:int, t1:int, t2:int, t3:int
+entry:
+  a1 = $call_ext input()
+  b = $copy 2
+  t1 = $cmp gt a1 0
+  $branch t1 else loop_hdr
+
+loop_hdr:
+  a2 = phi(a1, a3)
+  t2 = $cmp lt a2 100
+  $branch t2 loop_body loop_exit
+
+loop_body:
+  a3 = $arith mul a2 2
+  $jump loop_hdr
+
+loop_exit:
+  c1 = $arith add a2 b
+  $jump exit
+
+else:
+  c2 = $arith add a1 b
+  $jump exit
+
+exit:
+  a4 = phi(a1, a2)
+  c3 = phi(c1, c2)
+  t3 = $arith add c3 a4
+  $ret t3
+}
+```
 
 ## revisiting sparse analysis
 
-- if the program is in SSA form and we're doing a first-order analysis (i.e., computing an abstraction of program variable values), then we can modify our worklist algorithm to operate on variables instead of basic blocks or statements.
+- if the program is in SSA form and we're doing a first-order analysis (i.e., computing an abstraction of program variable values), then we can modify our worklist algorithm to operate on variables instead of basic blocks or statements
 
-    + since there is a single assignment for each variable, we don't need separate abstract stores for each block: just a single, global abstract store for the whole program.
+    + since there is a single assignment for each variable, we don't need separate abstract stores for each block: just a single, global abstract store for the whole program
 
-    + there is no propagation of abstract stores or anything like that.
+    + there is no propagation of abstract stores or anything like that; in fact, we're doing effectively a flow-insensitive analysis, but because of being in SSA form we're getting a flow-sensitive solution
 
 - example: constant propagation
 
@@ -4467,33 +4534,37 @@ P2 -> { ref(d,D) }
       if y's value changed: add y to worklist
   ```
 
+- [demonstrate using previous example for computing SSA]
+
 ## dealing with pointers
 
-- all of the examples i've given have contained _no_ pointers. what if they did have pointers? there are basically two options.
+- all of the examples i've given have contained _no_ pointers; what if they did have pointers? 
 
-- option 1 (the option compilers use, like gcc and llvm): don't allow address-taken variables; any source-level address-taken variable is converted into a pointer instead. do SSA only for the program variables, not for the address-taken objects.
+- there are basically two options
+
+- option 1 (the option compilers use, like gcc and llvm): don't allow address-taken variables; any source-level address-taken variable is converted into a pointer instead, and we do SSA only for the program variables, not for the address-taken objects
 
     + example:
 
-      BEFORE
-      ```
-      x:int = $copy 0
-      y:int* = $addrof x:int
-      z:int = x:int
-      ```
+BEFORE
+```
+      x = $copy 0
+      y = $addrof x
+      z = x
+```
 
-      AFTER
-      ```
-      x:int* = $alloc
-      $store x:int* 0
-      y:int* = x:int*
-      z:int = $load x:int*
-      ```
+AFTER
+```
+      x = $alloc 1 [id] // on stack, not on heap
+      $store x 0
+      y = x
+      z = $load x
+```
 
-    + people generally just call this SSA as usual, but in terms of analysis i like to call it "partial SSA" because only top-level variables are really in SSA form; anything on the heap is not.
+- people generally just call this SSA, but in terms of analysis i like to call it "partial SSA" because only top-level variables are really in SSA form; anything on the heap is not in SSA form
 
-- option 2 (can be useful, but not the common choice): do a pointer analysis; treat every store as a def and every load as a use of the appropriate address-taken objects and compute SSA as normal.
+- option 2 (can be useful, but not the common choice): do a pointer analysis and then treat every store as a def and every load as a use of the appropriate address-taken objects and compute SSA as normal
 
-    + the points-to sets can be large, and the pointer analysis is a "may point-to" analysis, so there can be many spurious def-use edges in this version.
+    + the points-to sets can be large, and the pointer analysis is a "may point-to" analysis, so there can be many spurious def-use edges in this version
 
-    + still useful: this is one of the techniques that i used to scale flow-sensitive pointer analysis to make it 100x more scalable.
+    + still useful: this is one of the techniques that i used to scale flow-sensitive pointer analysis to make it 100x more scalable
