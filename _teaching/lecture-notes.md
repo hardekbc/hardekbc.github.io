@@ -3649,235 +3649,279 @@ P2 -> { ref(d,D) }
   }
   ```
 
-## TODO: context-insensitive taint analysis
-### adding calls
+## context-insensitive interprocedural taint analysis
+### prep
 
-- for simplicity of describing the analysis, we'll assume we're using an ICFG: basic blocks end at a call instruction and may begin with a call_return instruction (that has the same information as the corresponding call).
+- we need to remember the connections between call instructions and callees (e.g., when we return from a callee what call instructions might we be returning to?) and also what information got returned from each callee (whose use we'll see soon)
 
-    + we'll define `bb_in` as a map from basic block to the initial input store for that basic block.
+    + we'll have a map `call_edges` : `callee function -> { set of call instructions (i.e., function + basic block) }`
 
-- intuition:
+    + we'll have a map `call_returned` : `function -> returned abstract store` that remembers for each function the abstract store it returns to its callers
 
-    + what are we actually passing to a callee? the value of the arguments PLUS anything reachable from the arguments via the points-to solution.
+- since we're now analyzing multiple functions we need to change `bb_in` from `basic block -> abstract store` to `function -> basic block -> abstract store` (remember that basic block labels can be repeated across functions, and in fact at least `entry` definitely will be)
 
-    + what are we returning? the return value PLUS anything reachable from the return value PLUS anything reachable from the parameters.
+    + again, we'll always start the analysis from the entry block of `main`
 
-    + if we only pass the reachable part of the store to the callee, what happens to the rest? we need to propagate it to the call_return point to eventually be merged with the callee's returned store.
+- we also need to change the worklist from a list of `basic block`s to a list of `(function, basic block)` pairs (or else have each basic block have a reference to its parent function)
 
-    + if we have multiple callees (including a mix of normal and special function callees) then we need to behave as if each one is being called independently "in parallel".
+- the worklist loop will still work the same (including propagating the abstract store to the target basic block for call terminals), with the addition of _also_ propagating abstract stores from calls to callees
 
-- `lhs = $[i]call <func/fptr>(args...)`
+### helpers
 
-    + let `CALLEE_STORE`, `REMAINING_STORE` = SplitStore(store, args)
+- intuition for handling calls:
 
-        - SplitStore will copy the given store into two new stores: one containing everything reachable from args (not including args themselves), the other containing whatever remains.
+    + what are we actually passing to a callee? the value of the arguments PLUS anything reachable from the arguments via the points-to solution
 
-    + let `CALLEES` be the set of (non-special) function callees (skipping any external functions, which we'll ignore).
+        - that is, we don't pass _everything_ in the caller's abstract store, just the things that the callee can actually access
 
-    + for each callee \in CALLEES:
+    + what are we returning? the return value PLUS anything reachable from the return value PLUS anything reachable from the parameters
 
-        - let `THIS_CALLEE_STORE` be a fresh copy of CALLEE_STORE (we need a fresh copy for each callee because we'll be adding the callee's parameters to it).
+        - again we don't pass _everything_ in the callee's abstract store, just the things the caller can actually access
 
-        - for each arg \in args with corresponding parameter param: THIS_CALLEE_STORE[param] |= taint(args). note the weak update: if this is a recursive function call then the parameter may already be in THIS_CALLEE_STORE.
+- we'll use several helper functions
 
-        - let `callee_entry` be the entry basic block of callee: bb_in[callee_entry] |= THIS_CALLEE_STORE. if bb_in[callee_entry] changed, push onto worklist.
+    + `get_callee_store` : `(ptsto info, abstract store, callee function, args) -> abstract store` 
+    
+        - given the current abstract store at a call instruction, the callee function, and the call arguments, computes the abstract store that will be passed to the callee
 
-    + let `ret_point` be the basic block begining with the call_return instruction for this call: bb_in[ret_point] |= REMAINING_STORE. if bb_in[ret_point] changed, push onto worklist.
+        - what is that callee store? it maps each callee parameter to the abstract value of its corresponding argument AND copies each element of the current abstract store reachable from an argument via pointer derefences
 
-    + remember to handle the case of there being special funcion callees and normal callees mixed together.
+        - example (sign analysis with pointer info):
 
-- `$ret op`
+>         // ptsto = [b -> {c}]
+>         // store = [a -> Pos, c -> Neg]
+>         x = $call_dir foo(a, 0, b) then bb
+>
+>         // callee store = [p1 -> Pos, p2 -> Zero, c -> Neg]
+>         fn foo(p1:int, p2:int, p3:&int) -> int { ... }
 
-    + if this is the `main` function then there is no caller; skip this instruction.
+        - one tricky corner case: the reachable elements may include the callee parameters (e.g., a recursive call whose argument is a pointer that reaches a parameter); be sure to use _weak updates_ to create the callee store to avoid unsoundness
 
-    + let `ROOTS` = { returned variable if pointer } \union { pointer-typed parameters }
+    + `get_returned_store` : `(ptsto info, abstract store, current function, return operand(?)) -> abstract store`
 
-    + let `REACHABLE_STORE` = a copy of the current store containing only entries reachable from ROOTS (but not including ROOTS)
+        - given the current abstract store at a return instruction, the current function containing that return instruction, and the returned operand (if one exists), computes the abstract store that will be passed back to the call instruction
 
-    + let `RETURN_POINTS` be the set of call_return basic blocks we're returning to.
+        - what is that returned store? this is a little tricky because we could be returning to multiple different call instructions and its slightly different depending on which call we're returning to based on the left-hand side of the call...we'll create a generic returned store and then specialize it later
 
-    + for each ret_point in RETURN_POINTS:
+            + it contains all variables reachable from the current function parameters via pointer deferences AND all variables reachable from the return instruction's variable operand (if there was one) AND the value of the returned operand (if there was one)
 
-        - let `lhs = $[i]call(...)` be the call_return instruction at the beginning of the basic block (i.e., a copy of the corresponding call instruction).
+            + problem: what do we map to the value of the returned operand? it should be the left-hand side of the original call to this function, but there could be many such calls...for now use a placeholder fake variable (distinct from any variable in the program)
 
-        - let `RETURNED_STORE` be a fresh copy of REACHABLE_STORE.
+        - example (sign analysis with pointer info):
 
-        - let `retval_taint` be the taint of the $ret operand: RETURNED_STORE[lhs] = retval_taint.
+>         // returned store = [c -> Top, _placeholder -> Zero]
+>         x = $call_dir foo(a, 0, b) then bb
+>
+>         // ptsto = [p3 -> c]
+>         // current store = [p1 -> Neg, p2 -> Top, c -> Top, y -> Zero]
+>         fn foo(p1:int, p2:int, p3:&int) -> int { ... $ret y }
 
-        - bb_in[ret_point] |= RETURNED_STORE; if bb_in[ret_point] changed then push onto worklist.
+    + `get_caller_store` : `(abstract store, optionally call lhs) -> abstract store`
 
-            + notice that we strongly updated RETURNED_STORE with new lhs taint, but then weakly updated bb_in[ret_point]; that's because the call may have had multiple callees and we need to merge all their return values together.
+        - given the returned abstract store and a specific call instruction's left-hand side, returns the abstract store returned to that specific call (i.e., with the placeholder value, if present, replaced by the left-hand side of the call, if present)
 
-### examples
+        - example 1 (sign analysis with pointer info):
 
-- example 1: direct calls
+>         // returned store = [c -> Top, _placeholder -> Zero]
+>         // caller store = [c -> Top, x -> Zero]
+>         x = $call_dir foo(a, 0, b) then bb
 
-  PROGRAM CFG (remember to show conversion to ICFG)
-  ```
-  function main() -> int {
-    entry:
-      a:int = $call src1()
-      b:int* = $addrof a:int
-      $branch a:int bb2 bb3
+        - example 2 (sign analysis with pointer info):
 
-    bb2:
-      c:int* = $call src2()
-      d:int* = $call foo(c:int*)
-      e:int = $load d:int*
-      $jump exit
+>         // returned store = [c -> Top, _placeholder -> Zero]
+>         // caller store = [c -> Top]
+>         $call_dir foo(a, 0, b) then bb
 
-    bb3:
-      f:int = $call src3()
-      g:int* = $addrof f:int
-      h:int* = $call foo(g:int*)
-      j:int = $load h:int*
-      $jump exit
+### adding call and return instructions
 
-    exit:
-      i:int = $call sink(j:int)
-      $ret i:int
-  }
+- `[x =] $call_dir <func>(args...) then bb`
 
-  function foo(p:int*) -> int* {
-    entry:
-      q:int = $call src4()
-      r:int = $load p:int*
-      s:int = $arith add q:int r:int
-      t:int* = $addrof s:int
-      $ret t:int*
-  }
+    + `store[x] = ⊥` (the actual value of `x` will be computed by the callee's `$ret`)
+    + propagate `store` to `bb` as normal
+    + notice that we're propagating the entire store to `bb` including the parts that we're also passing to the callee; that's because the callee can only make weak updates to those values (via a pointer) and so we don't lose any precision by also propagating them locally
 
-  function src1() -> int* {
-    entry:
-      x:int* = $alloc
-      $ret x:int*
-  }
-  ```
+    + now we need to handle the actual call, but there's a tricky corner case: what if we propagate info to the callee _but_ (1) the callee has already been analyzed from another call and so has pre-existing abstract stores; and (2) the current info we're propagating isn't adding any new info to that pre-existing info? then the callee analysis may never reach the `$ret` instruction and thus it's returned store may never get propagated back to _this_ call
 
-  POINTS-TO
-  ```
-  b --> a
-  {c, g, p} --> alloc1
-  {d, h, t} --> s
-  ```
+    + to handle that tricky case we check if the callee already has a `returned store` and if so we preemptively propagate it here
+    + if `call_returned[<func>]` = `ret_store` then
+        - let `caller_store` = `get_caller_store(ret_store, x)`
+        - propagate `caller_store` to `bb`
 
-  SOLUTION
-  ```
-  sink --> { src2, src3, src4 }
-  ```
+    + but we still need to propagate our current info to the callee in case it _is_ new information
+    + let `callee_store` = `get_callee_store(ptsto, store, <func>, args)`
+    + propagate `callee_store` to `(<func>, entry)`
 
-- example 2: indirect calls with multiple targets
+- `x = $call_idr fp(args...) then bb`
 
-  PROGRAM (remember to show conversion to ICFG)
-  ```
-  function main() -> int {
-    entry:
-      f1:int[int*]* = $copy @foo:int[int*]*
-      f1:int[int*]* = $copy @bar:int[int*]*
-      f1:int[int*]* = $copy @src1:int[int*]*
-      f1:int[int*]* = $copy @sink1:int[int*]*
-      a:int* = $alloc
-      b:int = $call src2()
-      x:int = $icall f1:int[int*]*(a:int*)
-      y:int = $call sink2(x:int)
-      z:int = $call sink3(a:int*)
-      $ret 0
-  }
+    + mostly like `$call_dir`, but what if there are multiple callees (i.e., `fp` has a points-to set greater than 1)? we need the analysis to behave as if each callee is being called independently "in parallel"
 
-  function foo(p1:int*) -> int {
-    entry:
-      $ret 0
-  }
+    + handle `ret_store` and `callee_store` for each callee separately
 
-  function bar(p2:int*) -> int {
-    entry:
-      q2:int = $call src2()
-      $ret q2:int
-  }
+    + note that `x` will be strongly updated in that its old value will be replaced, but its new value must be the _join_ of the return values from each callee; we'll handle that when we process a `$ret`
 
-  function src1(p3:int*) -> int {
-    entry:
-      $ret 0
-  }
+- `$ret op?`
 
-  function sink1(p4:int*) -> int {
-    entry:
-      $ret 0
-  }
-  ```
+    + if we're in `main` then there is no caller and we can skip this instruction
 
-  SOLUTION
-  ```
-  sink1 --> {}
-  sink2 --> { src1, src2 }
-  sink3 --> { src1 }
-  ```
+    + let `ret_store` = `get_returned_store(ptsto, store, <current function>, op?)`
 
-## TODO: adding context-sensitivity
+    + set `call_returned[<current function>]` = `ret_store`
+
+    + `∀(func, bb) ∈ call_edges[<current function>]` where the terminal of `bb` is `[x =] $call_{dir, idr} ... then next_bb`:
+
+        - `caller_store` = `get_caller_store(ret_store, x)`
+        - propagate `caller_store` to `(func, next_bb)`
+
+    + notice that because propagation uses ⊔ and because we set `x` to ⊥ when handling the call instruction, the effect of this process is that the value of `x` for `next_bb` will be the join of the return values of each callee
+
+### example
+
+- [ask students to go over it in their head first, figuring out the solution without going through it step by step; then go over it together walking through it step by step]
+
+CFG
+```
+extern src1: () -> int
+extern src2: (&int) -> _
+extern src3: () -> int
+extern src4: () -> int
+extern snk: (int) -> _
+
+fn main() -> int {
+  let a:int, b:&int, c:&int, d:&int, e:int, f:int, g:&int, h:&int, i:int, j:int
+
+  entry:
+    a = $call src1()
+    b = $addrof a
+    $branch a bb2 bb4
+
+  bb2:
+    c = $alloc 1 [_a1]
+    $call_ext src2(c)
+    d = $call_dir foo(c) then bb3
+
+  bb3:
+    e = $load d
+    $jump exit
+
+  bb4:
+    f = $call src3()
+    g = $addrof f
+    h = $call foo(g)
+    j = $load h
+    $jump exit
+
+  exit:
+    $call snk(j)
+    $ret 42
+}
+
+fn foo(p:&int) -> &int {
+  let q:int, r:int, s:int, t:&int
+
+  entry:
+    q = $call src4()
+    r = $load p
+    s = $arith add q r
+    t = $addrof s
+    $ret t
+}
+```
+
+POINTS-TO
+```
+b --> { a }
+c --> { _a1 }
+d --> { s }
+g --> { f }
+h --> { s }
+p --> { _a1, f }
+t --> { s }
+```
+
+SOLUTION
+```
+snk --> { src2, src3, src4 }
+```
+
+## adding context-sensitivity
 ### intro
 
-- our interprocedural analysis on the ICFG does not follow the concrete semantics for how function calls concretely work. it essentially transforms calls and returns into gotos, so that values can flow into a callee from one callsite and return at another, losing precision.
+- the context-insensitive analysis does not follow the concrete semantics for how function calls concretely work---it essentially transforms calls and returns into gotos, so that values can flow into a callee from one callsite and return at another, losing precision
 
-    + this is _context insensitive_ analysis.
-
-    + the "context", in this case, is the execution context in which calls to the same function are made (e.g., callsite, function stack, arguments, etc).
+    + the "context", in this case, is the execution context in which calls to the same function are made (e.g., callsite, function stack, arguments, etc)
 
 - example:
 
   ```
-  function main() -> int {
+  fn main() -> int {
+    let taint1:int, taint2:int, a:int, b:int
     entry:
-      taint1:int = $call src1()
-      a:int = $call foo(taint1:int)
-      _x:int = $call sink1(a:int)
-      taint2:int = $call src2()
-      b:int = $call foo(taint2:int)
-      _x:int = $call sink2(b:int)
+      taint1 = $call_ext src1()
+      a = $call_dir foo(taint1) then bb1
+
+    bb1:
+      $call_ext snk1(a)
+      taint2 = $call_ext src2()
+      b = $call_dir foo(taint2) then exit
+
+    exit:
+      $call_ext snk2(b)
       $ret 0
   }
 
-  function foo(p:int) -> int {
+  fn foo(p:int) -> int {
+    let taint3:int, taint4:int, c:int
     entry:
-      $branch p:int bb2 bb3
+      $branch p bb1 bb3
+
+    bb1:
+      taint3 = $call_ext src3()
+      c = $call_dir bar(p, taint3) then bb2
 
     bb2:
-      taint3:int = $call src3()
-      c:int = $call bar(p:int, taint3:int)
-      _y:int = $call sink3(c:int)
+      $call_ext snk3(c)
       $jump exit
 
     bb3:
-      taint4:int = $call src4()
-      c:int = $call bar(p:int, taint4:int)
-      _y:int = $call sink4(c:int)
+      taint4 = $call src4()
+      c = $call_dir bar(p, taint4) then bb4
+
+    bb4:
+      $call_ext snk4(c)
       $jump exit
 
     exit:
-      $ret c:int
+      $ret c
   }
 
-  function bar(q:int, r:int) -> int {
+  fn bar(q:int, r:int) -> int {
     entry:
-      q:int = $arith add q:int r:int
-      $ret q:int
+      q = $arith add q r
+      $ret q
   }
   ```
 
   SOLUTION (CI)
   ```
-  sink1 --> { src1, src2, src3, src4 }
-  sink2 --> { src1, src2, src3, src4 }
-  sink3 --> { src1, src2, src3, src4 }
-  sink4 --> { src1, src2, src3, src4 }
+  snk1 --> { src1, src2, src3, src4 }
+  snk2 --> { src1, src2, src3, src4 }
+  snk3 --> { src1, src2, src3, src4 }
+  snk4 --> { src1, src2, src3, src4 }
   ```
 
-- to make the analysis more precise, we can make it _context sensitive_; that is, it can try to distinguish different contexts for the same callee function.
+- the arguments from one callsite propagate back to the other callsites, polluting the precision of the analysis
 
-    + there are a number of different schemes for doing so; we'll go over two in depth and then mention a few more.
+- to make the analysis more precise we can make it _context sensitive_: it can try to distinguish different contexts for the same callee function
 
-    + as always, there is a cost: more precision means a more expensive, less scalable analysis.
+    + the basic idea is to give each function context a unique id `cid`; then instead of `bb_in` : `function -> basic block -> abstract store` we have `bb_in` : `function + cid -> basic block -> abstract store`
 
-### call-string context-sensitivity
+        - in other words, we compute an entirely separate solution for each context of each function, and make sure to only propagate information between matching caller/callee contexts
+
+    + we haven't said what a "context" is exactly; there are a number of different schemes and we'll go over two of the most common
+
+    + as always, there is a cost: more precision means a more expensive, less scalable analysis
+
+### TODO: call-string context-sensitivity
 
 - one way to distinguish different contexts for the same callee function is to abstract the runtime function stack.
 
@@ -3978,7 +4022,7 @@ P2 -> { ref(d,D) }
 
     + the key is that the only difference between all of these schemes is how the context is defined; otherwise they all work exactly the same way.
 
-### functional context-sensitivity (aka partial transfer function)
+### TODO: functional context-sensitivity (aka partial transfer function)
 
 - a different way to distinguish different contexts for the same callee function is by remembering that the abstract transfer functions are, in fact, functions---and hence if we give them the same input they will always yield the same output.
 
@@ -4049,7 +4093,7 @@ P2 -> { ref(d,D) }
 
     + this won't happen for assign3 because our abstract domain for taint analysis is finite.
 
-### which scheme is better?
+### TODO: which scheme is better?
 
 - call-string: what we're doing with this scheme is essentially statically expanding the ICFG to have a separate copy of each function for each possible callstack that reaches it.
 
@@ -4065,7 +4109,7 @@ P2 -> { ref(d,D) }
 
 - so which is better? it depends.
 
-### other kinds of context-sensitivity
+### TODO: other kinds of context-sensitivity
 #### summary-based (aka transfer function)
 
 - the partial transfer function approach (aka functional) memoized the callee context based on its abstract inputs, so if we saw the same abstract inputs we could just retrieve the previous result.
@@ -4173,7 +4217,7 @@ P2 -> { ref(d,D) }
 
 - we can use CFL reachability for other things besides context sensitivity as well (e.g., field sensitivity).
 
-### context-sensitive heap models
+### TODO: context-sensitive heap models
 
 - when doing pointer analysis we used a common heap model: an abstract object per static allocation site.
 
