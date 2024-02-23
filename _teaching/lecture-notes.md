@@ -22,7 +22,7 @@
 - week 6.1: through `andersen-style pointer analysis` -> `no structs or calls` -> `setup`; stopped 10 minutes early
 - week 6.2: through `andersen-style pointer analysis`
 - week 7.1: through `program slicing`; stopped 10 minutes early
-- week 7.2: ???
+- week 7.2: through `sparse analysis and SSA`; stopped 10 minutes early
 - week 8.1: ???
 - week 8.2: ???
 - week 9.1: ???
@@ -3335,6 +3335,366 @@ P2 -> { ref(d,D) }
 
 - notice that we're missing some `$jump` instructions; that's because they are unconditional and so there is no control dependence on them
 
+# sparse analysis and SSA
+## efficiency problem with standard DFA
+
+- the DFA algorithm we've been using has an efficiency problem: information is propagated indiscriminately throughout the CFG, delaying convergence
+
+- example (constant propagation):
+
+  ```
+  fn foo(p:int) -> int {
+  let x:int, y:int, z:int
+  entry:
+    x = $copy 4
+    y = $copy 1
+    $branch p if_true if_false
+
+  if_true:
+    y = $copy 3
+    z = $copy x
+    $jump exit
+
+  if_false:
+    z = $copy 3
+    $jump exit
+
+  exit:
+    a = $arith add y z
+    $ret a
+  }
+  ```
+
+- notice that the `x` info is propagated to `if_false` and `exit` and the `y` info is propagated to `if_true` and `if_false`, none of which actually use this info
+
+- this problem doesn't affect precision but does impact performance; it would be better to propagate information only where it is actually needed and nowhere else
+
+    + for large programs this can mean the difference between taking seconds and taking hours, or between taking hours and taking days
+
+## def-use chains and sparse analysis
+
+- how do we know where information is needed? we already know how to figure this out: reaching definitions
+
+- the reaching definitions solution allows us to directly connect where information is _produced_ (defs) to where it is _needed_ (uses)
+
+    + this is basically the PDG with only data dependence edges, no control dependence edges
+
+- replace the CFG with a "def-use graph":
+
+    + nodes are statements (not basic blocks)
+
+    + there is an edge `A-->B` if a def at instruction `A` reaches a use at instruction `B`
+
+- run the standard DFA worklist algorithm, but on the def-use graph instead of the CFG
+
+    + there is no single 'entry' point; the easiest thing to do is just initialize the worklist with all statements
+
+- example: [reuse example from above]
+
+## factoring def-use chains: SSA form
+
+- there's still a problem with the def-use graph: the number of def-use edges can be quadratic in the number of statements
+
+- example (using shorthand to remove irrelevant details):
+
+  ```
+  if (_)      x = _
+  else if (_) x = _
+  else        x = _
+
+  if (_)      _ = x
+  else if (_) _ = x
+  else        _ = x
+  ```
+
+- [draw def-use graph]
+
+- the solution is to _factor_ the def-use edges, which will give us _SSA form_
+
+- a program is in _Static Single Assignment_ (SSA) form if every variable is defined with exactly one instruction and every use of a variable has exactly one reaching definition
+
+- example 1: renaming variables to transform into SSA
+
+  ```
+  x = 4
+  y = x
+  x = 6
+  y = x
+  ```
+
+  ```
+  x1 = 4
+  y1 = x1
+  x2 = 6
+  y2 = x2
+  ```
+
+- why _static_ single assignment? there is only a single textual assignment, but it can happen dynamically an arbitrary number of times
+
+  ```
+  while (_) x = x + 1
+  ```
+
+- there's still one complexity: what if multiple defs reach a single use?
+
+  ```
+  if (_)      x1 = _
+  else if (_) x2 = _
+  else        x3 = _
+
+  if (_)      _ = x?
+  else if (_) _ = x?
+  else        _ = x?
+  ```
+
+- this is where _phi functions_ come in: a phi function is a choice operator that multiplexes multiple defs together
+
+    + `x1 = phi(x2, x3, ...)` _means_ that `x1` is assigned the value of whichever reaching def (one of `x2, x3, ...`) is appropriate
+
+  ```
+  if (_)      x1 = _
+  else if (_) x2 = _
+  else        x3 = _
+  x4 = phi(x1, x2, x3)
+  if (_)      _ = x4
+  else if (_) _ = x4
+  else        _ = x4
+  ```
+
+- [draw the new def-use graph]
+
+    + note that the number of edges has gone from quadratic to linear
+
+- SSA form renders some analyses trivial (e.g., reaching defs) and others much easier and more efficient (e.g., sign analysis, constant propagation, slicing, taint analysis)
+
+- to compute SSA form, we need to (1) insert phi functions, and (2) rename variables
+
+## computing SSA form
+### intro
+
+- there are two parts to computing SSA:
+
+    + where should phi functions be placed?
+
+    + how to rename variables?
+
+### placing phi functions
+
+- where should we put these new phi functions?
+
+- naive answer: at every join point in the CFG, put a phi function for every variable
+
+    + this is way too many, most of them are unneeded
+
+- better answer: for each variable `x`, if blocks `A` and `B` both define `x` and there are non-intersecting paths from `A` and `B` to block `Z`, then put a phi function for `x` at the top of block `Z`
+
+    + this just says to find the earliest point in the CFG where multiple defs converge to one point, and put the phi function there
+
+    + there are refinements that yield even fewer phi functions (e.g., require that variable `x` must be used at some point after `Z`), but this answer is a pretty good one
+
+- fortunately, we already know how to compute this information: dominance frontiers
+
+    + the dominance frontier of block `X` is the set of all blocks `Y` s.t. `X` dominates a predecessor of `Y` but does not strictly dominate `Y`
+
+    + intuitively, the dominance frontier is the set of blocks that are _almost_ dominated by `X`, but just outside its control; or, it's the set of blocks that are the earliest point where some competing control-flow path may reach that block
+
+- the dominance frontier of a variable definition is the set of blocks where we need to add phi functions for that variable
+
+    + remember that we used _post-dominance_ for computing control dependence; now we're using _dominance_: same algorithm, just different direction of the CFG edges
+
+    + note that when we add a phi function that this is a new definition of the variable, which itself may require more phi functions to be added
+
+    + iterated dominance frontier: `DF⁺(S)` = the limit of the sequence:
+
+        - `DF₁(S)` = `DF(S)`
+        - `DFᵢ₊₁(S)` = `DF(S ∪ DFᵢ(S))`
+
+    + let `S` be the set of definitions for variable `x`; then `DF⁺(S)` is exactly the set of blocks that require phi functions for `x`
+
+### renaming variables
+
+- after phi functions have been placed, we need to rename all the variables
+
+- simple method:
+
+    + compute reaching defs using the original variables names (but with phi functions in place); because of how we placed phi functions only one def will ever reach any use
+
+    + for each definition, give the defined variable a unique name
+
+    + for each use, replace that use with the unique name of the single reaching def
+
+- this is easy but not as efficient as it could be; there's a more complicated but efficient version found in cytron et al, "efficiently computing static single assignment form and the control dependence graph"
+
+### example
+
+SOURCE
+```
+fn main() -> int {
+  let a:int = input(), b:int = 2, c:int;
+  if a > 0 {
+    while a < 100 {
+      a = a * 2;
+    }
+    c = a + b;
+  }
+  else {
+    c = a + b;
+  }
+  return c + a;
+}  
+```
+
+LIR
+```
+fn main() -> int {
+let a:int, b:int, c:int, t1:int, t2:int, t3:int
+entry:
+  a = $call_ext input()
+  b = $copy 2
+  t1 = $cmp gt a 0
+  $branch t1 else loop_hdr
+
+loop_hdr:
+  t2 = $cmp lt a 100
+  $branch t2 loop_body loop_exit
+
+loop_body:
+  a = $arith mul a 2
+  $jump loop_hdr
+
+loop_exit:
+  c = $arith add a b
+  $jump exit
+
+else:
+  c = $arith add a b
+  $jump exit
+
+exit:
+  t3 = $arith add c a
+  $ret t3
+}
+```
+
+DOM FRONTIERS
+```
+entry -> {}
+loop_hdr -> { exit }
+loop_body -> { loop_hdr }
+loop_exit -> { exit }
+else -> { exit }
+exit -> {}
+```
+
+ITERATED DOM FRONTIERS (a)
+```
+DF₁({entry, loop_body}) = { loop_hdr }
+DF₂({entry, loop_body, loop_hdr}) = { loop_hdr, exit }
+DF₃({entry, loop_body, loop_hdr, exit}) = { loop_hdr, exit }
+```
+
+ITERATED DOM FRONTIERS (c)
+```
+DF₁({else, loop_exit}) = { exit }
+DF₂({else, loop_exit, exit}) = { exit }
+```
+
+SSA
+```
+fn main() -> int {
+let a1:int, a2:int, a3:int, a4:int, b:int, c1:int, c2:int, c3:int, t1:int, t2:int, t3:int
+entry:
+  a1 = $call_ext input()
+  b = $copy 2
+  t1 = $cmp gt a1 0
+  $branch t1 else loop_hdr
+
+loop_hdr:
+  a2 = phi(a1, a3)
+  t2 = $cmp lt a2 100
+  $branch t2 loop_body loop_exit
+
+loop_body:
+  a3 = $arith mul a2 2
+  $jump loop_hdr
+
+loop_exit:
+  c1 = $arith add a2 b
+  $jump exit
+
+else:
+  c2 = $arith add a1 b
+  $jump exit
+
+exit:
+  a4 = phi(a1, a2)
+  c3 = phi(c1, c2)
+  t3 = $arith add c3 a4
+  $ret t3
+}
+```
+
+## revisiting sparse analysis
+
+- if the program is in SSA form and we're doing a first-order analysis (i.e., computing an abstraction of program variable values), then we can modify our worklist algorithm to operate on variables instead of basic blocks or statements
+
+    + since there is a single assignment for each variable, we don't need separate abstract stores for each block: just a single, global abstract store for the whole program
+
+    + there is no propagation of abstract stores or anything like that; in fact, we're doing effectively a flow-insensitive analysis, but because of being in SSA form we're getting a flow-sensitive solution
+
+- example: constant propagation
+
+  ```
+  initialize store and worklist to empty
+
+  for each variable x:
+    if x is assigned a constant k:
+      store[x] = k
+      add x to worklist
+
+  while worklist is not empty:
+    pop x from worklist
+    for each variable y defined using x:
+      compute value for y using value of x
+      store[y] = updated value
+      if y's value changed: add y to worklist
+  ```
+
+- [demonstrate using previous example for computing SSA]
+
+## dealing with pointers
+
+- all of the examples i've given have contained _no_ pointers; what if they did have pointers? 
+
+- there are basically two options
+
+- option 1 (the option compilers use, like gcc and llvm): don't allow address-taken variables; any source-level address-taken variable is converted into a pointer instead, and we do SSA only for the program variables, not for the address-taken objects
+
+    + example:
+
+BEFORE
+```
+      x = $copy 0
+      y = $addrof x
+      z = x
+```
+
+AFTER
+```
+      x = $alloc 1 [id] // on stack, not on heap
+      $store x 0
+      y = x
+      z = $load x
+```
+
+- people generally just call this SSA, but in terms of analysis i like to call it "partial SSA" because only top-level variables are really in SSA form; anything on the heap is not in SSA form
+
+- option 2 (can be useful, but not the common choice): do a pointer analysis and then treat every store as a def and every load as a use of the appropriate address-taken objects and compute SSA as normal
+
+    + the points-to sets can be large, and the pointer analysis is a "may point-to" analysis, so there can be many spurious def-use edges in this version
+
+    + still useful: this is one of the techniques that i used to scale flow-sensitive pointer analysis to make it 100x more scalable
+
 # taint analysis (interprocedural dfa; icfg; context sensitivity)
 ## intro
 
@@ -4284,366 +4644,6 @@ snk --> { src2, src3, src4 }
 - example revisited: now `x` points to `_a1_context1` and `y` points-to `_a1_context2`
 
 - as always, there's a cost: a context-sensitive heap model is more precise, but can be much more expensive
-
-# sparse analysis and SSA
-## efficiency problem with standard DFA
-
-- the DFA algorithm we've been using has an efficiency problem: information is propagated indiscriminately throughout the CFG, delaying convergence
-
-- example (constant propagation):
-
-  ```
-  fn foo(p:int) -> int {
-  let x:int, y:int, z:int
-  entry:
-    x = $copy 4
-    y = $copy 1
-    $branch p if_true if_false
-
-  if_true:
-    y = $copy 3
-    z = $copy x
-    $jump exit
-
-  if_false:
-    z = $copy 3
-    $jump exit
-
-  exit:
-    a = $arith add y z
-    $ret a
-  }
-  ```
-
-- notice that the `x` info is propagated to `if_false` and `exit` and the `y` info is propagated to `if_true` and `if_false`, none of which actually use this info
-
-- this problem doesn't affect precision but does impact performance; it would be better to propagate information only where it is actually needed and nowhere else
-
-    + for large programs this can mean the difference between taking seconds and taking hours, or between taking hours and taking days
-
-## def-use chains and sparse analysis
-
-- how do we know where information is needed? we already know how to figure this out: reaching definitions
-
-- the reaching definitions solution allows us to directly connect where information is _produced_ (defs) to where it is _needed_ (uses)
-
-    + this is basically the PDG with only data dependence edges, no control dependence edges
-
-- replace the CFG with a "def-use graph":
-
-    + nodes are statements (not basic blocks)
-
-    + there is an edge `A-->B` if a def at instruction `A` reaches a use at instruction `B`
-
-- run the standard DFA worklist algorithm, but on the def-use graph instead of the CFG
-
-    + there is no single 'entry' point; the easiest thing to do is just initialize the worklist with all statements
-
-- example: [reuse example from above]
-
-## factoring def-use chains: SSA form
-
-- there's still a problem with the def-use graph: the number of def-use edges can be quadratic in the number of statements
-
-- example (using shorthand to remove irrelevant details):
-
-  ```
-  if (_)      x = _
-  else if (_) x = _
-  else        x = _
-
-  if (_)      _ = x
-  else if (_) _ = x
-  else        _ = x
-  ```
-
-- [draw def-use graph]
-
-- the solution is to _factor_ the def-use edges, which will give us _SSA form_
-
-- a program is in _Static Single Assignment_ (SSA) form if every variable is defined with exactly one instruction and every use of a variable has exactly one reaching definition
-
-- example 1: renaming variables to transform into SSA
-
-  ```
-  x = 4
-  y = x
-  x = 6
-  y = x
-  ```
-
-  ```
-  x1 = 4
-  y1 = x1
-  x2 = 6
-  y2 = x2
-  ```
-
-- why _static_ single assignment? there is only a single textual assignment, but it can happen dynamically an arbitrary number of times
-
-  ```
-  while (_) x = x + 1
-  ```
-
-- there's still one complexity: what if multiple defs reach a single use?
-
-  ```
-  if (_)      x1 = _
-  else if (_) x2 = _
-  else        x3 = _
-
-  if (_)      _ = x?
-  else if (_) _ = x?
-  else        _ = x?
-  ```
-
-- this is where _phi functions_ come in: a phi function is a choice operator that multiplexes multiple defs together
-
-    + `x1 = phi(x2, x3, ...)` _means_ that `x1` is assigned the value of whichever reaching def (one of `x2, x3, ...`) is appropriate
-
-  ```
-  if (_)      x1 = _
-  else if (_) x2 = _
-  else        x3 = _
-  x4 = phi(x1, x2, x3)
-  if (_)      _ = x4
-  else if (_) _ = x4
-  else        _ = x4
-  ```
-
-- [draw the new def-use graph]
-
-    + note that the number of edges has gone from quadratic to linear
-
-- SSA form renders some analyses trivial (e.g., reaching defs) and others much easier and more efficient (e.g., sign analysis, constant propagation, slicing, taint analysis)
-
-- to compute SSA form, we need to (1) insert phi functions, and (2) rename variables
-
-## computing SSA form
-### intro
-
-- there are two parts to computing SSA:
-
-    + where should phi functions be placed?
-
-    + how to rename variables?
-
-### placing phi functions
-
-- where should we put these new phi functions?
-
-- naive answer: at every join point in the CFG, put a phi function for every variable
-
-    + this is way too many, most of them are unneeded
-
-- better answer: for each variable `x`, if blocks `A` and `B` both define `x` and there are non-intersecting paths from `A` and `B` to block `Z`, then put a phi function for `x` at the top of block `Z`
-
-    + this just says to find the earliest point in the CFG where multiple defs converge to one point, and put the phi function there
-
-    + there are refinements that yield even fewer phi functions (e.g., require that variable `x` must be used at some point after `Z`), but this answer is a pretty good one
-
-- fortunately, we already know how to compute this information: dominance frontiers
-
-    + the dominance frontier of block `X` is the set of all blocks `Y` s.t. `X` dominates a predecessor of `Y` but does not strictly dominate `Y`
-
-    + intuitively, the dominance frontier is the set of blocks that are _almost_ dominated by `X`, but just outside its control; or, it's the set of blocks that are the earliest point where some competing control-flow path may reach that block
-
-- the dominance frontier of a variable definition is the set of blocks where we need to add phi functions for that variable
-
-    + remember that we used _post-dominance_ for computing control dependence; now we're using _dominance_: same algorithm, just different direction of the CFG edges
-
-    + note that when we add a phi function that this is a new definition of the variable, which itself may require more phi functions to be added
-
-    + iterated dominance frontier: `DF⁺(S)` = the limit of the sequence:
-
-        - `DF₁(S)` = `DF(S)`
-        - `DFᵢ₊₁(S)` = `DF(S ∪ DFᵢ(S))`
-
-    + let `S` be the set of definitions for variable `x`; then `DF⁺(S)` is exactly the set of blocks that require phi functions for `x`
-
-### renaming variables
-
-- after phi functions have been placed, we need to rename all the variables
-
-- simple method:
-
-    + compute reaching defs using the original variables names (but with phi functions in place); because of how we placed phi functions only one def will ever reach any use
-
-    + for each definition, give the defined variable a unique name
-
-    + for each use, replace that use with the unique name of the single reaching def
-
-- this is easy but not as efficient as it could be; there's a more complicated but efficient version found in cytron et al, "efficiently computing static single assignment form and the control dependence graph"
-
-### example
-
-SOURCE
-```
-fn main() -> int {
-  let a:int = input(), b:int = 2, c:int;
-  if a > 0 {
-    while a < 100 {
-      a = a * 2;
-    }
-    c = a + b;
-  }
-  else {
-    c = a + b;
-  }
-  return c + a;
-}  
-```
-
-LIR
-```
-fn main() -> int {
-let a:int, b:int, c:int, t1:int, t2:int, t3:int
-entry:
-  a = $call_ext input()
-  b = $copy 2
-  t1 = $cmp gt a 0
-  $branch t1 else loop_hdr
-
-loop_hdr:
-  t2 = $cmp lt a 100
-  $branch t2 loop_body loop_exit
-
-loop_body:
-  a = $arith mul a 2
-  $jump loop_hdr
-
-loop_exit:
-  c = $arith add a b
-  $jump exit
-
-else:
-  c = $arith add a b
-  $jump exit
-
-exit:
-  t3 = $arith add c a
-  $ret t3
-}
-```
-
-DOM FRONTIERS
-```
-entry -> {}
-loop_hdr -> { exit }
-loop_body -> { loop_hdr }
-loop_exit -> { exit }
-else -> { exit }
-exit -> {}
-```
-
-ITERATED DOM FRONTIERS (a)
-```
-DF₁({entry, loop_body}) = { loop_hdr }
-DF₂({entry, loop_body, loop_hdr}) = { loop_hdr, exit }
-DF₃({entry, loop_body, loop_hdr, exit}) = { loop_hdr, exit }
-```
-
-ITERATED DOM FRONTIERS (c)
-```
-DF₁({else, loop_exit}) = { exit }
-DF₂({else, loop_exit, exit}) = { exit }
-```
-
-SSA
-```
-fn main() -> int {
-let a1:int, a2:int, a3:int, a4:int, b:int, c1:int, c2:int, c3:int, t1:int, t2:int, t3:int
-entry:
-  a1 = $call_ext input()
-  b = $copy 2
-  t1 = $cmp gt a1 0
-  $branch t1 else loop_hdr
-
-loop_hdr:
-  a2 = phi(a1, a3)
-  t2 = $cmp lt a2 100
-  $branch t2 loop_body loop_exit
-
-loop_body:
-  a3 = $arith mul a2 2
-  $jump loop_hdr
-
-loop_exit:
-  c1 = $arith add a2 b
-  $jump exit
-
-else:
-  c2 = $arith add a1 b
-  $jump exit
-
-exit:
-  a4 = phi(a1, a2)
-  c3 = phi(c1, c2)
-  t3 = $arith add c3 a4
-  $ret t3
-}
-```
-
-## revisiting sparse analysis
-
-- if the program is in SSA form and we're doing a first-order analysis (i.e., computing an abstraction of program variable values), then we can modify our worklist algorithm to operate on variables instead of basic blocks or statements
-
-    + since there is a single assignment for each variable, we don't need separate abstract stores for each block: just a single, global abstract store for the whole program
-
-    + there is no propagation of abstract stores or anything like that; in fact, we're doing effectively a flow-insensitive analysis, but because of being in SSA form we're getting a flow-sensitive solution
-
-- example: constant propagation
-
-  ```
-  initialize store and worklist to empty
-
-  for each variable x:
-    if x is assigned a constant k:
-      store[x] = k
-      add x to worklist
-
-  while worklist is not empty:
-    pop x from worklist
-    for each variable y defined using x:
-      compute value for y using value of x
-      store[y] = updated value
-      if y's value changed: add y to worklist
-  ```
-
-- [demonstrate using previous example for computing SSA]
-
-## dealing with pointers
-
-- all of the examples i've given have contained _no_ pointers; what if they did have pointers? 
-
-- there are basically two options
-
-- option 1 (the option compilers use, like gcc and llvm): don't allow address-taken variables; any source-level address-taken variable is converted into a pointer instead, and we do SSA only for the program variables, not for the address-taken objects
-
-    + example:
-
-BEFORE
-```
-      x = $copy 0
-      y = $addrof x
-      z = x
-```
-
-AFTER
-```
-      x = $alloc 1 [id] // on stack, not on heap
-      $store x 0
-      y = x
-      z = $load x
-```
-
-- people generally just call this SSA, but in terms of analysis i like to call it "partial SSA" because only top-level variables are really in SSA form; anything on the heap is not in SSA form
-
-- option 2 (can be useful, but not the common choice): do a pointer analysis and then treat every store as a def and every load as a use of the appropriate address-taken objects and compute SSA as normal
-
-    + the points-to sets can be large, and the pointer analysis is a "may point-to" analysis, so there can be many spurious def-use edges in this version
-
-    + still useful: this is one of the techniques that i used to scale flow-sensitive pointer analysis to make it 100x more scalable
 
 # MORE TOPICS
 
