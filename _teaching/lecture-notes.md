@@ -59,6 +59,8 @@
 
 - we could also make things simpler by not using globals (except for the global function pointers needed for indirect calls, which we can just say to ignore); this may be going too far though (and this would require us to change the official analysis implementations to treat the global function pointers specially, to conform to the student solutions)
 
+- rather than having everything just in terms of `bb_in` and doing a final pass to get the output abstract store for a basic block as the final solution, it might be easier to explain (and understand for the students) if we define both `bb_in` and `bb_out` explicitly and use them during the fixpoint computation---this doesn't exactly mirror the reference implementation but makes it easy to discuss both inputs and outputs of basic blocks and how one feeds into the other without confusion
+
 - there's a lot of redundancy between `intro to DFA` -> `the basics` and `intro to DFA` -> {`abstract domains`, `abstract semantics`}, i should collapse these together
 
 - in `intro to DFA` -> `abstract semantics` i had the students fill in the tables for addition and less-than, which worked great but came really late in the lecture; when i integrate the sections per the above note i should try to move the student interaction part earlier
@@ -72,6 +74,12 @@
 - for `intro to widening`:
 
     - i say to use it whenever we're propagating to a loop header, but really to be more precise we should use it only when propagating along a back-edge---the extra complexity probably isn't worth it though; think about whether i want to do this
+
+- instead of saying that reaching defs / control analysis are only useful as a precursor to other analyses, point out that they can be used to detect possible uses of undefined variables
+
+    - look for uses that either don't have any reaching defs or whose reaching defs collectively don't dominate the use (i.e., there is a path along with the variable is undefined)
+
+    - or if we're looking for definitely uninitialized, simply check for uses that don't have any reaching defs
 
 ### assignments
 
@@ -100,6 +108,10 @@
     - create a list of properties for test cases and then a tool that creates random valid programs and filters out those that don't have interesting
 
 ### additional materials
+
+- maybe have one or both of aldrich et al "program analysis", moller et al "static program analysis" draft textbooks as supplementary material (both available for free on the web)
+
+    - might have to provide some notes to the students translating from what they do to what i do, i think we use some different conventions/terminology
 
 - create a tool to automatically log an analysis execution and play it back for the students, in order to more easily go through examples in lecture
 
@@ -3053,7 +3065,9 @@ P2 -> { ref(d,D) }
 
         + revisit reaching defs, but using pointer info
         + reaching defs + control analysis to do program slicing
-    
+
+    - look at another application of reaching defs and control analysis: static single assignment form and sparse analysis
+
     - extending DFA to interprocedural analysis
 
         + taint analysis
@@ -3061,7 +3075,6 @@ P2 -> { ref(d,D) }
 
     - if time:
 
-        - sparse analysis and SSA
         - a little abstract interpretation
         - maybe more...
 
