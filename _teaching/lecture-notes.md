@@ -23,8 +23,8 @@
 - week 6.2: through `andersen-style pointer analysis`
 - week 7.1: through `program slicing`; stopped 10 minutes early
 - week 7.2: through `sparse analysis and SSA`; stopped 10 minutes early
-- week 8.1: ???
-- week 8.2: ???
+- week 8.1: through `taint analysis` -> `intraprocedural taint analysis`; stopped 15 minutes early
+- week 8.2: through `taint analysis` -> `context-insensitive interprocedural taint analysis`
 - week 9.1: ???
 - week 9.2: ???
 - week 10.1: ???
@@ -100,6 +100,8 @@
 - assignments 2--5: avoid having struct-type variables in the assignment tests; the valid cflat program generator can be tuned to not have struct-typed variables pretty easily, but when lowering to lir they can still be introduced so we need to apply a post-lowering filter to eliminate them from the test cases
 
     - or modify ast_gen.rs to prevent generating struct vars; see the ast_gen.rs in assign-3/test-gen for ideas
+
+- assignment 4: the current tests don't use globals, which specifically affects modref information for the tests with function calls (the last test suite); we should add some tests that have callees that def/use globals
 
 - develop tools for creating interesting test suites:
 
@@ -4106,20 +4108,20 @@ AFTER
 
 - `[x =] $call_dir <func>(args...) then bb`
 
+    + update `call_edges[<func>]` to include `(<current function>, <current bb>)`
+    + let `callee_store` = `get_callee_store(ptsto, store, <func>, args)`
+    + propagate `callee_store` to `(<func>, entry)`
+
     + `store[x] = ⊥` (the actual value of `x` will be computed by the callee's `$ret`)
     + propagate `store` to `bb` as normal
     + notice that we're propagating the entire store to `bb` including the parts that we're also passing to the callee; that's because the callee can only make weak updates to those values (via a pointer) and so we don't lose any precision by also propagating them locally
 
-    + now we need to handle the actual call, but there's a tricky corner case: what if we propagate info to the callee _but_ (1) the callee has already been analyzed from another call and so has pre-existing abstract stores; and (2) the current info we're propagating isn't adding any new info to that pre-existing info? then the callee analysis may never reach the `$ret` instruction and thus it's returned store may never get propagated back to _this_ call
+    + there's a tricky corner case: what if we propagate info to the callee _but_ (1) the callee has already been analyzed from another call and so has pre-existing abstract stores; and (2) the current info we're propagating isn't adding any new info to that pre-existing info? then the callee analysis may never reach the `$ret` instruction and thus it's returned store may never get propagated back to _this_ call
 
     + to handle that tricky case we check if the callee already has a `returned store` and if so we preemptively propagate it here
     + if `call_returned[<func>]` = `ret_store` then
         - let `caller_store` = `get_caller_store(ret_store, x)`
         - propagate `caller_store` to `bb`
-
-    + but we still need to propagate our current info to the callee in case it _is_ new information
-    + let `callee_store` = `get_callee_store(ptsto, store, <func>, args)`
-    + propagate `callee_store` to `(<func>, entry)`
 
 - `x = $call_idr fp(args...) then bb`
 
@@ -4176,7 +4178,9 @@ fn main() -> int {
   bb4:
     f = $call src3()
     g = $addrof f
-    h = $call foo(g)
+    h = $call_dir foo(g) then bb5
+
+  bb5:
     j = $load h
     $jump exit
 
@@ -4658,20 +4662,65 @@ snk --> { src2, src3, src4 }
 
 - as always, there's a cost: a context-sensitive heap model is more precise, but can be much more expensive
 
-# MORE TOPICS
+# abstract interpretation
+## intro
 
-- type inference using equality-based analysis: borrow from my 162 notes to introduce a small functional language, a type system (which can be thought of as a kind of analysis), and hindley-milner type inference
+- DFA and set constraint-based analysis are intended to be sound, but don't provide any framework for _proving_ that an analysis is sound
 
-    + this may be a lot of extra material not directly related to program analysis, perhaps too much
+    + they provide ways to prove the analysis is _computable_, not _sound_
 
-- logic-based analyses (DOOP-style); is there much to show?
+    + essentially, the analysis designer is just supposed to "think about it real hard"
 
-    + andersen-style pointer analysis
+    + this is OK for some applications (e.g., compilers) but not for others (e.g., critical systems such as medical devices, avionics, etc)
 
-    + making andersen-style context-sensitive
+- abstract interpretation is similar to DFA in many respects, but does provide a framework for proving soundness (and precision)
 
-    + other analyses?
+- a sound analysis over-approximates program behavior---in order to prove anything about them, we need a mathematical description of program behavior
 
-- abstract interpretation: grab my old notes from previous iterations of this course to introduce operational semantics, galois connections, etc
+    + a formal _concrete semantics_ is a mathematical description of how a program behaves when it executes
 
-    + this may be too much, i'd likely have to prune it a lot
+    + a formal _abstract semantics_ is a mathematical description of how the analysis behaves
+
+    + to prove an analysis is sound, we must prove that the abstract semantics over-approximates the concrete semantics
+
+    + abstract interpretation gives us the machinery required to do so (and a bit more as well: precision)
+
+- this is just a primer, we'll focus on:
+
+    + a simple language with no functions or pointers (IMP)
+
+    + first-order analyses (like integer analysis)
+
+    + we can easily extend to second-order analyses and more complicated languages, but the basic ideas remain the same
+
+## formal semantics
+
+- TODO:
+
+## IMP concrete semantics
+
+- [see docs/imp-concrete.pdf]
+
+- TODO:
+
+## concrete collecting semantics
+
+- TODO:
+
+## IMP abstract semantics
+
+- [see docs/imp-abstract.pdf]
+
+- TODO:
+
+## analysis: executing the abstract semantics
+
+- TODO:
+
+## proving soundness
+
+- TODO:
+
+## widening for control-flow
+
+- TODO:
