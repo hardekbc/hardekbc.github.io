@@ -4694,14 +4694,204 @@ snk --> { src2, src3, src4 }
     + we can easily extend to second-order analyses and more complicated languages, but the basic ideas remain the same
 
 ## formal semantics
+### syntax vs semantics
 
-- TODO:
+- how do we formally define a programming language?
+
+    - syntax (what a program looks like)
+    - semantics (how a program behaves)
+
+- for syntax there are standard, agreed-upon formalisms:
+
+    - regular expressions and context-free grammars
+    - parsing: translate concrete syntax (a text file) into an abstract syntax tree (AST, a data structure)
+
+- example abstract syntax for arithmetic expressions:
+
+>   n ∈ 𝐙
+>   e ∈ Exp ::= n | e1 PLUS e2 | e1 MUL e2
+
+- example AST: `(1 PLUS [6 MUL 3]) PLUS (3 MUL 2)` -- [draw as tree]
+
+- for semantics there is no such concensus: there are many possible ways to formally define behavior, each with different tradeoffs
+
+### denotational
+
+- like a dictionary, explain the "meaning" of a term by explaining it using already known, well-defined terms
+
+    + basically, a compiler from the AST to some known, well-defined formalism
+
+    + e.g., give a translation from the AST (the syntax) to a lambda calculus formula (describing the behavior of that syntax)
+
+    + our example language is too simple to need the lambda calculus, we can just translate using simple arithmetic:
+
+>          [[n]] => n
+> [[e1 PLUS e2]] => [[e1]] + [[e2]]
+>  [[e1 MUL e2]] => [[e1]] * [[e2]]
+
+> [[(1 PLUS [6 MUL 3]) PLUS (3 MUL 2)]] => 25
+
+### operational
+
+- explain the "meaning" of a term by describing what it does (i.e., how it operates, hence the name)
+
+    + basically, a mathematically-defined interpreter for the syntax
+
+    + there are a variety of different types of operational semantics
+
+#### big-step operational semantics (aka natural semantics)
+
+- define as a set of recursive rules from the AST to the final answer
+
+    + this is similar to denotational at the surface level (especially for our simple language) but is actually different, which becomes more apparent for more complex languages
+
+    + it's called `big step` because the rules can be thought of as a set of mutually recursive functions that go from the AST to the final answer in one "big step"
+
+>       ------- 
+>       n ==> n
+>
+>       e1 ==> n1  e2 ==> n2
+>       ----------------------
+>       e1 PLUS e2 ==> n1 + n2
+>
+>       e1 ==> n1  e2 ==> n2
+>       ----------------------
+>       e1 MUL e2 ==> n1 * n2
+
+> (1 PLUS [6 MUL 3]) PLUS (3 MUL 2) ==> 25
+
+#### small-step structural operational semantics
+
+- define as a set of rewrite rules on the AST that end up with the final answer
+
+    + it's called `small step` because we see all the intermediate points between the AST and the final answer
+
+    + it's called `structural` because we're always rewriting the AST (which is a structure)
+
+>       e1 -> e1'
+>       -------------------------
+>       e1 PLUS e2 -> e1' PLUS e2
+>
+>       e2 -> e2'
+>       -------------------------
+>       n1 PLUS e2 -> n1 PLUS e2'
+>
+>       ---------------------
+>       n1 PLUS n2 -> n1 + n2
+>
+>       e1 -> e1'
+>       -------------------------
+>       e1 MUL e2 -> e1' MUL e2
+>
+>       e2 -> e2'
+>       -------------------------
+>       n1 MUL e2 -> n1 MUL e2'
+>
+>       ---------------------
+>       n1 MUL n2 -> n1 * n2
+
+> (1 PLUS [6 MUL 3]) PLUS (3 MUL 2) ->
+> (1 PLUS 18) PLUS (3 MUL 2) ->
+> 19 PLUS (3 MUL 2) ->
+> 19 PLUS 6 ->
+> 25
+
+### small-step abstract machine-based operational semantics
+
+- this turns out to be a good choice for static analysis, so this is what we'll focus on from now on 
+        
+    - note that "abstract" is being used in the sense of "mathematical, not physical" and not the sense we've been using "abstract" as meaning "approximate, not concrete"
+
+    - we'll be defining an "abstract machine", i.e., a mathematical interpreter, that computes on ASTs
+
+- first we define a "state" of the machine, then we define the rules of the machine that transition from one state to the next, aka `state transition rules`
+
+- first some intuition
+
+    + we can easily code up the big step semantics for arithmetic expressions as a recursive function
+
+    + how would we translate that into iterative (i.e., non-recursive) code? we would need to reify the function stack into an explicit data structure that keeps track of what still needs to be done
+
+    + we call that data structure a `continuation`, because it is the continuation of the execution
+
+```
+fn bigstep(e:Exp) -> int {
+  match e with {
+    case Num(n) => return n
+    case Plus(e1, e2) => return bigstep(e1) + bigstep(e2)
+    case Mul(e1, e2) => return bigstep(e1) * bigstep(e2)
+  }
+}
+```
+
+```
+fn bigstep_nonrecursive(e:Exp) -> int {
+  let curr_exp = e
+  let cont = []
+
+  while !(curr_exp is Num and cont is empty) {
+    match curr_exp {
+      case Plus(e1, e2) => {
+        curr_exp = e1
+        cont.push_front(AddR(e2))
+      }
+      case Mul(e1, e2) => {
+        curr_exp = e1
+        cont.push_front(MulR(e2))
+      }
+      case Num(n1) => {
+        match cont.pop_front() {
+          case AddR(e) => {
+            curr_exp = e
+            cont.push_front(AddL(n1))
+          }
+          case MulR(e) => {
+            curr_exp = e
+            cont.push_front(MulL(n1))
+          }
+          case AddL(n2) => curr_exp = Num(n1 + n2)
+          case MulL(n2) => curr_exp = Num(n1 * n2)
+        }
+      }
+    }
+  }
+
+  return curr_exp.n
+}
+```
+
+- show on `(1 PLUS [6 MUL 3]) PLUS (3 MUL 2)`
+
+- this is essentially what we'll be doing with our abstract machine, just using math instead of code
+
+- STATE
+
+    + the `Exp` part of the state is like `curr_exp` in the code
+    + the `Kont` part of the state is like `cont` in the code
+
+```
+ς ∈ State = Exp × Kont*
+κ ∈ Kont = addR Exp ∪ ⊍ addL ℤ ⊍ mulR Exp ⊍ mulL ℤ
+```
+
+- STATE TRANSITION RULES
+
+    + this is doing the same thing as the code
+
+```
+  (e1 PLUS e2, κ…) → (e1, addR e2 · κ…)
+   (e1 MUL e2, κ…) → (e1, mulR e2 · κ…)
+  (n, addR e · κ…) → (e, addL n · κ…)
+  (n, mulR e · κ…) → (e, mulL n · κ…)
+(n1, addL n2 · κ…) → (n1 + n2, κ…)
+(n1, mulL n2 · κ…) → (n2 * n1, κ…)
+```
+
+- show on `(1 PLUS [6 MUL 3]) PLUS (3 MUL 2)`
 
 ## IMP concrete semantics
 
 - [see docs/imp-concrete.pdf]
-
-- TODO:
 
 ## concrete collecting semantics
 
@@ -4710,8 +4900,6 @@ snk --> { src2, src3, src4 }
 ## IMP abstract semantics
 
 - [see docs/imp-abstract.pdf]
-
-- TODO:
 
 ## analysis: executing the abstract semantics
 
