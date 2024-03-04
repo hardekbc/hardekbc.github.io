@@ -1,12 +1,4 @@
 # WINTER 2024
-## reminders for myself
-
-- when going over analysis details in lecture, make it an exercise first then go over it myself (something to make the lecture more interactive and make the students think)
-
-- remind students that they can answer a lot of their own questions about output format and analysis behavior for the assignments by using the solution that i provide
-
-- if i need to update my solution on CSIL, remember to tell students that if they've copied the solution to their local machine then they need to re-copy it [this doesn't apply if i'm using `chmod =x` on the CSIL solution]
-
 ## lecture timing
 
 - week 1.1: through first half of `intro to dfa` -> `the basics` -> `high-level idea`; stopped 20 minutes early
@@ -73,7 +65,7 @@
 
 - for `intro to widening`:
 
-    - i say to use it whenever we're propagating to a loop header, but really to be more precise we should use it only when propagating along a back-edge---the extra complexity probably isn't worth it though; think about whether i want to do this
+    - i say to use it whenever we're propagating to a loop header, but really to be more precise we should use it only when propagating along a back-edge---the extra complexity probably isn't worth it though; think about whether i want to do this (i would have to change my implementation too)
 
 - instead of saying that reaching defs / control analysis are only useful as a precursor to other analyses, point out that they can be used to detect possible uses of undefined variables
 
@@ -109,6 +101,8 @@
 
     - create a list of properties for test cases and then a tool that creates random valid programs and filters out those that don't have interesting
 
+    - we have this hard-coded for assign-4 and assign-5, generalize those
+
 ### additional materials
 
 - maybe have one or both of aldrich et al "program analysis", moller et al "static program analysis" draft textbooks as supplementary material (both available for free on the web)
@@ -119,11 +113,9 @@
 
 - see farrago issue #77 for list of additional analyses and analysis types that we could cover
 
-- constraint solver optimizations (i cover this extremely briefly, but it seems like there's time to make a whole lecture around it and insert it right after the andersen-style pointer analysis section)
+- constraint solver optimizations
 
 - type inference using equality-based analysis
-
-- abstract interpretation (semantics, galois connections, soundness)
 
 # admin
 
@@ -4675,7 +4667,7 @@ snk --> { src2, src3, src4 }
 
 - abstract interpretation is similar to DFA in many respects, but does provide a framework for proving soundness (and precision)
 
-- a sound analysis over-approximates program behavior---in order to prove anything about them, we need a mathematical description of program behavior
+- a sound analysis over-approximates program behavior---in order to prove anything about programs, we need a mathematical description of program behavior
 
     + a formal _concrete semantics_ is a mathematical description of how a program behaves when it executes
 
@@ -4713,9 +4705,11 @@ snk --> { src2, src3, src4 }
 
 - example AST: `(1 PLUS [6 MUL 3]) PLUS (3 MUL 2)` -- [draw as tree]
 
+- note that we would need something in the concrete syntax to establish precedence (e.g., parentheses), but this is handled automatically by the tree-shape of the AST once we translate to abstract syntax
+
 - for semantics there is no such concensus: there are many possible ways to formally define behavior, each with different tradeoffs
 
-### denotational
+### denotational semantics
 
 - like a dictionary, explain the "meaning" of a term by explaining it using already known, well-defined terms
 
@@ -4725,19 +4719,19 @@ snk --> { src2, src3, src4 }
 
     + our example language is too simple to need the lambda calculus, we can just translate using simple arithmetic:
 
->          [[n]] => n
-> [[e1 PLUS e2]] => [[e1]] + [[e2]]
->  [[e1 MUL e2]] => [[e1]] * [[e2]]
+>          ⟦n⟧ => n
+> ⟦e1 PLUS e2⟧ => ⟦e1⟧ + ⟦e2⟧
+>  ⟦e1 MUL e2⟧ => ⟦e1⟧ * ⟦e2⟧
 
-> [[(1 PLUS [6 MUL 3]) PLUS (3 MUL 2)]] => 25
+> ⟦(1 PLUS [6 MUL 3]) PLUS (3 MUL 2)⟧ => 25
 
-### operational
+### operational semantics
 
 - explain the "meaning" of a term by describing what it does (i.e., how it operates, hence the name)
 
     + basically, a mathematically-defined interpreter for the syntax
 
-    + there are a variety of different types of operational semantics
+    + there are a variety of different types of operational semantics, we'll look at some of the most popular
 
 #### big-step operational semantics (aka natural semantics)
 
@@ -4745,20 +4739,20 @@ snk --> { src2, src3, src4 }
 
     + this is similar to denotational at the surface level (especially for our simple language) but is actually different, which becomes more apparent for more complex languages
 
-    + it's called `big step` because the rules can be thought of as a set of mutually recursive functions that go from the AST to the final answer in one "big step"
+    + it's called `big step` because the rules can be thought of as describing recursive functions that go from the AST to the final answer in one "big step"
 
 >       ------- 
->       n ==> n
+>       n ⇓ n
 >
->       e1 ==> n1  e2 ==> n2
+>       e1 ⇓ n1  e2 ⇓ n2
 >       ----------------------
->       e1 PLUS e2 ==> n1 + n2
+>       e1 PLUS e2 ⇓ n1 + n2
 >
->       e1 ==> n1  e2 ==> n2
+>       e1 ⇓ n1  e2 ⇓ n2
 >       ----------------------
->       e1 MUL e2 ==> n1 * n2
+>       e1 MUL e2 ⇓ n1 * n2
 
-> (1 PLUS [6 MUL 3]) PLUS (3 MUL 2) ==> 25
+> (1 PLUS [6 MUL 3]) PLUS (3 MUL 2) ⇓ 25
 
 #### small-step structural operational semantics
 
@@ -4766,34 +4760,34 @@ snk --> { src2, src3, src4 }
 
     + it's called `small step` because we see all the intermediate points between the AST and the final answer
 
-    + it's called `structural` because we're always rewriting the AST (which is a structure)
+    + it's called `structural` because we define the rewrite rules in terms of the AST (which is a structure)
 
->       e1 -> e1'
+>       e1 ⟶ e1'
 >       -------------------------
->       e1 PLUS e2 -> e1' PLUS e2
+>       e1 PLUS e2 ⟶ e1' PLUS e2
 >
->       e2 -> e2'
+>       e2 ⟶ e2'
 >       -------------------------
->       n1 PLUS e2 -> n1 PLUS e2'
+>       n1 PLUS e2 ⟶ n1 PLUS e2'
 >
 >       ---------------------
->       n1 PLUS n2 -> n1 + n2
+>       n1 PLUS n2 ⟶ n1 + n2
 >
->       e1 -> e1'
+>       e1 ⟶ e1'
 >       -------------------------
->       e1 MUL e2 -> e1' MUL e2
+>       e1 MUL e2 ⟶ e1' MUL e2
 >
->       e2 -> e2'
+>       e2 ⟶ e2'
 >       -------------------------
->       n1 MUL e2 -> n1 MUL e2'
+>       n1 MUL e2 ⟶ n1 MUL e2'
 >
 >       ---------------------
->       n1 MUL n2 -> n1 * n2
+>       n1 MUL n2 ⟶ n1 * n2
 
-> (1 PLUS [6 MUL 3]) PLUS (3 MUL 2) ->
-> (1 PLUS 18) PLUS (3 MUL 2) ->
-> 19 PLUS (3 MUL 2) ->
-> 19 PLUS 6 ->
+> (1 PLUS [6 MUL 3]) PLUS (3 MUL 2) ⟶
+> (1 PLUS 18) PLUS (3 MUL 2) ⟶
+> 19 PLUS (3 MUL 2) ⟶
+> 19 PLUS 6 ⟶
 > 25
 
 ### small-step abstract machine-based operational semantics
@@ -4804,7 +4798,11 @@ snk --> { src2, src3, src4 }
 
     - we'll be defining an "abstract machine", i.e., a mathematical interpreter, that computes on ASTs
 
-- first we define a "state" of the machine, then we define the rules of the machine that transition from one state to the next, aka `state transition rules`
+    - we can easily translate this mathematical interpreter into a real interpreter (particularly using a functional language)---the result isn't efficient, but will clearly match the formalism and can be used as an oracle for correctness
+
+    - NOTE: you don't have to use this kind of semantics to do abstract interpretation, it's just the one that i've chosen
+
+- defining an abstract machine: first we define a "state" of the machine, then we define the rules of the machine that transition from one state to the next, aka `state transition rules`
 
 - first some intuition
 
@@ -4813,6 +4811,8 @@ snk --> { src2, src3, src4 }
     + how would we translate that into iterative (i.e., non-recursive) code? we would need to reify the function stack into an explicit data structure that keeps track of what still needs to be done
 
     + we call that data structure a `continuation`, because it is the continuation of the execution
+
+        - languages with `first-class continuations` give the programmer a way to explicitly get a reference to the continuation and treat as a value, kind of like a closure (except it never returns)
 
 ```
 fn bigstep(e:Exp) -> int {
@@ -4827,27 +4827,27 @@ fn bigstep(e:Exp) -> int {
 ```
 fn bigstep_nonrecursive(e:Exp) -> int {
   let curr_exp = e
-  let cont = []
+  let kont = []
 
-  while !(curr_exp is Num and cont is empty) {
+  while !(curr_exp is Num and kont is empty) {
     match curr_exp {
       case Plus(e1, e2) => {
         curr_exp = e1
-        cont.push_front(AddR(e2))
+        kont.push_front(AddR(e2))
       }
       case Mul(e1, e2) => {
         curr_exp = e1
-        cont.push_front(MulR(e2))
+        kont.push_front(MulR(e2))
       }
       case Num(n1) => {
         match cont.pop_front() {
           case AddR(e) => {
             curr_exp = e
-            cont.push_front(AddL(n1))
+            kont.push_front(AddL(n1))
           }
           case MulR(e) => {
             curr_exp = e
-            cont.push_front(MulL(n1))
+            kont.push_front(MulL(n1))
           }
           case AddL(n2) => curr_exp = Num(n1 + n2)
           case MulL(n2) => curr_exp = Num(n1 * n2)
@@ -4856,7 +4856,7 @@ fn bigstep_nonrecursive(e:Exp) -> int {
     }
   }
 
-  return curr_exp.n
+  return curr_exp.n // curr_exp must be a Num
 }
 ```
 
@@ -4871,7 +4871,7 @@ fn bigstep_nonrecursive(e:Exp) -> int {
 
 ```
 ς ∈ State = Exp × Kont*
-κ ∈ Kont = addR Exp ∪ ⊍ addL ℤ ⊍ mulR Exp ⊍ mulL ℤ
+κ ∈ Kont = addR Exp ⊍ addL ℤ ⊍ mulR Exp ⊍ mulL ℤ
 ```
 
 - STATE TRANSITION RULES
@@ -4879,12 +4879,12 @@ fn bigstep_nonrecursive(e:Exp) -> int {
     + this is doing the same thing as the code
 
 ```
-  (e1 PLUS e2, κ…) → (e1, addR e2 · κ…)
-   (e1 MUL e2, κ…) → (e1, mulR e2 · κ…)
-  (n, addR e · κ…) → (e, addL n · κ…)
-  (n, mulR e · κ…) → (e, mulL n · κ…)
-(n1, addL n2 · κ…) → (n1 + n2, κ…)
-(n1, mulL n2 · κ…) → (n2 * n1, κ…)
+  (e1 PLUS e2, κ*) ⟶ (e1, addR e2 · κ*)
+   (e1 MUL e2, κ*) ⟶ (e1, mulR e2 · κ*)
+  (n, addR e · κ*) ⟶ (e, addL n · κ*)
+  (n, mulR e · κ*) ⟶ (e, mulL n · κ*)
+(n1, addL n2 · κ*) ⟶ (n1 + n2, κ*)
+(n1, mulL n2 · κ*) ⟶ (n2 * n1, κ*)
 ```
 
 - show on `(1 PLUS [6 MUL 3]) PLUS (3 MUL 2)`
@@ -4895,20 +4895,227 @@ fn bigstep_nonrecursive(e:Exp) -> int {
 
 ## concrete collecting semantics
 
-- TODO:
+- the ideal program analysis solution (which is undecidable in general) is the exact set of states that a program could produce when it is executed
+
+    + a sound analysis over-approximates this set of states
+
+    + so in order to prove that our analysis is sound, we need to define what this ideal solution actually is, mathematically
+
+- the exact set of possible concrete states is called the `concrete collecting semantics`
+
+    + `concrete` because we're talking about the actual program execution
+
+    + `collecting` because we're collecting all states from all possible executions, not just a single execution
+
+- to formalize the collecting semantics for a program `P`:
+
+    + let `F` be the concrete semantics, lifted to operate on sets of states (i.e., `F` implements the abstract machine s.t., given a set of states, it outputs a new set of states using the state transition rules)
+
+    + let `i` be the initiate state for the program (before it starts executing)
+
+    + given a function `f : S -> S` over sets let `fᵁ(S) = S ∪ f(S)`, i.e., `fᵁ` unions its input with its output
+
+    + let the concrete lattice be the powerset of the set of all possible states (complete, but not noetherian)
+
+        - ⊤ = the set of all states
+        - ⊥ = the empty set
+        - ⊑ = ⊆
+        - ⊔ = ∪
+        - ⊓ = ∩
+
+    + then `⟦P⟧₊` = `lfpᵢ Fᵁ`
+
+    + in other words, it's the set of all possible _reachable_ states of the program starting from the initial state
+
+- so `⟦P⟧₊` is the exact analysis solution that we need to over-approximate
 
 ## IMP abstract semantics
 
+- we define the abstract semantics using the same abstract machine method as we used for the concrete semantics
+
+    + instead of concrete values we use abstract values
+
+    + conditionals may be nondeterministic
+
 - [see docs/imp-abstract.pdf]
 
-## analysis: executing the abstract semantics
+## abstract collecting semantics
 
-- TODO:
+- we can now define the abstract collecting semantics:
+
+    + let `F♯` be the abstract semantics, lifted to operate on sets of abstract states
+
+    + let `i♯` be the initiate abstract state for the program
+
+    + then `⟦P⟧♯₊` = `lfp_{i♯} F♯ᵁ`
+
+    + in other words, it's the set of all possible reachable abstract states starting from the initial abstract state
+
+- we can easily implement `⟦P⟧♯₊` as a straightforward translation from the mathematical description to code
+
+    + this is an implementation of the analysis
+
+    + however, we're getting a MOP solution rather than a MFP solution, with all the caveats that we had for DFA
+
+    + we'll look at getting a MFP solution using an easy and straightforward method in a bit
+
+- one complication: we want the sets of abstract states to form a complete lattice just like the concrete collecting semantics did
+
+    + if we defined the abstract domains used for the abstract states as complete lattices, then the abstract states form a complete lattice (e.g., given `a,b ∈ State♯`, we can ask things like: is `a ⊑ b`?)
+
+    + but we need _sets_ of abstract states to form a complete lattice, which isn't quite as easy
+
+        - we can't just use a powerset lattice like we did with concrete states
+
+        - why not? hint: 
+        
+            + (pp, x ↦ Even) ⊑ (pp, x ↦ ⊤)
+            + `{(pp, x ↦ Even)}` ⊈ `{(pp, x ↦ ⊤)}`
+
+    + first try: `∀A,B ∈ P(State#). A ⊑ B ⇔ ∀a ∈ A, ∃b ∈ B, a ⊑ b`
+
+        - i.e., if every state in `A` is over-approximated by some state in `B` then `A ⊑ B`
+
+    + this is almost right, except it isn't a partial order because it isn't anti-symmetric
+
+        - `{(pp, x ↦ Even), (pp, x ↦ ⊤)} ⊑ {(pp, x ↦ Odd), (pp, x ↦ ⊤)}`
+        - `{(pp, x ↦ Odd), (pp, x ↦ ⊤)} ⊑ {(pp, x ↦ Even), (pp, x ↦ ⊤)}`
+
+    + solution: use a "quotient lattice", which groups sets of states into equivalence classes based on ⊑
+
+- now `(℘(State♯), ⊑)` is a complete lattice and the solution to the abstract collecting semantics is an element of that lattice
+
+- if we assume that the individual abstract domains making up an abstract state are noetherian then the abstract lattice is also notherian, and thus the abstract collecting semantics is computable
 
 ## proving soundness
+### problem statement
 
-- TODO:
+- now we have a formal definition of the exact analysis solution (from the concrete semantics) and a formal definition of the approximate analysis solution (from the abstract semantics)
+
+- we need to show that the abstract semantics gives an over-approximation of the exact solution
+
+- we have:
+
+    - concrete lattice `L = (P(State), ⊆)`
+    - abstract lattice `L♯ = (P(State♯), ⊑)`
+    - abstraction function `α ∈ L ⟶ L♯`
+    - concretization function `γ ∈ L♯ ⟶ L`
+    - concrete transition function `F ∈ L ⟶ L`
+    - abstract transition function `F♯ ∈ L♯ ⟶ L♯`
+
+- we want to show `lfp_i Fᵁ ⊆ γ(lfp_α(i) F♯ᵁ)`
+
+    + or alternatively `∀ℓ∈L, F(ℓ) ⊆ γ(F♯(α(ℓ)))`
+    + this amounts to the same thing
+
+- this is our formal statement of what soundness means
+
+- EXAMPLE: constant propagation
+
+```
+L♯ [x↦0,y↦⊤,z↦3] ———————— F♯(x = y+z) --------→ [x↦⊤,y↦⊤,z↦3]
+          ↑                                              |
+          |                                              γ
+          α                                              ↓
+          |                                              X
+          |                                              ⊆
+L {[x↦0,y↦2,z↦3],[x↦0,y↦4,z↦3]} —- F(x = y+z) -→ {[x↦5,y↦2,z↦3],[x↦7,y↦4,z↦3]}
+```
+
+- BUT, this is only a safety condition: making everything ⊤ satisfies this requirement...we also want to ensure that the analysis solution is as precise as possible given the abstract domain we're using
+
+### galois connections
+
+- let `A`, `B` be posets and `F ∈ A⟶B`, `G ∈ B⟶A`; then `(F, G)` is a galois connection iff
+
+  + `F` and `G` are monotone
+  + `∀a∈A, b∈B, F(a) ⊑_B b ⇔ a ⊑_A G(b)`
+  + alternatively: `a ⊑_A (G∘F)(a)` and `(F∘G)(b) ⊑_B b`
+
+- this connection is denoted `A(galois double arrows F,G)B`
+
+- in terms of our analysis framework, `L(galois α,γ)L♯` iff:
+
+  + `α` and `γ` are monotone
+  + `∀x∈L, ∀x̂∈L♯, α(x) ⊑ x̂ ⇔ x ⊆ γ(x̂)`
+  + alternatively: `x ⊆ γ(α(x))` and `α(γ(x̂)) ⊑ x̂`
+
+- if we break the ⇔ into each direction, both are saying that `x̂` is a sound approximation of `x`, but having both directions guarantees that `x̂` is the "best" approximation of `x` (i.e., most precise given this particular abstract domain)
+
+- EXAMPLE: constant propagation
+
+    + `L = (𝒫(ℤ), ⊆)`
+    + `L♯ = (ℤ ∪ {⊥, ⊤}, ⊑)`
+    + for `n ∈ 𝐙, x ∈ 𝒫(𝐙)`, `α({}) = ⊥` and `α({n}) = n` else `α(x) = ⊤`
+    + for `n ∈ 𝐙, x̂ ∈ ℤ ∪ {⊥, ⊤}`, `γ(⊥) = {}` and `γ(n) = {n}` and `γ(⊤) = 𝐙`
+
+    + need to prove that `α` and `γ` are monotone (they are)
+    + need to prove that `x ⊆ γ(α(x))` and `α(γ(x̂)) ⊑ x̂`
+
+```
+L:  {} ⊆ {2} ⊆ {1,2} ⊆ {1,2,3} ⊆ ... ⊆ ℤ
+    |↑    |↑       \                    |↑
+    αγ    αγ        α                   αγ
+    ↓|    ↓|         \_________________ ↓|
+L♯: ⊥  ⊑  2                           ⊑ ⊤
+```
+
+- suppose we changed `α` so that `α({n}) = ⊤`; this is sound but not as precise as we could be
+
+    + then look specifically at `{2}` in the diagram above: its abstraction now goes to `⊤` instead of `2` and so `α(γ(2)) ̸⊑ 2`
+
+    + this example just builds intuition for why a galois connection guarantees that we are getting the best possible precision for a particular abstract domain
+
+- given a concrete semantics `F` and a galois connection `(α, γ)`, we can compute the best possible (i.e., most precise) abstract semantics `F♯` as:
+
+    + `F♯ = α ∘ F ∘ γ`
+
+    + in other words, given a set of abstract states we can compute the set of next abstract states by (1) using `γ` to get a set of concrete states, (2) using `F` to compute the next set of concrete states, then (3) using `α` to transform the next set of concrete states into a set of abstract states
+
+    + however, usually this is not a computable function
+
+- in reality we come up with our own `F♯` and then prove that `α ∘ F ∘ γ ⊑ F♯`
+
+- EXAMPLE: constant propagation
+
+    + we can prove that the abstract semantics we created before (shown below) is exactly implementing `α ∘ F ∘ γ`
+
+```
+   + | ⊤ | c2     | ⊥
+ ----+---+--------+---
+ ⊤   | ⊤ | ⊤     | ⊥
+ c1  | ⊤ | c1+c2 | ⊥
+ ⊥   | ⊥ | ⊥     | ⊥
+```
+
+- IMPORTANT NOTE: for certain abstract domains a galois connection may not exist
+
+    + example: convex polyhedra (conjunctions of linear inequalities on reals) and approximating a circle
+
+    + you can still define an `α` and `γ`, but that doesn't automatically mean that they form a galois connection---you have to prove the requirements hold
+
+    + if we can't have a galois connection, we fall back to our basic safety condition to prove soundness, i.e., `lfp_i Fᵁ ⊆ γ(lfp_α(i) F♯ᵁ)`
 
 ## widening for control-flow
 
-- TODO:
+- the abstract collecting semantics is, essentially, an MOP solution: we're computing all reachable states along all possible paths
+
+- to get a MFP solution (aka flow-sensitive), we can apply a simple procedure:
+
+    + let `ς1 ~ ς2` (i.e., state 1 is equivalent to state 2) iff they contain the same statement
+
+    + whenever we compute a set of abstract states, join all equivalent abstract states together, yielding at most a single abstract state per program point
+
+- mathematically we can specify this as a widening operator:
+
+    + for `X,Y ∈ 𝒫(State♯)`, `X ▽ Y = { ⨆_(s ∈ S) s | S ∈ (X ∪ Y)/~ }`
+
+    + in other words, take the collective set of states `X ∪ Y`; split them into their equivalence classes based on the `~` relation `(X ∪ Y)/~`; then for each equivalence class `S ∈ (X ∪ Y)/~` join all the states in that equivalence class together
+
+    + this meets all our requirements for being a widening operator
+
+- instead of computing `lfpᵢ F♯ᵁ`, compute `lfpᵢ F♯▿` (that is, use `▿` instead of `∪` to combine the abstract states)
+
+    + because it's a widening operator we potentially lose precision (depending on whether the analysis is distributive or not) but retain soundness, just like MFP vs MOP for DFA
+
+- this is an extremely versatile idea: we can specify and implement lots of different control-flow sensitivities by defining them as a widening operator this way (including all sorts of context sensitivities)
