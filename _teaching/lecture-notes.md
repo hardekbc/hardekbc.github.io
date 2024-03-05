@@ -4352,11 +4352,15 @@ snk --> { src2, src3, src4 }
 
     + for some fixed constant `k`, we only use the top `k` elements of the callstack to determine what context we're in
 
+    + the current context is a string of callsites `ctx` s.t. `|ctx| <= k` (it can be less than `k` if we haven't made `k` calls yet)
+
+    + when making a call at callsite `pp`, to get the callee context `callee_ctx` we take `ctx`, append `pp`, then if `|callee_ctx| = k+1` we remove the first element to get it back to `k`
+
 - this k-limiting raises an issue: what context are we returning to? previously we had the entire callstack, but now we only have the top `k` entries
     
     + consider the 3-limited context `abc` that makes a call at callsite `d`, yielding the callee context `bcd`; when the callee returns, how does it know that it should return to the context `abc`?
 
-    + we already have most of a solution in `call_edges`; extend it to from `callee function -> { set of call instructions }` to `(callee function + context) -> { set of (context + call instruction) pairs }`
+    + we already have most of a solution in `call_edges`; extend it from `callee function -> { set of call instructions }` to `(callee function + context) -> { set of (context + call instruction) pairs }`
 
     + update `call_edges` as before when processing a call instruction, just include the callee and caller contexts in the saved information
 
@@ -4412,6 +4416,10 @@ snk --> { src2, src3, src4 }
     + thus, a 'context' is an abstract store describing the inputs to a given function
 
 - we'll use the exact same data structures as for the call-string strategy except using abstract stores as contexts instead of call-strings; all the things like `call_edges`, `call_returned`, the worklist, `bb_in`, etc stay the same
+
+    + when making a call, `callee_ctx == get_callee_store(...)`
+
+    + we already memoize using `call_returned`, no need to add anything extra: if there is an entry for `(callee, callee_ctx)` in `call_returned` then we use that, otherwise we analyze the callee in `callee_ctx` (which will then memoize the result in `call_returned`)
 
 - example:
 
@@ -4485,6 +4493,8 @@ snk --> { src2, src3, src4 }
 ### which scheme is better?
 
 - call-string: what we're doing with this scheme is essentially statically expanding the ICFG to have a separate copy of each function for each possible callstack that reaches it
+
+    + [draw a simple diagram to illustrate]
 
     + we don't have to actually create a separate copy for each context because we keep the different contexts separate for a given function by mapping `(function + context, basic block) --> abstract store`
 
