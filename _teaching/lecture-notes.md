@@ -91,7 +91,7 @@
 
 - assignments 2--5: avoid having struct-type variables in the assignment tests; the valid cflat program generator can be tuned to not have struct-typed variables pretty easily, but when lowering to lir they can still be introduced so we need to apply a post-lowering filter to eliminate them from the test cases
 
-    - or modify ast_gen.rs to prevent generating struct vars; see the ast_gen.rs in assign-3/test-gen for ideas
+    - or modify ast_gen.rs to prevent generating struct vars; see the ast_gen.rs in assign-3/test-gen for ideas (i ended up using this strategy)
 
 - assignment 4: the current tests don't use globals, which specifically affects modref information for the tests with function calls (the last test suite); we should add some tests that have callees that def/use globals
 
@@ -99,9 +99,9 @@
 
     - manually create mutants of the analysis, then a tool that creates random valid programs and runs them on the real solution and each mutant, saving the programs that kill at least one mutant; keep going until there are a minimum number of test cases that kill each mutant
 
-    - create a list of properties for test cases and then a tool that creates random valid programs and filters out those that don't have interesting
+    - create a list of properties for test cases and then a tool that creates random valid programs and filters out those that aren't interesting (we have this hard-coded for assign-4 and assign-5, generalize those)
 
-    - we have this hard-coded for assign-4 and assign-5, generalize those
+    - the problem with filtering after the fact is that it can be hard to determine if anything interesting happened in the analysis just from the solution (e.g., for taint analysis did the taint go through a function call?); think of a way to determine whether the analysis itself was interesting
 
 ### additional materials
 
