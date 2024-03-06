@@ -17,7 +17,7 @@
 - week 7.2: through `sparse analysis and SSA`; stopped 10 minutes early
 - week 8.1: through `taint analysis` -> `intraprocedural taint analysis`; stopped 15 minutes early
 - week 8.2: through `taint analysis` -> `context-insensitive interprocedural taint analysis`
-- week 9.1: ???
+- week 9.1: through `taint analysis`; 5 minutes late, skimmed last few subsubsections (`other kinds...`, etc)
 - week 9.2: ???
 - week 10.1: ???
 - week 10.2: ???
