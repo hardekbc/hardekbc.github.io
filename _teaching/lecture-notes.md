@@ -18,7 +18,7 @@
 - week 8.1: through `taint analysis` -> `intraprocedural taint analysis`; stopped 15 minutes early
 - week 8.2: through `taint analysis` -> `context-insensitive interprocedural taint analysis`
 - week 9.1: through `taint analysis`; 5 minutes late, skimmed last few subsubsections (`other kinds...`, etc)
-- week 9.2: ???
+- week 9.2: through `abstract interpretation` -> `concrete collecting semantics`
 - week 10.1: ???
 - week 10.2: ???
 
@@ -74,6 +74,8 @@
     - or if we're looking for definitely uninitialized, simply check for uses that don't have any reaching defs
 
 ### assignments
+
+- maybe instead of dropping an entire assignment (which means most don't do assignment 5) just let every assignment except the last one be turned in up to the end of the quarter with only an 11% penalty (so like what i have now except no dropping an assignment and allow unlimited late days)
 
 - maybe only give them the JSON format instead of giving them a choice?
 
