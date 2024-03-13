@@ -19,8 +19,8 @@
 - week 8.2: through `taint analysis` -> `context-insensitive interprocedural taint analysis`
 - week 9.1: through `taint analysis`; 5 minutes late, skimmed last few subsubsections (`other kinds...`, etc)
 - week 9.2: through `abstract interpretation` -> `concrete collecting semantics`
-- week 10.1: ???
-- week 10.2: ???
+- week 10.1: through `abstract interpretation`; ended 15 minutes early
+- week 10.2: no lecture
 
 ## assignment timing
 
