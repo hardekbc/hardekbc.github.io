@@ -1,5133 +1,6137 @@
-# WINTER 2024
+# PLANS
+
+- topics:
+
+    1. lexing (source --> tokens)
+    2. ll(1) parsing (tokens --> AST)
+    3. validation (AST)
+    4. lowering (AST --> LIR)
+    5. codegen (LIR --> x86)
+    6. register allocation (x86) -- naive graph coloring
+    7. optimization (LIR) -- constant propagation, dead store/assignment elimination, value numbering, copy propagation
+    8. memory management (GC)
+
+- assignment schedule:
+
+    - OPTION 1
+    - week 2T assign-1 (lexer) [10 days]
+    - week 3F assign-2 (parser/validation) [11 days]
+    - week 5T assign-3 (lowering) [10 days]
+    - week 6F assign-4 (codegen) [11 days]
+    - week 8T assign-5 (register allocation) [10 days]
+    - week 9F assign-6 (optimization) [14 days]
+    - finals [due friday]
+
+    - OPTION 2
+    - week 1R assign-1 (lexer) [11 days]
+    - week 3M assign-2 (parser/validation) [11 days]
+    - week 4F assign-3 (lowering) [12 days]
+    - week 6W assign-4 (codegen) [9 days]
+    - week 7F assign-5 (register allocation) [14 days]
+    - week 9F assign-6 (optimization) [14 days]
+    - finals [due friday]
+
+    - OPTION 3
+    - week 1R assign-1 (lexer) [11 days]
+    - week 3M assign-2 (parser/validation) [11 days]
+    - week 4F assign-3 (lowering) [12 days]
+    - week 6W assign-4 (codegen) [12 days]
+    - week 8M assign-5 (register allocation) [11 days]
+    - week 9F assign-6 (optimization) [14 days]
+    - finals [due friday]
+
+- grading strategy:
+
+    - assignments autograded with sets of test suites, each with a point value
+    - on-time submission: 100% of earned points
+    - within 5 days late: 89% of earned points
+    - before end of finals: 69% of earned points
+    - one assignment can be turned in before end of finals without any late penalty
+
+TODO:
+
+- revise lecture notes
+- create handouts for language, passes
+- implement stuff for assignments
+- create autograders for assignments
+- reimplement cflat specifically for this class?
+
+# Spring 2024 notes
 ## lecture timing
 
-- week 1.1: through first half of `intro to dfa` -> `the basics` -> `high-level idea`; stopped 20 minutes early
-- week 1.2: through `intro to dfa` -> `abtract semantics`; stopped 10 minutes early
-- week 2.1: through `defining...integer-based analysis` -> `MFP algorithm`
-- week 2.2: through all of `defining...integer-based analysis` (had to skim the examples)
-- week 3.1: through `second-order DFA` -> `reaching definitions` -> `abstract domain`
-- week 3.2: through `second-order DFA` -> `reaching definitions`; stopped 20 minutes early
-- week 4.1: through `second-order DFA` -> `control analysis`; stopped 10 minutes early
-- week 4.2: through `widening redux`
-- week 5.1: through `practice designing DFA` (skipped abstract semantics); stopped 10 minutes early; remote due to weather
-- week 5.2: halfway through `set constraint-based analysis` -> `solving inclusion constraints` -> `solving the constraint graph`
-- week 6.1: through `andersen-style pointer analysis` -> `no structs or calls` -> `setup`; stopped 10 minutes early
-- week 6.2: through `andersen-style pointer analysis`
-- week 7.1: through `program slicing`; stopped 10 minutes early
-- week 7.2: through `sparse analysis and SSA`; stopped 10 minutes early
-- week 8.1: through `taint analysis` -> `intraprocedural taint analysis`; stopped 15 minutes early
-- week 8.2: through `taint analysis` -> `context-insensitive interprocedural taint analysis`
-- week 9.1: through `taint analysis`; 5 minutes late, skimmed last few subsubsections (`other kinds...`, etc)
-- week 9.2: through `abstract interpretation` -> `concrete collecting semantics`
-- week 10.1: through `abstract interpretation`; ended 15 minutes early
-- week 10.2: no lecture
+- week  1.1: 
+- week  1.2: 
+- week  2.1: 
+- week  2.2: 
+- week  3.1: 
+- week  3.2: 
+- week  4.1: 
+- week  4.2: 
+- week  5.1: 
+- week  5.2: 
+- week  6.1: 
+- week  6.2: 
+- week  7.1: 
+- week  7.2: 
+- week  8.1: 
+- week  8.2: 
+- week  9.1: 
+- week  9.2: 
+- week 10.1: 
+- week 10.2: 
 
-## assignment timing
+## grading scale
 
-- week 1.1: assign-0 out (parsing LIR, not graded)
+| percentage | letter grade |
+|------------|--------------|
+| 97--100    | A+           |
+| 93--96     | A            |
+| 90--92     | A-           |
+| 87--89     | B+           |
+| 83--86     | B            |
+| 80--82     | B-           |
+| 77--79     | C+           |
+| 73--76     | C            |
+| 70--72     | C-           |
+| 67--69     | D+           |
+| 63--66     | D            |
+| 60--62     | D-           |
+| 00--59     | F            |
 
-- week 2.1: assign-1 out (constants, intervals)
+# logistics
 
-- week 4.1: assign-1 in, assign-2 out (reaching defs no pointer info, control analysis)
+- introduce myself and TAs
 
-- week 6.1: assign-2 in, assign-3 out (andersen-style pointer analysis)
+    - hitomi
+    - thanawat
+    - jeffrey
+    - josiah
 
-- week 8.1: assign-3 in, assign-4 out (slicing: reaching defs with pointer info, pdg)
+- class slack:
 
-- week 9.2: assign-4 in, assign-5 out (context-sensitive taint analysis)
+    - if registered, should have gotten invite; if need invite, email me
 
-- finals: assign-5 in
+    - all communication goes through slack: announcements, assignments, questions, etc
 
-## thoughts for future course offerings
-### lectures
+    - be sure to stay on top of slack notifications
 
-- the initial example for sign analysis (`intro to DFA` -> `the basics` -> `high-level example`) confuses students because it refines the abstract values based on branch conditions and recognizes arithmetic identities like `x - x = 0`; i need to rewrite it to remove these elements and make it just like the version described later
+    - when asking questions:
 
-- dealing with extern function calls:
+        - if it makes sense to do so, please make it public so that others can benefit from the answer
 
-    - TODO: update lecture notes: say we assume the extern function's internals have no effect on the analysis (if they did we would stub them), so we deal with the return value and nothing else
+        - if DMing, for best results DM the entire instructional team not just one person
 
-    - TODO: also modify my implementations to be consistent: some treat externs as having the same possible effects as internal function calls, some ignore externs altogether, and some treat them as like internal calls except they can't access globals
+- if you are trying to register for the class, see the CS advising staff (not me)
 
-- we could also make things simpler by not using globals (except for the global function pointers needed for indirect calls, which we can just say to ignore); this may be going too far though (and this would require us to change the official analysis implementations to treat the global function pointers specially, to conform to the student solutions)
+    - i have told them to take as many people as possible given constraints like number of TAs
 
-- rather than having everything just in terms of `bb_in` and doing a final pass to get the output abstract store for a basic block as the final solution, it might be easier to explain (and understand for the students) if we define both `bb_in` and `bb_out` explicitly and use them during the fixpoint computation---this doesn't exactly mirror the reference implementation but makes it easy to discuss both inputs and outputs of basic blocks and how one feeds into the other without confusion
+    - they are responsible for managing the waitlist
 
-- there's a lot of redundancy between `intro to DFA` -> `the basics` and `intro to DFA` -> {`abstract domains`, `abstract semantics`}, i should collapse these together
+- office hours:
 
-- in `intro to DFA` -> `abstract semantics` i had the students fill in the tables for addition and less-than, which worked great but came really late in the lecture; when i integrate the sections per the above note i should try to move the student interaction part earlier
+    - mine are after every lecture (unlimited for T, 30 minutes for R)
 
-- in general for `intro to DFA` i feel like i'm throwing a lot of abstract concepts at them, maybe too fast and without sufficient context; is there a way for me to get to the actual analysis process more quickly before going into the ideas of abstract domains, abstract semantics, etc? maybe it would be sufficient to preface this stuff with a concrete program example and set of sign invariants that i want to infer, just to set the stage?
+    - TA office hours to be announced (mix of in-person and remote)
 
-- having struct-type variables (globals, parameters, locals) makes several analyses rather complicated without a lot of benefit: reaching defs (with and without pointers), pointer analysis (constraint generation, specifically), slicing (because it relies on the two previous analyses), and taint analysis. the lecture notes don't handle this case, and neither do the analysis implementations. for now my solution is to just assume there are no struct-type variables, but i need to think whether this is a long-term solution
+- discussion sections: no new material; give examples and exercises, answer questions
 
-    - the basic difficulty is that any def/use of the struct-type variable should also be a def/use of its fields---this is possible, it just makes the analyses complicated to explain and more difficult for students
+- assessment:
 
-- for `intro to widening`:
+    - no exams
 
-    - i say to use it whenever we're propagating to a loop header, but really to be more precise we should use it only when propagating along a back-edge---the extra complexity probably isn't worth it though; think about whether i want to do this (i would have to change my implementation too)
+    - 6 projects (going into finals week)
 
-- instead of saying that reaching defs / control analysis are only useful as a precursor to other analyses, point out that they can be used to detect possible uses of undefined variables
+        - 1--3 person teams
+        - weighted evenly, must do all 6
+        - late days allowed, but with grade penalty (-11% for one week late, -31% if before end of quarter)
+        - one assignment can be turned in late with no penalty (automatically whichever helps you most)
+        - this late penalty scheme is intended to give all the flexibility you need, please don't ask for more late days
 
-    - look for uses that either don't have any reaching defs or whose reaching defs collectively don't dominate the use (i.e., there is a path along with the variable is undefined)
+    - projects in C++, done from scratch---no skeleton code given
 
-    - or if we're looking for definitely uninitialized, simply check for uses that don't have any reaching defs
+    - if you're using an online repo (e.g., github) make sure it's private! sharing your code publically is considered a violation of academic integrity (as is using code that others may have shared)---projects should be your own work
 
-### assignments
+    - important: this is a work-intensive course that requires a _lot_ of coding---be prepared! don't take other heavy-workload courses at the same time (like 170)
 
-- maybe instead of dropping an entire assignment (which means most don't do assignment 5) just let every assignment except the last one be turned in up to the end of the quarter with only an 11% penalty (so like what i have now except no dropping an assignment and allow unlimited late days)
+- expected prereq knowledge:
 
-- maybe only give them the JSON format instead of giving them a choice?
+    - programming in C++
 
-    - TODO: check student submissions and see how many ended up using the LIR format directly and how many used the JSON version
+    - 138: REs, NFAs, DFAs, PDAs, CFGs
 
-- try to integrate all the autograders into one, or at least have a single library that they all call into
+- please ask questions and correct my mistakes!
 
-- assignment 2: because the test programs are generated from cflat there will always be global function pointers in the lir because they're automatically inserted during lowering; this makes the "no global" test suites kind of pointless (they just refrain from adding explicit globals to the generated cflat program)
+    - questions are good: they let me know when i need to do a better job of explaining things and slow the pace of the lecture if it's going too fast
 
-    - if there are no indirect calls it would be nice to remove them so there are no globals period (this impacts the handling of function calls---since there are always globals, there are always def-use chains between calls)
+    - i'm only human, and sometimes when i'm writing things down my wires get crossed and i make mistakes...i'd much prefer that they're caught right away instead of going into people's notes and causing confusion later
 
-    - or change the lowerer so that the global function pointers are only generated when they are needed
+# intro to course
 
-    - this is done in an ad-hoc way for assignment 3 by removing global pointers after the fact; maybe just backport this to assignment 2
+- this course is about _compilers_, which you've been using for years now
 
-- assignments 2--5: avoid having struct-type variables in the assignment tests; the valid cflat program generator can be tuned to not have struct-typed variables pretty easily, but when lowering to lir they can still be introduced so we need to apply a post-lowering filter to eliminate them from the test cases
+    - you put C++ (or whatever) source code in, and get an executable out
 
-    - or modify ast_gen.rs to prevent generating struct vars; see the ast_gen.rs in assign-3/test-gen for ideas (i ended up using this strategy)
+    - up to now it's just been a black box that works by _magic_
 
-- assignment 4: the current tests don't use globals, which specifically affects modref information for the tests with function calls (the last test suite); we should add some tests that have callees that def/use globals
+    - but how does it work? and why do we do it that way?
 
-- develop tools for creating interesting test suites:
+- motivation
 
-    - manually create mutants of the analysis, then a tool that creates random valid programs and runs them on the real solution and each mutant, saving the programs that kill at least one mutant; keep going until there are a minimum number of test cases that kill each mutant
+    - computer chips are designed with an _instruction set architecture_ (ISA); an ISA is a set of binary values that correspond to certain actions by the computer (e.g., take two registers, add their values, and put the result in another register)
 
-    - create a list of properties for test cases and then a tool that creates random valid programs and filters out those that aren't interesting (we have this hard-coded for assign-4 and assign-5, generalize those)
+        - different architectures use different ISAs (e.g., x86, ARM, RISC-V, MIPS) but they basically all work the same way
 
-    - the problem with filtering after the fact is that it can be hard to determine if anything interesting happened in the analysis just from the solution (e.g., for taint analysis did the taint go through a function call?); think of a way to determine whether the analysis itself was interesting
+        - ISA instructions are also called _machine code_, in contrast to _source code_
 
-### additional materials
+    - humans can't program directly in machine code except for very small, limited cases; even when we use a somewhat higher level of abstraction (assembly language) it's still really painful
 
-- maybe have one or both of aldrich et al "program analysis", moller et al "static program analysis" draft textbooks as supplementary material (both available for free on the web)
+    - so we use modern, high-level programming languages like C, C++, Java, Python, JavaScript, etc (there are dozens of widely-used languages, thousands of existing languages)
 
-    - might have to provide some notes to the students translating from what they do to what i do, i think we use some different conventions/terminology
+        - this is important: programming languages are for humans, not computers
 
-- create a tool to automatically log an analysis execution and play it back for the students, in order to more easily go through examples in lecture
+    - but to the computer, source code is just text---it might as well be shakespeare, it has no meaning that the computer can understand or execute
 
-- see farrago issue #77 for list of additional analyses and analysis types that we could cover
+        - so we still need to be able to translate source code into machine code
 
-- constraint solver optimizations
-
-- type inference using equality-based analysis
-
-# admin
-
-## class info
-
-- no background in program analysis is expected or required
-
-- no textbook (there are a couple of texts out there, but none that are good for teaching from); you'll need to heavily rely on your notes from these lectures
-
-- please ask questions during lecture! this lets me know that you're engaged with the material and gives me feedback about what i need to explain better
-
-    - this material is mostly cumulative; if you fall behind it will snowball...it's up to you to not let that happen (for example, by stopping me and asking questions)
-
-- class slack workspace
-
-    - should have gotten an invite if registered, otherwise send me an email
-
-    - all communication (including assignments) will happen on slack
-
-    - feel free to ask and answer each other's questions
-
-- office hours: after lectures or by appointment
-
-## assessment
-
-- no exams, just assignments
-
-- 1--2 person teams
-
-- all will be programming-based
-
-    - use any language you want
-
-    - has to be something i can get running on the ubuntu 22.04 docker container used by gradescope
-
-    - c++, python, java supported by default
-
-- 1 ungraded pseudo-assignment, out today
-
-    - preparing the infrastructure you'll need for all future assignments
-
-    - i won't even check, but you'll need to do it at some point; easiest to get it out of the way now
-
-    - feel free to share implementation between groups using the same implementation language (just for this assignment, not the rest)
-
-- 5 graded regular programming assignments
-
-    - each out of 100 points, weighted equally
-
-    - lowest automatically dropped
-
-        - use this judiciously
-
-    - late turn-in allowed up to 5 days, but -11 points (highest grade is B+)
-
-        - caveat: last assignment due at end of finals, no late days for that due to campus grading deadline
-
-# what is program analysis
-
-- fundamental goal: compute invariants about program behavior, i.e., "what must definitely happen (or definitely not happen) when this program is executed"
-
-    - what is `program behavior`? for now, think of it roughly as "execution trace": the sequence of instructions executed, along with snapshots of memory contents at each instruction; given some input, the program's resulting execution trace is its behavior on that input
-
-    - each input to a program will result in a different behavior (i.e., execution trace)
-
-- examples: say we have a program that sits on the server side of a web application; it accepts input from the user, consults a database backend, then sends output back to the user. what questions might we want to ask about that program's behavior?
-
-    + compiler optimization
-
-        - is the value of a variable constant over all executions for a given expression? (constant propagation)
-
-        ```
-        x = 42
-        y = x + 2
-        z = y
-        ```
-
-        - is the result of this code snippet inside a loop always the same for every iteration? (loop invariant code motion)
-
-        ```
-        do {
-            x = y + z
-            a += x
-            i++
-        }
-        while (i < n)
-        ```
-
-    + automatic parallelization
-
-        - are two pieces of the program independent so that we can safely run them in parallel?
-
-    + security
-
-        - can user input make its way to the SQL commands being sent to the database without being sanitized?
-
-        - does the sanitization function actually prevent all malicious input?
-
-    + bug checking
-
-        - can the program possibly raise an uncaught exception (e.g., array out of bounds, or division by zero)?
-
-        - in languages like C: can this program exhibit undefined behavior? e.g., integer overflow or pointer arithmetic past the end of an object
-
-        - are two pieces of the program that are being run in parallel actually independent, or at least properly synchronized?
-
-    + program understanding and debugging
-
-        - if i change this line of code, what other code can be affected by the change?
-
-        - given a specific line of code (e.g., where a bug has manifested), what other code can affect the result at this line?
-
-    + and many more...
-
-- let's look at this goal from a 10,000 foot view
-
-    + examples of program behavior [inputs: (1, 2); (2, 1); (1, 1)]
-
-        ```
-         1. x = input()
-         2. y = input()
-         4. if (x < y) {
-         5.   diff = y - x
-         6. }
-         7. else {
-         8.   diff = x - y
-         9. }
-        10. output(diff)
-        ```
-
-    + [give some examples of false behaviors: (1, 2) that behaves like (2, 1); (1, 1) that behaves like (1, 2)]
-
-    + [draw a circle] for a given program let this represent the set of all possible true behaviors; anything outside this set is a false behavior
-
-        - note that the set of true behaviors is infinite, as is the set of false behaviors
-
-    + if we inspect every element of this set and find that something is true of all of them, then that is a program invariant. what are some invariants of the example program?
-
-        - line 5: diff is positive
-        - line 10: diff is non-negative
-
-    + so: compute set of all possible true behaviors, then inspect all the elements of the set to determine invariants...right?
-
-    + the fly in the ointment: computing this set is undecidable, i.e., it's provably impossible to do what we want to do. of course, we don't give up---we do what we usually do when we need to solve an unsolvable problem: we approximate
-
-- there are three strategies for approximating the ideal:
-
-    + [draw bigger circle] over-approximate the set of possible behaviors
-    
-        - guarantee: all true behaviors are in this set, but it contains some false behaviors too (and we can't tell which are which)
-
-        - if something is invariant over all members of the set, then it must be an invariant of all the true behaviors, and thus a true invariant
-
-        - if something is _not_ invariant over all members of the set, then we don't know if it's a true invariant or not
-
-        - we're getting a one-way guarantee: either something is definite a true invariant, or we don't know
-
-        - example: suppose for the above program we have all the true behaviors, plus the false behaviors that have x == y but we take the true branch. then we can't derive the invariant that diff is positive in the true branch, but we can still derive the invariant that diff is non-negative at the output.
-
-    + [draw smaller circle] under-approximate the set of possible behaviors
-    
-        - guarantee: all behaviors in this set are true behaviors, but not all true behaviors are in the set
-
-        - if something is invariant over all members of the set, then we don't know if it's a true invariant or not
-
-        - if something is _not_ invariant over all members of the set, then it is definitely not a true invariant
-
-        - we're getting the opposite one-way guarantee: either something is definitely not an invariant, or we don't know
-
-        - example: suppose for the above program that we only have behaviors for x, y \in [0--10]. then we can't say for sure that diff is always non-negative at the output, but we can say for certain that it isn't always positive (because we have true behaviors where it's 0).
-
-    + [draw an off-set circle] neither over- nor under-approximate
-    
-        - no guarantees at all
-
-        - why do this? basically to make the analysis simpler and easier to implement and (hopefully) allow it to be more precise
-
-        - for example, we could make some assumptions that technically aren't guaranteed to be true, but we happen to know that for almost all real programs will be true
-
-        - this strategy is only useful for applications where we don't need correctness guarantees (e.g., bug-finding); for optimization (as one example) it would be a terrible strategy
-
-- all program analyses are trying to compute program invariants via some kind of approximation. the art of analysis design and implementation is to balance guarantees, precision, and performance
-
-    + guarantees: in some cases we need to maintain a guarantee (either over- or under-approximation), which can make the analysis much more complex and expensive; example: compiler optimizations must have guarantees or they can break the program being compiled
-
-    + precision: how close the approximation is to the real set of true behaviors. we can get arbitrarily close, but at the cost of getting arbitrarily more expensive. less precision is less expensive, but also less useful.
-
-    + performance: if we get really precise answers but it takes centuries to get them, then practically speaking it isn't helpful.
-
-    + so: we need to design and implement an analysis that gives us the desired guarantee, is precise enough to provide useful answers, and performant enough to give us the answers is a useful amount of time/resources. this is an extremely hard problem in general.
-
-- there are many different approaches to program analysis (literally thousands of papers since the beginning of CS as a discipline); we'll be looking at two of the major and most common approaches: dataflow analysis (DFA) and set constraint-based analysis
-
-    + there are other approaches (which you'll see if you look at the program analysis literature), but probably 90-odd percent of the program analyses used in the real world are one of these two
-
-    + we'll be focusing specifically on over-approximations (also called _sound_ analysis)
-
-# the language we're analyzing
-
-- in order to study program analysis we need programs to analyze, and these programs must be written in some programming language
-
-- i want to show that this material is applicable to the real world, but i don't want to overwhelm you with the full complexities of a real PL
-
-    + i also don't want to specialize things too much to a particular PL and/or infrastructure; this course is teaching the fundamentals of how to analyze _any_ language using _any_ infrastructure
-
-- compromise: we'll analyze a language that's basically a well-typed subset of C
-
-    + datatypes:
-
-        + integers
-        + pointers
-        + structs
-        + [no floats, unsigned ints, unions]
-
-    + control:
-
-        + conditionals
-        + loops
-        + functions
-
-    + require programs to be well-typed
-
-    + notice that structs + pointers + functions (including function pointers) are the building blocks of object-oriented and functional programming languages
-
-- in practice we usually don't analyze source code directly, but instead some intermediate representation (like in a compiler)
-
-    + our IR is based on LLVM, but LLVM itself is more complex than we need
-
-    + i've designed a "stripped-down" version of LLVM IR, which is what we'll use in this class
-
-- example cflat program: [show `example.cb` (should be in one-note)]
-
-- corresponding lir program: [show `example.lir` (should be in one-note); CFG format explained soon (intro to DFA)]
-
-# intro to dataflow analysis (DFA)
-## the basics
-### high-level idea
-
-- we'll begin with the high-level idea of DFA, hand-wavy and without low-level details, just enough to give you some intuition about how it works
-
-    + later we'll define some specific analyses in detail (like the ones you'll implement for homework), and also go through the math behind DFA that makes it all work.
-
-    + we'll limit ourselves for now to intraprocedural analysis (i.e., one function at a time) and treat function calls and pointers conservatively (i.e., we won't try to track information about them at all)
-
-    + so this means: a single function, only tracking integer values and variables
-
-    + we'll lift these restrictions later and show how we can deal with each of these language features using DFA
-
-- a bit of history: kildall and original motivation to replace ad-hoc error-prone compiler analyses and optimizations with a general framework
-
-- you'll notice that we're going to be doing a fair amount of handwaving in terms of soundness guarantees (i.e., relating the analysis to actual program behavior)
-
-    + that is characteristic of DFA; it's OK with just eye-balling correctness and doesn't usually care about actually proving correctness (that's one reason it's more popular than abstract interpretation amongst non-experts)
-
-- very high-level idea behind DFA:
-
-    + replace concrete values (e.g., actual integers) with abstract values that over-approximate the concrete values (e.g., signs)
-
-    + replace concrete semantics (e.g., arithmetic on integers) with abstract semantics (e.g., arithmetic on signs)
-
-    + "execute" program on abstract values to over-approximate concrete behaviors
-
-### high-level example: sign analysis (i.e., 0/positive/negative)
-
-- there are infinite possible concrete integers (assuming arbitrary precision integers); we'll approximate them using sets of integers corresponding to their sign (zero, positive, or negative)
-
-- abstract values:
-
-    + 0: {0}
-    + pos: {n | n > 0}
-    + neg: {n | n < 0}
-    + bottom (undefined): {}
-    + top (any value): 𝐍
-
-    + notice that these form a partial order based on subset, corresponding to the precision of the abstract value
-
-    + also notice that we could have included abstract values for "non-negative" and "non-positive"
-    
-        - doing so would make the analysis more precise, but also more expensive
-
-        - defining the set of abstract values is part of analysis design
-
-- abstract semantics for addition:
-
-    + 0 + 0 = 0
-    + 0 + pos = pos
-    + 0 + neg = neg
-    + pos + pos = pos
-    + pos + neg = top
-    + neg + neg = neg
-    + bottom + X = X
-    + top + X = X (where X is not bottom)
-
-- example program (just doing things by eye, no specific algorithm):
-
-    ```
-    x = input(0, 100)  <-- x is top
-    if (x > 0) {       <-- x is pos
-      y = x * x        <-- y is pos
-      z = 1 / y        <-- z is top (because could be 0 if y > 1)
-    }
-    else {             <-- x is 0
-      y = x - x        <-- y is 0
-      z = 1 / y        <-- division by 0
-    }
-    ```
-
-- now let's get a little bit more in-depth (though still high-level)
-
-## control-flow graph (CFG)
-### basic idea
-
-- DFA was originally defined for flowchart-style programs with explicit and obvious control-flow; thus, it is based on the idea of a 'control-flow graph' (CFG, which is confusing if you're also talking about grammars). a CFG is just a representation of a program's possible execution paths.
-
-- a CFG is a graph whose nodes are basic blocks and whose edges represent control-flow
-
-- a basic block is a linear sequence of instructions s.t. (1) it can only be entered at the beginning, and (2) can only be left at the end; that is, there is no way to jump into the middle of a block or exit it early
-
-    + a block will always begin with a label that can be jumped to and end in a terminal instruction that transfers control to another block (jump, branch, internal calls) or leaves the current function (ret)
-
-    + usually calls aren't considered terminal instructions because control returns after the call is done, but it will be convenient for us to think of them as terminal when we look at interprocedural analysis
-
-    + calls to extern functions aren't terminals though, since we can't analyze them at all
-
-- the usual assumption (and ours for LIR programs) is that for each function there is a single entry basic block and a single exit basic block
-
-    + if this isn't true (e.g., there are multiple return instructions) it's easy to massage the CFG to make it true (e.g., replace all the return instructions with jumps to a new basic block that contains a single return instruction); this has already been done for LIR programs
-
-- we'll look at some examples of translating a program into its CFG, but for your assignments this will have already been done---a LIR program is already in the correct format
-
-### EXAMPLE 1
-
-  ```
-  let x:int = input(), y:int = 0, z:int = 0;
-  if (x != 0) {
-    x = 3;
-    y = 2;
-  } else {
-    x = 2;
-    y = 3;
-  }
-  z = x + y;
-  return z;
-  ```
-
-  CFG (draw):
-
-  ```
-  bb1: x = $call_ext input()
-       y = $copy 0
-       z = $copy 0
-       tmp = $cmp neq x 0
-       $branch tmp bb2 bb3
-
-  bb2: x = $copy 3
-       y = $copy 2
-       $jump bb4
-
-  bb3: x = $copy 2
-       y = $copy 3
-       $jump bb4
-
-  bb4: z = $arith add x y
-       $ret z
-  ```
-
-### EXAMPLE 2
-
-  ```
-  let x:int = input(), y:int = input(), z:int = input();
-  while (z != 0) {
-    x = x + 1;
-    y = y + 2;
-    z = x / y;
-  }
-  return x;
-  ```
-
-  CFG (draw):
-
-  ```
-  bb1: x = $call_ext input()
-       y = $call_ext input()
-       z = $call_ext input()
-       $jump bb2
-
-  bb2: tmp = $cmp neq z 0
-       $branch tmp bb3 bb4
-
-  bb3: x = $arith add x 1
-       y = $arith add y 2
-       z = $arith div x y
-       $jump bb2
-
-  bb4: $ret x
-  ```
-
-### EXAMPLE 3
-
-  ```
-  let x:int = input(), y:int = input(), z:int = input();
-  while (z != 0) {
-    while (y <= x) {
-      y = y + 2;
-      z = x / y;
-    }
-    x = x + 1;
-  }
-  return x;
-  ```
-
-  CFG (draw):
-
-  ```
-  bb1: x = $call_ext input()
-       y = $call_ext input()
-       z = $call_ext input()
-       $jump bb2
-
-  bb2: tmp1 = $cmp neq z 0
-       $branch tmp1 bb3 bb6
-
-  bb3: tmp2 = $cmp lte y x
-       $branch tmp2 bb4 bb5
-
-  bb4: y = $arith add y 2
-       z = $arith div x y
-       $jump bb3
-
-  bb5: x = $arith add x 1
-       $jump bb2
-
-  bb6: $ret x
-  ```
-
-## abstract domains
-
-- RECAP: a DFA is an abstract domain + abstract semantics + abstract execution, performed on a CFG. we'll drill down on each of these in turn.
-
-- an abstract domain is a set of abstract values, where an abstract value represents a set of possible concrete values (i.e., actual values from executing the program) 
-
-    - an abstract value represents a possible solution to our analysis; in other words, our analysis will result in some answer that is contained in the abstract domain that we define
-
-    - it represents a set of concrete values because we're over-approximating: for a sound analysis, all actual concrete values will belong to that set but there may be extra values as well
-
-- the main source of undecidability is infinite domains (e.g., the integer domain)---this gives us an infinite space of behaviors
-
-    - we need to constrain the domain to be finite, BUT...
-    
-    - at the same time, we need to over-approximate the actual behaviors
-    
-    - this means our finite 'abstract' domain must over-approximate the infinite 'concrete' domain; how?
-
-- the usual method is to partition the infinite domain into a finite number of partitions. examples for the integer domain:
-
-    + parity: 𝐍ᵉ, 𝐍ᵒ
-    + sign: 𝐍⁺, 0, 𝐍⁻
-    + [draw these domains out, but not the full lattice just the integer partitions]
-
-- the abstract domain that we define (i.e., the way that we partition the concrete domain, like the set of integers) defines the analysis that we're creating
-
-    + parity abstract domain: parity analysis
-    + sign abstract domain: sign analysis
-    + etc...
-
-- note that the precision of the answer that we get from the analysis is bounded by the precision of the abstract domain we use. also note that different abstract domains can be non-comparable in terms of precision (as are parity and signedness)
-
-    + there is a whole spectrum of possible abstract domains ranging from very imprecise but very fast to extremely precise but intractable, and many points in-between; there has been a lot of work in the field of program analysis designing many different abstract domains with different tradeoffs
-
-- what if we don't know which partition a value fits into? for example, `x = input()`: we don't know the value of `x` at all
-
-    + we also need abstract values that can represent unknown concrete values that don't fit into a single partition
-
-    + we need at least an abstract value to represent things that don't have any value yet (bottom, ⊥) and one to represent things that could have any possible value (top, ⊤)
-
-    + we can also have domains that represent different levels of precision (e.g., the two possible sign abstract domains)
-
-    + [draw the full lattices for parity and sign]
-
-- notice that these different sets are related via subset, with more precise abstract values being subsets of less precise abstract values.
-
-    + [show this for parity and signedness lattices]
-
-    + sometimes we'll need to "merge" or "join" abstract values in order to find the most precise value that over-approximates the input values---we'll define this operation more precisely later, but in general it just means find the smallest superset that contains both inputs
-
-- we also need a way to map concrete values into the corresponding abstract values, and it can be useful mathematically to have the reverse mapping too:
-
-    + α: Int -> Int#
-
-        - α for sign: α(x) = pos if x is positive, neg is x is negative, zero if x is 0
-        - α for parity: α(x) = Even if x is even, Odd if x is odd
-
-    + γ: Int# -> 𝒫(Int)
-
-        - γ for sign: γ(x) = { n | n > 0 } if x is pos, { n | n < 0 } if x is neg, { 0 } if x is zero
-        - γ for parity: γ(x) = { n | n % 2 = 0 } if x is Even, { n | n % 2 = 1 } if x is Odd
-
-    + note that γ(α(v)) should be a set that contains v; that's what makes the abstract domain an overapproximation
-    
-        - example for signedness: γ(α(1)) = 𝐍⁺ and 1 ⊆ 𝐍⁺
-
-    + also note that γ usually isn't useable in practice because it yields an infinite set; we'll see that it can still be useful later when proving properties of an analysis
-
-- later we'll see how we can relax the requirement for finite abstract domains while still remaining decidable
-
-    + it will require some math to guarantee it will work correctly; we'll have to formalize this informal notion of abstract domain and give it some restrictions
-
-- in general we need to define abstract domains for every kind of concrete value that we're interested in (integers, pointers, etc)
-
-## abstract transfer functions (aka abstract semantics)
-### basic idea
-
-- now that we're operating on abstract values instead of concrete values, we need to know how concrete operators map to abstract operators
-
-    + when we see, e.g., `x + y` in a program, we're no longer operating on integers but on partitions of integers
-    
-    + the abstract versions of concrete operations are often called 'abstract transfer functions'
-
-- for integer abstractions the most relevant semantics to abstract are arithmetic and comparison
-
-    + we'll look at some examples for our parity and sign analyses
-
-- [have students try to come up with transfer functions below first]
-
-### parity
-
-- addition
-
-    ```
-        ⊥ | E | O | ⊤
-      +--------------
-    ⊥ | ⊥   ⊥   ⊥   ⊥
-    E | ⊥   E   O   ⊤
-    O | ⊥   O   E   ⊤
-    ⊤ | ⊥   ⊤   ⊤   ⊤
-    ```
-
-- less-than (result of comparison is either 0 [false] or 1 [true])
-
-    ```
-        ⊥ | E | O | ⊤
-      +--------------
-    ⊥ | ⊥   ⊥   ⊥   ⊥
-    E | ⊥   ⊤   ⊤   ⊤
-    O | ⊥   ⊤   ⊤   ⊤
-    ⊤ | ⊥   ⊤   ⊤   ⊤
-    ```
-
-### sign
-
-- addition
-
-    ```
-        ⊥ | + | 0 | - | ⊤
-      +------------------
-    ⊥ | ⊥   ⊥   ⊥   ⊥   ⊥
-    + | ⊥   +   +   ⊤   ⊤
-    0 | ⊥   +   0   -   ⊤
-    - | ⊥   ⊤   -   -   ⊤
-    ⊤ | ⊥   ⊤   ⊤   ⊤   ⊤
-    ```
-
-- less-than (result of comparison is either 0 [false] or 1 [true])
-
-    ```
-        ⊥ | + | 0 | - | ⊤
-      +------------------
-    ⊥ | ⊥   ⊥   ⊥   ⊥   ⊥
-    + | ⊥   T   0   0   ⊤
-    0 | ⊥   +   0   0   ⊤
-    - | ⊥   +   +   ⊤   ⊤
-    ⊤ | ⊥   ⊤   ⊤   ⊤   ⊤
-    ```
-
-### wrap-up
-
-- for both of these examples we can define the abstract transfer functions using tables because the abstract domains are finite; this isn't always the case (but again, to guarantee that infinite abstract domains still result in decidable analyses requires some math we'll get into later).
-
-- we could combine these abstract domains if we want: an abstract value could be a pair `(parity, sign)`, with the obvious abstract semantics. this is generally true of all abstract domains, that they can be combined to get more precise domains
-
-- note that again we're being hand-wavy, we can't just make these transfer functions be anything we want and still ensure the analysis works---soon we'll need to formalize this notion of transfer function and give some restrictions to make sure they'll work properly
-
-    + that's where the math comes in
-
-## abstract execution (MOP vs MFP)
-### intro
-
-- given a CFG, abstract domain, and abstract transfer functions, how do we actually analyze a given program?
-
-- essentially we want to "execute" the program, except instead of using concrete values and concrete operations we want to use abstract values and abstract transfer functions
-
-    + because the abstract values and transfer functions over-approximate all possible concrete values and operations, a single abstract execution over-approximates all possible program behaviors
-
-- DFA is inherently _flow-sensitive_: the goal is to compute an abstract value for each variable at each program point (i.e., each node of the CFG)
-
-    + [contrast with flow-insensitive, which we'll see a bit later]
-
-### method 1: MOP
-
-- trace through each execution path in turn, then for each program point find the join of all abstract values computed for that program point along all paths
-
-    + [draw generic CFG example with two diamonds in a row, trace all four paths, then show merge at each basic block]
-
-- at best exponential time complexity, at worst non-termination
-
-- this is the most like actual program execution, but is also not feasible in practice
-
-- gives the best possible precision; serves as the "gold standard" for judging other methods
-
-### method 2: MFP (maximal/minimal fixpoint)
-
-- treat the transfer functions as a system of equations and compute a fixpoint (more particularly, the most precise fixpoint)
-
-    + whether MFP stands for "maximal fixpoint" or "minimal fixpoint" depends on the way we structure the abstract domain; this won't make sense until we cover the math behind DFA, so for now don't worry about it
-
-- fixpoint review:
-
-    + define fixpoint of a function: an input that yields itself.
-
-    + functions can have zero fixpoints, a single fixpoint, multiple but finite fixpoints, or infinite fixpoints.
-
-    + example: f(x) = x²: fixpoints are 0, 1; least fixpoint is 0
-
-- so for MFP, we want to assign abstract values to each variable at each program point s.t. if we execute the abstract semantics on the program, we get the same result
-
-    + and specifically, we want the most precise abstract values for each variable that makes this true, i.e., the 'least fixpoint'
-
-    + we could, for example, assign ⊤ to all variables, but this wouldn't be very useful
-
-    + intuitively, this approach will join the abstract values along different paths _before_ propagating them further, rather than keeping each path distinct and only joining them at the end
-
-    + [take same diamond example as for MOP and show the difference with MFP]
-
-- polynomial time complexity (assuming abstract domain and transfer functions have the correct properties)
-
-- there is a standard worklist algorithm for computing the MFP, which we'll go over shortly
-
-- remember that fixpoints don't necessarily exist (and if they do there isn't necessarily a least fixpoint); later we'll worry about how to guarantee a least fixpoint exists and that we can find it (you guessed it: we need math)
-
-### EXAMPLE
-
-- to get an intuitive understanding of the difference between MOP and MFP, consider the following example
-
-    - since there are no loops we don't actually need a fixpoint algorithm, just execute in topological order of the CFG (i.e., execute every predecessor of a basic block before executing that basic block)
-
-- [show MFP sign analysis; have students do MFP parity analysis; show MOP parity analysis (more precise than MFP parity)]
-
-  ```
-  let x:int = 0, y:int = input(), z:int = input();
-  if (y != 0) { x = 1; } else { x = 2; }
-  if (z != 0) { x = x + x; } else { x = 0; }
-  x = x + x;
-  return x;
-  ```
-
-  CFG (draw):
-
-  ```
-  bb1: x = $copy 0
-       y = $call input()
-       z = $call input()
-       tmp1 = $cmp neq y 0
-       $branch tmp1 bb2 bb3
-
-  bb2: x = $copy 1
-       $jump bb4
-
-  bb3: x = $copy 2
-       $jump bb4
-
-  bb4: tmp2 = $cmp neq z 0
-       $branch tmp2 bb5 bb6
-
-  bb5: x = $arith add x x
-       $jump bb7
-
-  bb6: x = $copy 0
-       $jump bb7
-
-  bb7: x = $arith add x x
-       $ret x
-  ```
-
-- is MFP always less precise than MOP? NO. an analysis is _distributive_ if, for transfer function F, join(F(x), F(y)) = F(join(x, y))
-
-    + in other words, it doesn't matter if we merge abstract values before applying the transfer function or afterwards
-
-    + for distributive analyses MOP = MFP; for non-distributive domains MOP ⊑ MFP (i.e., MOP is more precise)
-
-# defining an intraprocedural, pointer-conservative integer-based analysis
-## what we need
-
-- the abstract domain we're using to replace concrete values
-
-- the abstract semantics (aka transfer functions) for each instruction to operate on the abstract domain
-
-- the MFP worklist algorithm (this is always the same for all DFA analyses)
-
-## MFP algorithm
-
-- standard worklist algorithm for all DFA
-
-### setup
-
-- create a map `bb2store` from basic block to abstract store at entry, initially empty
-
-    - this map contains the _entry abstract store_ for that basic block: the abstract values of all variables at the point execution reaches that basic block
-
-    - we need this because for MFP to "execute" a basic block it needs the join of the results of all predecessor basic blocks, so it needs to record that somewhere
-
-- create an initial abstract store that maps integer-typed function parameters and integer-typed globals to ⊤
-
-    - no local has a value yet so they're all ⊥ (i.e., not contained in the store)
-
-    - the parameters could have been passed any value as arguments so they're ⊤
-
-    - globals could have been set to anything by the callers of the function so they're ⊤
-
-- insert a mapping from the entry basic block to the initial abstract store
-
-- create a list `worklist` that will contain basic blocks, initially empty
-
-    - this can be a queue, stack, priority queue, etc; it doesn't matter for correctness though it does affect performance
-
-- insert the entry basic block into `worklist`
-
-- [show the result of all this using `abstract semantics` -> `EXAMPLE 1` below]
-
-### analysis
-
-- while the worklist isn't empty:
-
-    - pop a block from the worklist
-
-    - look up the block's abstract store in `bb2store` and _create a copy_ (we shouldn't update the _entry_ values while processing the block)
-
-    - execute the instructions in the basic block using the abstract semantics, updating the copy of the abstract store as appropriate
-
-    - at the terminal, for each target basic block:
-
-        - join the current abstract store with the entry abstract store of the target (from `bb2store`)
-
-        - if the target's entry store changed, put the target on the worklist
-
-- this loop is the fixpoint computation: as long as there is some basic block whose entry abstract store has changed from the last time it was processed, it will keep going
-
-    - if we've created the abstract domain and abstract semantics correctly, this is guaranteed to terminate
-
-### finishing up
-
-- once the worklist algorithm is done we have a map from each basic block to the entry store for that block
-
-- what we often want is a map from each basic block to the _final_ store for that block
-
-    - we could have kept track of this during the analysis but it would be redundant work, easiest to compute it once at the end
-
-    - just iterate through each basic block, take its entry store, execute the block's instructions to update the store, then save the result
-
-## abstract domain
-
-- sign integer abstract domain: ⊥ <= {pos, neg, zero} <= ⊤
-
-    - ⊥ ⊔ X = X for any X
-    - ⊤ ⊔ X = ⊤ for any X
-    - X ⊔ X = X for any X
-    - pos ⊔ neg, pos ⊔ zero, neg ⊔ zero = ⊤
-
-- parity integer abstract domain: ⊥ <= { Even, Odd } <= ⊤
-
-    - ⊥ ⊔ X = X for any X
-    - ⊤ ⊔ X = ⊤ for any X
-    - X ⊔ X = X for any X
-    - Even ⊔ Odd = ⊤
-
-- constants integer abstract domain: ⊥ <= { ..., -1, 0, 1, ... } <= ⊤
-
-    - ⊥ ⊔ X = X for any X
-    - ⊤ ⊔ X = ⊤ for any X
-    - X ⊔ X = X for any X
-    - n1 ⊔ n2 (s.t. n1 ≠ n2) = ⊤
-
-- pointer abstract domain: since we're handling pointers conservatively we don't need one
-
-- the abstract store will map integer-typed variables to elements of the integer abstract domain
-
-    - to make things a little simpler, we won't include any variables that map to ⊥
-    
-    - when looking up a variable in the store, if it isn't there then we know the value must be ⊥
-
-    - to join two input stores to get a new store:
-    
-        - the new store will have all variables that are in either input store
-        - if the variable is only in one of the input stores its value will be the same as in that store
-        - if the variable is in both stores its value will be the join of the values in the two stores
-
-## abstract semantics
-
-- [have the students try to come up with the abstract transfer functions for the instructions before giving the solution]
-
-### reminder
-
-- we're doing an intraprocedural analysis, so when processing a call we'll conservatively assume that it could have done anything instead of actually analyzing the callee function
-
-    - this also means that we need to treat globals conservatively since they could be modified by other functions that we aren't analyzing (callee or caller)
-
-- we're handling pointers conservatively, so when processing a pointer access we'll assume that it could access anything of the appropriate type instead of actually analyzing what things the pointers may actually point to
-
-- we'll be lifting each of these restrictions later in the quarter
-
-### prep
-
-- compute the set of integer-typed global variables; call this `global_ints`
-
-- compute the set of integer-typed address-taken local variables by inspecting the function for `$addrof` instructions; call this `addrof_ints`
-
-    - `addrof_ints` should also include everything in `global_ints`, because a global could have had its address taken in some other function
-
-### non-pointer, non-call related instructions
-
-- `x = $copy op`
-
-    - if `x` is a pointer then ignore this instruction
-    - translate `op` to abstract value using α or store
-    - update store to map `x` to result
-
-- `x = $arith <aop> op1 op2`
-
-    - translate `op1`, `op2` to abstract values using α or store
-    - apply abstract transfer function (`add` given earlier; rest left as exercise)
-    - update store to map `x` to result
-
-- `x = $cmp <rop> op1 op2`
-
-    - if `op1`, `op2` are not integer-typed then set `x` to T
-    - otherwise same as `$arith` (`lt` abstract semantics given earlier; rest left as exercise)
-
-- `$jump <bb>`
-
-    - propagate store to `<bb>`
-
-- `$branch op <bb1> <bb2>`
-
-    - translate `op` to abstract value
-    - if value is definitely not 0, propagate store only to `<bb1>`
-    - if value is definitely 0, propagate store only to `<bb2>`
-    - else propagate store to both `<bb1>` and `<bb2>`
-
-### EXAMPLE 1 (using signs)
-
-- [have students work through it first, then go over it]
-
-- cflat
-
-  ```
-  fn foo(p:int) -> int {
-    let x:int = -2, y:int = 2;
-    if p < x {
-        p = -p;
-        x = -x;
-    }
-    else if p > y {
-        p = p + y;
-    }
-    return x + y;
-  }
-  ```
-
-- lir:
-
-  ```
-  fn foo(p:int) -> int {
-  let _t1:int, _t2:int, _t3:int, _t4:int, _t5:int, _t6:int, _t7:int, x:int, y:int
-
-  entry:
-    _t1 = $arith sub 0 2
-    x = $copy _t1
-    y = $copy 2
-    _t2 = $cmp lt p x
-    $branch _t2 bb2 bb3
-
-  bb1:
-    _t7 = $arith add x y
-    $ret _t7
-
-  bb2:
-    _t3 = $arith sub 0 p
-    p = $copy _t3
-    _t4 = $arith sub 0 x
-    x = $copy _t4
-    $jump bb1
-
-  bb3:
-    _t5 = $cmp gt p y
-    $branch _t5 bb5 bb4
-
-  bb4:
-    $jump bb1
-
-  bb5:
-    _t6 = $arith add p y
-    p = $copy _t6
-    $jump bb4
-  }
-  ```
-
-### pointer-related instructions
-
-- `x = $load y`
-
-    - if `x` is a pointer then ignore this instruction
-    - update store to set `x` to ⊤
-
-- `$store x op`
-
-    - if `op` is a pointer then ignore this instruction
-    - translate `op` to abstract value
-    - for each variable `v` in `addrof_int`, update store to map `v` to the join of its current value and the value of `op`
-
-- `x = $alloc op [id]`
-- `x = $addrof y`
-- `x = $gep y op`
-- `x = $gfp y field`
-
-    - these always produce pointers, which we aren't tracking so we can ignore these instructions
-
-### EXAMPLE 2 (using signs)
-
-- [have students work through it first, then go over it]
-
-- cflat
-
-  ```
-  let g1: int, g2:&int;
-
-  fn foo(p:int, q:&int) -> int {
-    let x:int = 0, y:int = -2;
-    g1 = 4;
-    *q = 12;
-    y = *q;
-    q = &x;
-    return x + y;
-  }
-  ```
-
-- lir
-
-  ```
-  g1:int
-  g2:&int
-
-  fn foo(p:int, q:&int) -> int {
-  let _t1:int, _t2:int, _t3:&int, _t4:int, x:int, y:int
-
-  entry:
-    x = $copy 0
-    _t1 = $arith sub 0 2
-    y = $copy _t1
-    g1 = $copy 4
-    $store q 12
-    _t2 = $load q
-    y = $copy _t2
-    _t3 = $addrof x
-    q = $copy _t3
-    _t4 = $arith add x y
-    $ret _t4
-  }
-  ```
-
-### call-related instructions
-
-- `[x =] $call_ext <id>(op1, ...)`
-- `[x =] $call_dir <id>(op1, ...)`
-- `[x =] $call_idr fop(op1, ...)`
-
-    - for all `v` in `global_ints`, update store to map `v` to ⊤
-
-    - if `x` is integer-typed, update store to map `x` to ⊤
-
-    - if (1) any global is a pointer that can reach an `int`; OR (2) any argument is a pointer that can reach an `int`: for all `v` in `addrof_ints`, update store to map `v` to ⊤
-
-        - "reach an int" means (1) the basetype is `int`, or (2) the basetype is a struct containing a pointer that reaches an `int`
-
-    - note that we're making an important assumption that external calls are independent, i.e., that they do not influence each other (e.g., by using their own globals that are invisible to us)
-
-        - if we don't make this assumption then, for example, `$call_ext foo(x)` where `x` is a pointer to a local or global could store the value of `x` in an invisible global, then `$call_ext bar()` could modify that local/global even though it didn't get any arguments, or `$call_ext foo(y)` could do the same even though it isn't getting `x` this time---this would force us to be very conservative about handling external calls
-
-        - in the case where the external code really does do something like that, we can keep our analysis sound by stubbing those external functions as internal functions that summarize their behavior wrt the analysis we're implementing (this is a common technique in program analysis)
-
-    - for convenience we treat external calls the same as internal calls (including how they can effect globals) even though they don't have access to the globals; this is correct though conservative
-
-- `$ret [op]`
-
-    - since we're doing intraprocedural analysis we don't care about the caller and so we can ignore this instruction
-
-### EXAMPLE 3 (using signs)
-
-- [have students work through it first, then go over it]
-
-- cflat
-
-  ```
-  extern bar(&int) -> int;
-  extern baz() -> int;
-
-  let g1:int, g2:&int;
-
-  fn foo(p:int) -> int {
-    let x:int = 0, y:int = -2, z:int = 4;
-    g2 = &x;
-    y = bar(g2);
-    x = 0;
-    g1 = 12;
-    z = baz();
-    return x + y + z;
-  }
-  ```
-
-- lir
-
-  ```
-  g1:int
-  g2:&int
-
-  extern bar:(&int) -> int
-  extern baz:() -> int
-
-  fn foo(p:int) -> int {
-  let _t1:int, _t2:&int, _t3:int, _t4:int, _t5:int, _t6:int, x:int, y:int, z:int
-
-  entry:
-    x = $copy 0
-    _t1 = $arith sub 0 2
-    y = $copy _t1
-     z = $copy 4
-    _t2 = $addrof x
-    g2 = $copy _t2
-    _t3 = $call_ext bar(g2)
-    y = $copy _t3
-    x = $copy 0
-    g1 = $copy 12
-    _t4 = $call_ext baz()
-    z = $copy _t4
-    _t5 = $arith add x y
-    _t6 = $arith add _t5 z
-    $ret _t6
-  }
-  ```
-
-
-# intro to widening
-
-- given the DFA framework outlined above, we can modularly plug in different abstract domains to get different analyses (e.g., sign, parity, constants, etc); however we can't just use any abstract domain and still guarantee a computable analysis
-
-- example: the integer interval abstract domain
-
-    - elements: `⊥` and `[a, b]` s.t. `a` ∈ 𝐙 ∪ {-∞} and `b` ∈ 𝐙 ∪ {∞} and `a` <= `b` (note that ⊤ = [-∞, ∞])
-
-    - γ(⊥) = {}
-    - γ([a, b]) = { n ∈ 𝐙 | n >= a and n <= b }
-
-    - [maybe have the students figure out the operations below]
-
-    - JOIN
-    - ⊥ ⊔ X = X ⊔ ⊥ = X
-    - [a1, b1] ⊔ [a2, b2] = [min(a1, b1), max(a2, b2)]
-
-    - ADD
-    - ⊥ + X = ⊥
-    - [a1, b1] + [a2, b2] = [a1 + a2, b1 + b2]
-
-    - LTE
-    - ⊥ <= X, X <= ⊥ = ⊥
-    - [a1, b1] <= [a2, b2] =
-        - [0, 0] if a1 > b2
-        - [1, 1] if b1 < a2
-        - [0, 1] otherwise
-
-- this is clearly more precise than the constants abstract domain, because it contains the constants abstract domain inside of it ([-1, -1], [0, 0], [1, 1], etc)
-
-- EXAMPLE 1: let's try it out and see what happens
-
-  ```
-  let x:int = 0, y:int = input();
-  while x <= y {
-    x = x+1;
-  }
-  return x;
-  ```
-
-  ```
-  entry:
-    x = $copy 0
-    y = $call_ext input()
-    $jump while_hdr
-
-  while_hdr:
-    t = $cmp lte x y
-    $branch t while_body exit
-
-  while_body:
-    x = $arith add x 1
-    $jump while_hdr
-
-  exit:
-    $ret x
-  ```
-
-- the analysis never terminates! what went wrong?
-
-    - this is why we need to study the mathematical structures behind DFA that give us the tools to determine whether a given abstract domain and abstract semantics results in a computable analysis
-
-- there is a way to get around this problem, called _widening_
-
-    - if we know that an abstract domain isn't computable but it still has certain properties then we can modify the DFA algorithm to make it computable
-
-    - the key ingredient is something called a _widening operator_ `▿` (there may be many possible such operators for a given analysis with different tradeoffs, the analysis designer needs to create or pick one of them)
-
-    - shortly we'll be looking at the math behind it all to see how this works, but for now we'll just see a practical example
-
-- a widening operator for the integer interval abstract domain (one of many possible widening operators)
-
-    - ⊥ ▿ X = X ▿ ⊥ = X
-    - [a1, b1] ▿ [a2, b2] = [a3, b3] s.t.
-        - a3 = a1 if a1 <= a2, otherwise -∞
-        - b3 = b1 if b1 >= b2, otherwise ∞
-
-- the basic idea is that we use the widening operator instead of join to combine abstract stores
-
-    - this is overly pessimistic and can lose precision unnecessarily because widening is less precise than join
-
-    - where can non-termination actually happen? loops!
-
-    - only apply the widening operator at loop headers, otherwise use join
-
-- [redo previous example, using the widening operator at the loop header]
-
-- how do we identify loop headers in the CFG?
-
-    - just do a post-order labeling on the CFG; if you ever reach a node that you have already visited but not yet labeled then it's a loop header
-
-    - [demo using the previous example's CFG]
-
-- IMPORTANT NOTE: this widening operator isn't commutative, so it matters what order we visit the basic blocks in during out fixpoint computation
-
-    - example: two edges into a loop header, one that propagates `a -> [0, 0]` and one `a -> [1, 1]`; depending on which one propagates first we'll get either `[0, ∞)` or `(-∞, 1]`
-
-    - the assignment description tells you what you need to ensure you get the same solution as the autograder
-
-- we'll look at exactly when we need widening operators and what makes a valid widening operator soon when we look at the math behind DFA
-
-- EXAMPLE 2 (exercise for students)
-
-  ```
-  let x:int = 0, y:int = 10, z:int = input();
-  while x - y < z {
-    if x < z {
-        x = x + y;
-    } else {
-        y = y - 1;
-    }
-  }
-  return x + y
-  ```
-
-  ```
-  let x:int, y:int, z:int, t1:int, t2:int, t3:int, t4:int
-
-  entry:
-    x = $copy 0
-    y = $copy 10
-    z = $call_ext input()
-    $jump loop_hdr
-
-  loop_hdr:
-    t1 = $arith sub x y
-    t2 = $cmp lt t1 z
-    $branch t2 if_hdr exit
-
-  if_hdr:
-    t3 = $cmp lt x z
-    $branch t3 if_true if_false
-
-  if_true:
-    x = $arith add x y
-    $jump if_end
-
-  if_false:
-    y = $arith sub y 1
-    $jump if_end
-
-  if_end:
-    $jump loop_hdr
-
-  exit:
-    t4 = $arith add x y
-    $ret t4
-  ```
-
-# second-order DFA
-## basic idea
-
-- we've been looking at so-called 'first-order analysis': analyses where we care about _values_ at a particular point in the program. a 'second-order analysis', in contrast, asks questions about program _paths_ (i.e., execution traces), not individual program states
-
-    - example: a taint analysis might ask 'how did this string get to this sensitive system call? in particular, did it get here from user input without being sanitized?'
-    
-    - this isn't a question we can answer just by looking at the value of a variable at a particular point---we have to know the execution history that brought the value to that point.
-
-- how do we answer these questions?
-
-    - by abstracting program _traces_ just like we abstract program _values_
-
-    - instead of using an abstract value to over-approximate the set of concrete values a variable might have, we use abstract values to over-approximate the set of program paths that the program could take to reach a given location
-
-- the easiest way to understand this idea is to go through some examples
-
-## first analysis example: reaching definitions
-### intro
-
-- problem statement: for each "use" of a variable, what are the set of "defs" of that variable that may "reach" this program point?
-
-    - "use" means that we require the variable's value
-
-    - "def" means definition, i.e., assignment
-
-    - "reach" means there is some path from the def to the use that does not _definitely_ redefine that variable
-
-- this information allows us to trace how values flow through the program and is a useful foundation for more elaborate analyses
-
-    - we wouldn't compute reaching definitions for its own sake, we compute it for the sake of some follow-on analysis or transformation
-
-    - we'll see several examples of such follow-on useful analyses later in the quarter
-
-- notice that this is a "may" analysis: we're asking if it's possible for a def to reach a given use (and over-approximating the exact answer)
-
-- as always for DFA, we need an abstract domain, abstract semantics, and abstract execution (which is the same MFP worklist algorithm as before)
-
-### EXAMPLE 1
-
-- [go through example intuitively, without referring to abstract domain or semantics]
-
-    - for each use of a variable, what defs reach it?
-
-  ```
-  let x:int = 4, y:int = 6, z:int = input();
-  if (z) { x = 2; } else { x = 3; y = 3; }
-  z := x+y;
-  return z;
-  ```
-
-  ```
-  bb1: x = $copy 4
-       y = $copy 6
-       z = $call input()
-       tmp = $cmp neq z 0
-       $branch tmp if_true if_false
-
-  if_true:
-       x = $copy 2
-       $jump if_end
-
-  if_false:
-      x = $copy 3
-      y = $copy 3
-      $jump if_end
-
-  if_end:
-      z = $arith add x y
-      $ret z
-  ```
-
-### abstract domain
-
-- remember that our abstract domain is a set of abstract values that represent possible answers for our analysis
-
-    - for reaching defs, an answer to "what defs reach this use?" is a set of program points where the defs happen
-
-    - we can represent a program point as `<basic block label>`.{`<instruction index>`, `term`}; this uniquely identifies a particular point in a function
-
-    - [give some examples from EXAMPLE 1]
-
-- more precisely, our abstract values represent "executation traces"---specifically, traces from the beginning of the function to the current point following a path along which a particular variable has (1) been defined at program point PP; and (2) has not been redefined at any point between PP and now
-
-    - example: focusing on variable `x` in the example program and the point `if_end.0`, the abstract value `x -> {if_true.0, if_false.0}` abstracts the set of traces (starting from the beginning of the function) that define variable `x` with no intervening redefinitions before getting to `if_end.0`
-
-    - example: focusing on variable `y` in the example program and the point `if_end.0`, the abstract value `x -> {bb1.2, if_false.1}` abstracts the set of traces (starting from the beginning of the function) that define variable `y` with no intervening redefinitions before getting to `if_end.0`
-
-    - therefore, an abstract value for some variable `v` is a set of program points containing definitions of `v`
-
-- so an abstract value (i.e., an element of the abstract domain) is a set of program points; what is the entire domain?
-
-- remember that we need to create an abstract domain s.t. there is an abstract value for all possible concrete answers
-
-    - what is the least precise (most over-approximate) abstract value? the set of all program points
-
-    - what is the most precise (most under-approximate) abstract value? the empty set
-
-    - what is the entire abstract domain? the powerset of the set of all program points, ordered via subset
-
-- L♯ = (𝒫(PP), ⊆), ⊔ = ∪
-
-    - the elements of the abstract domain are sets of program points
-
-    - they are ordered via subset
-
-    - we can join abstract values using set union
-
-- finally, the abstract store will map objects (variables and allocated objects) to abstract values
-
-    - previously for the first-order integer analyses we only cared about variables, but now we care about defs/uses of anything, not just variables
-
-    - things allocated on the heap can be def'ed/used via pointers, so we need to keep track of them
-
-    - we have a problem: things allocated on the heap don't have names, we can't refer to them directly
-
-        - solution: give them fake names so that our analysis can refer to them
-
-        - for each type of object on the heap, we'll create a fake variable that represents all heap objects of that type (we're still being very conservative with pointers and function calls)
-
-        - like before we'll have a set of address-taken variables `addr_taken` that includes the operands of `$addrof` and also globals, though now it will be all such operands and all globals, not just `int`
-
-        - here's how we create the fake variables the represent objects in the heap:
-
-            - for type τ, let `reachable_types(τ)` be the set of types 'reachable' via pointer dereferences and/or struct field accesses from τ, excluding function types
-
-                - we don't include function types (e.g., `(int) -> int)`) because functions aren't allocated on the heap
-                - example:
-
->                 struct foo {
->                   f1: &bar
->                   f2: &int
->                 }
->
->                 struct bar {
->                   f3: &(int) -> int
->                   f4: &&int
->                 }
->
->                 g: &foo
->
->                 // reachable_types(&foo) = { foo, &bar, bar, &&int, &int, int, &(int)->int }
-
-            - let `PTRS` = all pointer-typed globals, parameters, and locals of the function being analyzed, and `PTRS_τ` be the set of types of these variables
-
-            - for `τ ∈ reachable_types(PTRS_τ)` create a fake variable to represent all heap-allocated objects of type `τ`, then put all the fake variables in `addr_taken`
-
-    - later we'll see a version of reaching defs that treats pointers and function calls much more precisely
-
-### abstract semantics [assuming no variables with struct type]
-
-- now we need to create abstract semantics to replace the program's concrete semantics, but in this case we don't care about the _values_ of the variables, just whether they are being defined or not by a given instruction
-
-    - our abstract semantics will update the abstract store, mapping each variable to its set of reaching defs at a particular point in the program
-
-    - our final solution will map program points containing uses to the combined set of reaching defs for all the uses; we can either do this during the analysis (but this will be a lot of redundant work) or just do it once when the analysis is finished
-
-    - [example: show abstract stores and final solution for EXAMPLE 1]
-
-- we don't need abstract semantics for arithmetic operations, relational comparisons, etc, just for variable definition (assignments and stores)
-
-- let the abstract store be σ, pp represent a program point, DEF be the set of definitions for an instruction, and USE be the set of uses for an instruction
-
-    - the set USE won't be needed during the analysis itself, only afterwards when we translate the analysis results into a final solution
-
-- [do the first one below as an example, then go through each of them but ask the students for the answer before giving the official answer]
-
-- pp: `x = {$alloc, $arith, $cmp, $copy, $gep, $gfp} <op>...`
-
-    - DEF = `{ x }`
-    - USE = `{ <op> | <op> is a variable }`
-
-    - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
-    - `σ[x] = { pp }`
-
-- pp: `x = $addrof y`
-
-    - DEF = `{ x }`
-    - USE = `{}`
-
-    - `σ[x] = { pp }`
-
-- pp: `x = $load y`
-
-    - DEF = `{ x }`
-    - USE = `{ y } ∪ { var ∈ addr_taken | type(var) = type(x) }`
-
-    - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
-    - `σ[x] = { pp }`
+- EXAMPLE source code: [see OneNote] // FIXME:
 
 ```
-    EXAMPLE:
-
-    let a:&int, b:int, c:&int, d:int
-    entry:
-      a = $addrof b
-      c = $alloc 1 [_a1]
-      d = $load c  // <-- USE = { c, b, fake_int }
+"x = x + 2;"
 ```
 
-- pp: `$store x <op>`
-
-    - DEF = `{ var ∈ addr_taken | type(var) = type(<op>) }`
-    - USE = `{ x } ∪ { <op> | <op> is a variable }`
-
-    - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
-    - `∀v ∈ DEF, σ[v] = σ[v] ∪ { pp }`
-
-    - [discuss strong update vs weak update]
+- what the computer sees (in ASCII code):
 
 ```
-    EXAMPLE:
-
-    let a:int, b:&int, c:int
-    entry:
-      b = $addrof a
-      a = $copy 42
-      c = $copy 12
-      $store b 6
-      $ret x // <-- σ[a] = { entry.1, entry.3 }; σ[c] = { entry.2 }
+['x', ' ', '=', ' ', 'x', ' ', '+', ' ', '2', ';']
 ```
 
-- pp: `[x =] $call_{dir, idr, ext} id/<fp>(<arg_op>...)`
-
-    - SDEF = `{ x }` // <-- strong def if `x` exists, otherwise `{}`
-    - WDEF = `{ var ∈ addr_taken | type(var) ∈ reachable_types(<arg_op>...) ∪ reachable_types(<globals>...) } ∪ { <globals>... }` // <-- weak defs
-    - USE = `{ <fp> } ∪ { <arg_op> | <arg_op> is a variable } ∪ WDEF`
-
-    - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
-    - `∀v ∈ WDEF, σ[v] = σ[v] ∪ { pp }`
-    - `σ[x] = { pp }` (if `x` exists)
-
-    - the order here is important, handle the strong def _after_ the weak defs (in case `x` is address-taken and included in the weak defs too)
-
-    - we have to assume that a callee function could define and/or use any variable reachable from its arguments or from a global, and also define/or use any global (again we're treating external calls the same as internal calls, which is overly conservative but convenient)
+- translated to assembly:
 
 ```
-    EXAMPLE:
-
-    let a:int, b:&int, c:&&int
-    entry:
-      a = $copy 0
-      b = $addrof a
-      c = $addrof b
-      b = $call_dir foo(c) then exit
-
-    exit:
-      $ret a // <-- σ[a] = { entry.0, entry.term }, σ[b] = { entry.term }, σ[c] = { entry.2 }
+mov [esp+4], eax
+add eax, 2
+mov eax, [esp+4]
 ```
 
-- pp: `$jump bb`, `$branch <op> bb1 bb1`, `$ret <op>`
-
-    - DEF = `{}`
-    - USE = `{ <op> | <op> is a variable }`
-
-    - `∀v ∈ USE, soln[pp] = soln[pp] ∪ σ[v]`
-    - no change to σ
-
-### abstract semantics [adding in variables with struct type---SKIP]
-
-- if a variable is a struct, then defining or using it also defines/uses its fields (which we're representing with the fake variables)
-
-- assume in the following that `x` has a struct type, and let `FLDS(x)` = `{ var ∈ addr_taken | fld ∈ fields(x.type()), type(var) = type(fld), var is a fake variable }`
-
-- pp: `x = $copy y`
-
-    - SDEF = `{ x }`
-    - WDEF = `FLDS(x)`
-    - USE = `{ y } ∪ FLDS(y)`
-
-- pp: `x = $load y`
-
-    - DEF = `{ x }`
-    - WDEF = `FLDS(x)`
-    - USE = `{ y } ∪ { var ∈ addr_taken | type(var) = type(x) } ∪ FLDS(x)`
-
-- pp: `$store y x`
-
-    - DEF = `{ var ∈ addr_taken | type(var) = type(x) } ∪ FLDS(x)`
-    - USE = `{ x, y } ∪ FLDS(x)`
-
-- pp: `[x =] $call_{dir, idr, ext} id/<fp>(<arg_op>...)`
-
-    - in addition to the previous sets for calls:
-    - WDEF ∪= `FLDS(x)`
-    - USE ∪= `FLDS(arg)` s.t. `arg` has a struct type
-
- - pp: `$ret x`
-
-    - DEF = `{}`
-    - USE = `{ x } ∪ FLDS(x)`
-
-### abstract execution
-
-- [go through previous example again, this time using MFP worklist algorithm]
-
-- this gives us the reaching defs for every program point, now we need to transform it into the reaching defs for every use
-
-    - just "execute" each basic block one more time, and for each instruction look at what variables are used and look them up in the abstract store to find their reaching defs
-
-    - we end up with a solution mapping a program point (the location of a set of uses) to a set of program points (the locations of the reaching defs for those uses)
-
-### EXAMPLE 2
-
-- [have students do this one on their own first]
+- translated to machine code:
 
 ```
-fn bar(p:int, q:&int) -> int {
-  let a:int, b:int, c:&int;
+[0x89, 0x44, 0x24, 0x04, 0x83, 0xC0, 0x02, 0x8B, 0x44, 0x24, 0x04]
+```
 
-  a = p - *q;
-  b = a;
-  c = &b;
+- besides the fact that source code is just text, is also uses abstractions that are meaningless to the computer
 
-  while a < p {
-    *c = b + a;
-    a = a + 1;
-  }
+    - classes, objects, structs, functions, if statements, while and for loops, variables...none of these are things that the computer knows about or understands
 
-  return *c;
+    - programming languages are specifically designed to give the human programmers useful abstractions to describe data and computation
+
+        - different languages use different kinds of abstractions (e.g., object-oriented languages vs functional languages vs logic programming languages)
+
+- so somehow we need to take a program in source code (with whatever abstractions that particular language uses) and turn it into a stream of ISA instructions (without any of those abstractions) that the computer can actually execute
+
+- approach 1: compilers
+
+    - take source code and translate it into machine code (e.g., gcc or clang)
+
+    - we call this 'ahead of time' because it happens before the program is ever executed
+
+- approach 2: interpreters
+
+    - take source code and have an interpreter take each statement and expression and implicity translate it into machine code on the fly (e.g., cpython for python)
+
+    - it's implicit because the mapping from source code to machine code isn't present explicitly in the interpreter---an interpreter for language A is itself written in some source language B, and it looks at the source code for A and implements it in terms of B
+
+    - but how was the interpreter itself made executable? a compiler!
+
+    - interpreting source code is much slower than executing compiled source code because both the interperter and the source code are executing at the same time; on the other hand, interpreters don't need to wait for compilation to start executing source code so they are faster to use in a "write-execute" cycle
+
+- approach 3: hybrid
+
+    - use an interpreter, but during execution _also_ in parallel compile code to machine instructions (e.g., v8 engine for javascript)
+
+    - this is called 'just in time' compilation, or JIT compilation for short
+
+    - get the fast startup time of interpreters but still a good part of the performance of compiled code (though still slower than ahead-of-time compilation)
+
+- some language implementations do all three, like Java and any other language that targets the Java Virtual Machine (JVM), or .NET languages that target the .NET runtime
+
+    - ahead of time compilation to java bytecode
+
+    - bytecode interpreted by JVM
+
+    - JVM also JIT compiles the bytecode for better performance
+
+- it's important to note that _languages_ are not compiled or interpreted---a language is _implemented_ with a compiler or interpreter
+
+    - there are interpreters for C and C++
+    - there are compilers for python
+
+- notice that in all these schemes compilers play an important role, even if it's behind the scenes somewhere
+
+- programming languages are how humans express computation: we can't compute without them, and we can't make them work without compilers---as computer scientists and/or developers, there shouldn't be any magic here
+
+- goals for this course:
+
+    - dispel the "magic" and get a basic understanding of how source code turns into executable code
+
+    - not just relevant to compilers for mainstream programming languages like C++, etc: parsing log or configuration files, creating domain-specific languages, etc
+
+    - show how some of the computational theory from 138 has practical applications
+
+    - give experience writing (relatively) large and complex software from scratch
+
+        - still much smaller and simpler than mainstream compilers that have had hundreds of people working on them for many years
+
+        - you won't be a compiler expert after this course, but you'll know enough to have an idea of how compilers work and a foundation you can use to learn more if you want
+
+# overview
+## compilation
+
+- to put compilation in context:
+
+```
+[source + macros] --PREPROCESSOR--> [source code] --COMPILER--> assembly --ASSEMBLER--> 
+[relocatable machine code] --LINKER--> executable machine code
+```
+
+- we often call this whole process "compilation", but technically the compiler part is from source code to assembly
+
+    - compilers like gcc, clang, etc automatically invoke the preprocessor, assembler, and linker as third-party executables; you can configure which ones they use
+
+- traditionally compilers are broken into three pieces:
+
+    - front end: responsible for syntax and validation
+    - "middle" end: responsible for optimization
+    - back end: responsible for generating machine code
+
+```
+[source code] --> [front end] --> [internal representation] --> [back end] --> [assembly]
+                                           ⇵
+                                     middle end
+```
+
+## front end
+
+- responsible for three things:
+
+    - lexer (aka scanner, tokenizer)
+    - parser
+    - validation (type checking, etc)
+
+### lexer
+
+- the lexer takes source code (as a single string) and turns it into a sequence of _tokens_
+
+    - lexer stands for "lexicographic analyzer"
+    - a token is a "word" in our programming language
+
+- EXAMPLE [see OneNote] FIXME:
+
+```
+// as an example
+let sum:int = 0, total:int = 5, x:int = 2;
+while sum < total {
+  sum = sum + x * 10;
 }
 ```
 
+- as a string:
+
 ```
-fn bar(p:int, q:&int) -> int {
-let a:int, b:int, c:&int, _t1:int, _t2:int, _t3:int, _t4:int
-entry:
-  _t1 = $load q
-  a = $arith sub p _t1
-  b = $copy a
-  c = $addrof b
-  $jump while.hdr
+['/', '/', ' ', 'a', 's', ' ', 'a', 'n', ' ', 'e', 'x', 'a', 'm', 'p', 'l', 'e',
+ 'l', 'e', 't', ' ', 's', 'u', 'm', ':', 'i', 'n', 't', ' ', '=', ' ', '0', ',',
+ ' ', 't', 'o', 't', 'a', 'l', ':', 'i', 'n', 't', ' ', '=', ' ', '5', ',', ' ',
+ 'x', ':', 'i', 'n', 't', ' ', '=', ' ', '2', ';', '\n', 'w', 'h', 'i', 'l', 'e',
+ ' ', 's', 'u', 'm', ' ', '<', ' ', 't', 'o', 't', 'a', 'l', ' ', '{', '\n', ' ',
+ ' ', 's', 'u', 'm', ' ', '=', ' ', 's', 'u', 'm', ' ', '+', ' ', 'x', ' ', '*',
+ ' ', '1', '0', ';', '\n', '}']
+```
 
-while.hdr:
-  _t2 = $cmp lt a p
-  $branch _t2 while.body exit
+- after lexing:
 
-while.body:
-  _t3 = $arith add b a
-  $store c _t3
-  a = $arith add a 1
-  $jump while.hdr
+```
+[LET, VAR(sum), COLON, TYPE(int), EQ, NUM(0), COMMA, VAR(total), COLON, TYPE(int),
+ EQ, NUM(5), COMMA, VAR(x), COLON, TYPE(int), EQ, NUM(2), SEMICOLON, WHILE, VAR(sum),
+ LT, VAR(total), OPEN_BRACE, VAR(sum), EQ, VAR(sum), PLUS, VAR(x), MUL, NUM(10),
+ SEMICOLON, CLOSE_BRACE]
+```
 
-exit:
-  _t4 = $load c
-  $ret _t4
+- notice that lexing eliminated the comments and whitespace, what's left are the building blocks of the source code
+
+    - some tokens carry extra information (e.g., for VAR what the name is); these are ignored by the parser but necessary for later stages
+
+- how does the lexer know what the tokens should be?
+
+    - the tokens are specified by the language designer as regular expressions
+
+    - these are converted into NFA (or DFA) and used to process the string into tokens
+
+- the lexer classifies sequences of characters into elements of our language (i.e., tokens), but still leaves those tokens as a flat sequence without any structure
+
+    - we know at this point that the source code only contains valid tokens, but we still don't know if it's syntactically correct
+
+### parser
+
+- the parser has two jobs:
+
+    - verify that the token stream represents a syntactically correct program in our language
+
+    - build an internal representation of that program for the compiler to operate on
+
+- verifying syntactic correctness:
+
+    - the syntax of the language is specified by the language designer as a CFG, with the tokens as the alphabet
+
+    - to show a program is syntactically correct we have to parse the tokens and show that a derivation exists from the start symbol to the token stream
+
+        - recall from 138 'derivation trees', aka 'parse trees', aka 'syntax tree'
+
+- the internal representation usually isn't the actual derivation tree because it contains a lot of things we don't care about when compiling (e.g., punctuation); instead we usually use an _abstract syntax tree_ (AST) that keeps the structure of the derivation tree but only keeps the important information
+
+- EXAMPLE [see OneNote] FIXME:
+
+```
+LET
+  - VAR(sum), TYPE(int), NUM(0)
+  - VAR(total), TYPE(int), NUM(5)
+  - VAR(x), TYPE(int), NUM(2)
+WHILE
+  - Guard
+    - LT
+      - Left: VAR(sum)
+      - Right: VAR(total)
+  - Body
+    - Assignment
+      - Left: VAR(sum)
+      - Right:
+        - PLUS
+          - Left: VAR(sum)
+          - Right:
+            - MUL
+              - Left: VAR(x)
+              - Right: NUM(10)
+```
+
+- notice that the punctuation like colons, semicolons, braces, etc are gone
+
+    - they were necessary in the concrete grammar to figure out the correct AST structure (where does a statement end; what statements belong to the while body; etc)
+
+    - they aren't needed now because the AST structure makes them superfluous
+
+    - notice that the AST structure also makes precedence explicit for the arithmetic
+
+- we know at this point that the program is syntactically correct, but we still don't know if it's valid
+
+### validation
+
+- just because a program is syntactically correct doesn't mean it's a valid program
+
+    - analogy with English: "colorless green ideals sleep furiously" (from chomsky)
+
+- example of a syntactically correct but invalid program:
+
+```
+let x:int = 0, y:int = 10;
+x = new int;
+y = x * y;
+```
+
+- here `x` is an integer but we're storing a pointer value (i.e., address)
+
+- we need to make several checks, but perhaps the most important is _type checking_
+
+    - everything is declared with a proper type
+    - anything declared as a given type is only used in ways that make sense for that type
+
+- at this point we know that the program is a valid program and we can go to the middle end
+
+## middle end
+
+- the primary job of the so-called middle-end is to optimize the code in order to make it more efficient
+
+    - we often _lower_ the AST into a simpler, lower-level intermediate representation (IR) that is easier to reason about and exposes more optimization opportunities
+
+- let's look at some examples (to keep things simple we'll just modify the source code itself instead of showing the IR):
+
+- original [see OneNote] FIXME:
+
+```
+let sum:int = 0, total:int = 5, x:int = 2;
+while sum < total {
+  sum = sum + x * 10;
 }
 ```
 
-## second analysis example: control analysis
-### intro
-
-- the subject of this analysis is control-flow: how the executions of the basic blocks depend on each other
-
-    - e.g., "basic block A must always execute before basic block B" or "if basic block A executes, then basic block B must execute", etc
-
-    - some potential uses of this analysis:
-
-        - security: every execution that reaches a use of user input must first go through a sanitizer function
-        - concurrency: every execution that enters a lock must then go through an unlock
-
-    - in general, anything related to execution control dependencies
-
-        - program slicing for debugging, program understanding, etc, which we'll implement in a later assignment
-        - converting a compiler IR into static single assignment form (SSA), which we'll hopefully get a chance to talk about later
-        - more...
-
-- for this analysis we don't care about individual instructions, just entire basic blocks---because of the way we defined basic blocks, if one instruction is executed all the others in the same block necessarily must be executed as well
-
-### control dominance
-#### definitions:
-
-- the DOM relation: `x DOM y iff every path from function entry to y must pass through x`
-
-    + that is, we can't get to y without going through x first
-
-    + reflexive, transitive, anti-symmetric (i.e., a partial order)
-
-- strict dominance: `x DOM! y iff x DOM y and x != y`
-
-    + that is, the irreflexive version of DOM
-
-- immediate dominance: `x IDOM y iff x DOM! y and x is dominated by all other strict dominators of y`
-
-    + intuitively, this is the "closest" strict dominator of y
-
-- post-dominance: `x PDOM y iff every path from y to the function exist must pass through x`
-
-    + the dual of dominance; just reverse the CFG and PDOM becomes DOM (and vice-versa)
-
-    + similarly, can have `PDOM!` and `PIDOM`
-
-- we'll only discuss the forward cases (`DOM`, `DOM!`, `IDOM`); everything we do for those works for the "post" cases too just by reversing the CFG
-
-    + remember that we've defined our CFG to have exactly one "exit" basic block (the one with the `$ret` instruction), so reversing it still leaves us with a single entry node
-
-#### examples
-
-- EXAMPLE 1
-
-  CFG:
-  ```
-  A --> B ----> C --> E
-          \          /
-           \__> D __/
-  ```
-
-  RELATIONS:
-  ```
-  A DOM { A, B, C, D, E }
-  B DOM { B, C, D, E }
-  C DOM { C }
-  D DOM { D }
-  E DOM { E }
-
-  A DOM! { B, C, D, E }
-  B DOM! { C, D, E }
-  C DOM! {}
-  D DOM! {}
-  E DOM! {}
-
-  A IDOM { B }
-  B IDOM { C, D, E }
-  C IDOM {}
-  D IDOM {}
-  E IDOM {}
-  ```
-
-- EXAMPLE 2:
-
-  CFG:
-  ```
-          +-----+
-          |     |
-          v     |
-  A ----> B --> C
-    \       \
-     \       \
-      \_> D --> E
-  ```
-
-  RELATIONS:
-  ```
-  A DOM { A, B, C, D, E }
-  B DOM { B, C }
-  C DOM { C }
-  D DOM { D }
-  E DOM { E }
-
-  A DOM! { B, C, D, E }
-  B DOM! { C }
-  C DOM! {}
-  D DOM! {}
-  E DOM! {}
-
-  A IDOM { B, D, E }
-  B IDOM { C }
-  C IDOM {}
-  D IDOM {}
-  E IDOM {}
-  ```
-
-#### computing dominance
-##### abstract domain
-
-- what are the potential analysis solution? sets of basic blocks, thus these are the abstract values
-
-- therefore, abstract domain is 𝒫(BasicBlock)
-
-- what is the most and least precise safe answers (i.e., ⊥ and ⊤)?
-
-    - remember that we want to be safe: if we say that bb1 dominates bb2 then it definitely does
-    - ⊥ = BasicBlock
-    - ⊤ = {}
-
-- what is join?
-
-    - set intersection
-
-- notice that this is flipped from reaching defs, where we had a powerset abstract domain but ⊥ = {} and ⊤ = PP
-
-    - this is because our notion of "safe" (the guarantee we want to provide) is different
-
-    - for reaching defs, we wanted to know all defs that _may_ reach this point
-
-    - for dominance, we want to know all basic blocks that _must_ dominate this one
-
-##### abstract semantics
-
-- the semantics are trivial because we don't care about the actual instructions, just the edges of the CFG
-
-- the abstract store is _not_ a mapping from variables to abstract values because variables are irrelevant to dominance; it's just a single abstract value (the set of dominating basic blocks)
-
-- to "execute" basic block bb, just insert it into the abstract store (because every basic block dominates itself)
-
-- everything else is handled by the fixpoint worklist algorithm
-
-##### examples 
-
-- [use examples 1 and 2 above]
-
-### control dependence
-#### intro
-
-- dominance tells us what basic blocks _must_ be executed before other blocks (or after for post-dominance), but it can also be used to tell us what blocks are _control dependent_ on what other blocks
-
-- intuitively, block X is control dependent on block Y if the execution of block Y directly determines whether block X will be executed or not (including how many times it will be executed, for loops)
-
-#### EXAMPLE 1
-
-  ```
-  entry:
-    secret = $call boolean_input()
-    $branch secret bb2 bb3
-
-  bb2:
-    public = $copy 1
-    $jump exit
-
-  bb3:
-    public = $copy 0
-    $jump exit
-
-  exit:
-    d = $call output(public)
-    $ret 0
-  ```
-
--  bb2 and bb3 are both control dependent on bb1; entry and exit are _not_ control dependent on any other blocks
-
-- this also shows another reason why control analysis is interesting: notice that the value of `public` is equal to the value of `secret` even though there is no explicit assignment between them---this can only leak one bit of information, but if we put something like this in a loop we could leak arbitrary bits
-
-#### EXAMPLE 2
-
-- CFG:
-
-  ```
-        +-----------+
-        |           |
-        V           |
-  A --> B --> C --> F --> G
-        |           ^
-        |           |
-        + --> D --> E
-              ^     |
-              |     |
-              +-----+
-  ```
-
-- CONTROL DEPENDENCIES:
-
-  ```
-  A: { }
-  B: { F }
-  C: { B }
-  D: { B, E }
-  E: { B, E }
-  F: { F }
-  G: { }
-  ```
-
--  B is control dependent on F because F controls how often B is executed; similarly for (D, E), (E, E), and (F, F).
-
-#### dominance frontiers
-
-- to compute control dependence info we need something called `dominance frontiers`
-
-- the dominance frontier of block X is the set of all blocks Y s.t. X dominates a predecessor of Y but does not strictly dominate Y
-
-    + intuitively, the dominance frontier is the set of blocks that are _almost_ dominated by X, but just outside its control; or, its the set of blocks that are the earliest point where some competing control-flow path may reach that block
-
-- given DOM for each basic block, we can compute the dominance frontiers by:
-
-  ```
-  // this will be the solution
-  let frontiers : BasicBlock -> 𝒫(BasicBlock) = {}
-
-  for (bb, bb_doms) in dominators:
-    // strict dominators of bb
-    let strict_bb_doms = bb_doms - {bb}
-
-    // for each predecessor of bb
-    for pred in cfg_preds(bb):
-      // for each dominator of pred that doesn't strictly dominate bb
-      for pred_dom in dominators[pred] - strict_bb_doms
-        // pred_dom dominates a predecessor of bb but doesn't strictly
-        // dominate bb, thus by definition frontier[pred_dom] includes bb
-        frontiers[pred_dom] ∪= bb
-  ```
-
-- [demonstrate on example 2 above]
-
-  DOMINANCE FRONTIERS:
-  ```
-  A: { }
-  B: { B }
-  C: { F }
-  D: { D, F }
-  E: { D, F }
-  F: { B }
-  G: { }
-  ```
-
-#### computing control dependence from dominance frontiers
-
-- X is control dependent on Y iff Y is in the post-dominance frontier of X
-
-    + remember that post-dominance (and post-dominance frontiers) are exactly the same as dominance (and dominance frontiers) except on a reversed CFG
-
-    + if Y is in the post-dominance frontier of X, then that means Y has multiple successors s.t. if a specific one is taken then X must necessarily execute, and if it is not taken then X will definitely not execute---in other words, X is control dependent on Y
-
-- algorithm:
-
-    + step 1: compute post-dominators (i.e., flip the edges of the CFG and compute the dominators on that)
-
-    + step 2: compute post-dominance frontiers (i.e., compute dominance frontiers but using the reversed CFG and the post-dominators)
-
-    + step 3: each block X is control dependent on any block in its post-dominance frontier
-
-- [demonstrate on example 2 above]
-
-  POST-DOMINANCE FRONTIERS (and thus CONTROL DEPENDENCIES):
-  ```
-  A: { }
-  B: { F }
-  C: { B }
-  D: { B, E }
-  E: { B, E }
-  F: { F }
-  G: { }
-  ```
-
-# the math behind DFA
-## preliminaries
-
-- we've been really hand-wavy so far---how can we guarantee that the analysis is decidable (i.e., terminates)? we saw that some domains guarantee termination (e.g., signs) and some don't (e.g., intervals), and being infinite doesn't tell the whole story (e.g., constants terminates while intervals does not without widening)
-
-- to make guarantees about computability we can't allow arbitrary abstract domains; instead we need to impose an algebraic structure to them that will allow us to prove computability
-
-- we'll go into a bunch of definitions and theorems in abstract algebra, and then afterwards connect it back to abstract domains and computability
-
-- these definitions are about _ordering_: given a set S, an ordering is a binary relation on that set which meets certain requirements
-
-    + examples of well-known orderings: (ℤ, ≤), (Strings, ≤)
-
-    + we often use the notation ⊑ for an arbitrary ordering
-
-## definitions
-### BINARY RELATION
-
-- a binary relation on set `S ⊆ 𝒫(S × S)`
-
-- example: `({1, 2, 3, 6}, ⊑)` where ⊑ means 'divides evenly'; the binary relation ⊑ is {(1,1), (1,2), (1,3), (1,6), (2,2), (2,6), (3,3), (3,6), (6,6)}
-
-- instead of saying `(1,3) ∈ ⊑` we usually say `1 ⊑ 3`
-
-- a relation may have some of the following properties:
-
-    - reflexive: `∀a ∈ S, (a, a)`
-
-    - transitive: `∀a,b,c ∈ S, (a, b) and (b, c) implies (a, c)`
-
-    - symmetric: `∀a,b ∈ S, (a, b) implies (b, a)`
-
-    - anti-symmetric: `∀a,b ∈ S, (a, b) and (b, a) implies a = b`
-
-### PARTIAL ORDER aka POSET
-
-- a binary relation that is _reflexive_, _transitive_, and _anti-symmetric_
-
-    - if it were _symmetric_ instead then it would be an _equivalence relation_: (ℤ, =), "has same birthday as"
-
-- examples:
-
-    + reachability on a DAG (anti-symmetric because no cycles)
-    + ℕ and divisibility: (ℕ, |)
-    + 𝒫(S) and ⊆
-
-- counterexample:
-
-    + (ℤ, |) (not anti-symmetric, e.g., 2 | -2 and -2 | 2)
-
-- we can visualize partial orders as Hasse diagrams:
-
-    + example: 𝒫({1, 2, 3}), ⊆
-
-    + example: ({1, 2, 3, 5, 6, 10, 15, 30}, "divides into")
-
-- a partial order can be a _total order_, i.e., a partial order s.t. for any two elements x and y, either x ⊑ y or y ⊑ x
-
-    + examples: (ℤ, ≤), (Strings, ≤)
-
-    + counterexample: the partial order examples given above
-
-### LEAST UPPER BOUND, aka JOIN, aka ⊔
-
-- for D ⊆ S, the least x ∈ S s.t. ∀d ∈ D, d ⊑ x
-
-- denoted `⊔D` or (if D = {x, y}) `x ⊔ y`
-
-- examples: use posets from above
-
-### GREATEST LOWER BOUND, aka MEET, aka ⊓
-
-- the dual of ⊔: for D ⊆ S, the greatest x ∈ S s.t. ∀d ∈ D, x ⊑ d
-
-- examples: taken from the above partial and total orders
-
-- note that ⊔ and ⊓ are not guaranteed to exist
-
-    + DAG reachability [e.g., nodes in isolated graph components]
-
-    + (ℤ, ≤), join(D) where D = the set of even integers [no least integer greater than all even integers]
-
-### CHAIN
-
-- a totally ordered subset of a partial order
-
-- example: taken from previous examples of partial orders
-
-### LATTICE
-
-- a partial order s.t. any two elements are guaranteed to have a ⊔ and ⊓
-
-- examples:
-
-    + (ℕ, |) [BOT = 1, TOP = 0]
-
-        - join(x, y) == least common multiple
-        - meet(x, y) == greatest common divisor [BOT = 1]
-
-    + (𝒫({1, 2, 3}), ⊆) [BOT = {}, TOP = {1,2,3}]
-
-        - join = union
-        - meet = intersection
-
-- QUIZ: lattice or not? [draw Hasse diagrams]
-
-  1. ({1, 2, 3}, |)             [NO]
-  2. ({1, 2, 3, 6}, |)          [YES]
-  3. ({1, 2, 3, 12, 18, 36}, |) [NO]
-  4. (ℕ, ≤)                     [YES]
-
-### NOETHERIAN LATTICE
-
-- a lattice s.t. the length of any ascending chain must be finite
-
-    + aka 'meets the finite ascending chain condition'
-
-- examples:
-
-    + any finite lattice
-    + (ℕ, >=) [TOP is 0]
-
-- counterexample: (ℕ, ≤) [BOT is 0]
-
-### COMPLETE LATTICE
-
-- a lattice S s.t. every subset has a ⊔ and ⊓
-
-    + contrast with a regular lattice which only requires that any two elements have a ⊔ and ⊓
-
-    + notice this implies there is a single greatest element (⊔S) and a single least element (⊓S)
-
-- examples:
-
-    + any finite lattice
-
-        - just take join/meet of each element in turn
-
-    + (𝒫(ℕ), ⊆)
-
-        - join = union
-        - meet = intersection
-
-    + (ℕ, |) [see example from LATTICE section for details]
-
-- counterexamples:
-
-    + ({ S ∈ 𝒫(ℕ) | S is finite }, ⊆)
-
-        - no join/meet for infinite set
-
-    + (ℕ, ≤)
-
-        - meet for infinite set, but no join
-
-### SUMMARY OF RELATIONS
+- loop invariant code motion
 
 ```
-binary relation
-  --> preorder
-      --> equivalence relation
-      --> partial order (includes total order)
-          --> lattice (may or may not be noetherian)
-              --> complete lattice (also may or may not be noetherian)
+let sum:int = 0, total:int = 5, x:int = 2, tmp:int;
+tmp = x * 10;
+while sum < total {
+  sum = sum + tmp;
+}
 ```
 
-## relation to program analysis
+- constant folding
 
-- we will require our abstract domains to be complete noetherian lattices with a partial order based on precision
+```
+let sum:int = 0, total:int = 5, x:int = 2, tmp:int;
+tmp = 20;
+while sum < 5 {
+  sum = sum + 20;
+}
+```
 
-    + examples: parity, sign, constants, reaching defs
+- dead code elimination
 
-    + recall that each abstract value represents a set of concrete values, and the abstract domain partial order reflects the subset relation between the concrete sets---a smaller concrete set of possible values means a more precise abstract value
+```
+let sum:int = 0;
+while sum < 5 {
+  sum = sum + 20;
+}
+```
 
-- so when we've said "the most precise abstract value", what we mean is the lowest possible element of the lattice that still over-approximates the given concrete values
+- we call this process "optimization", but there isn't really a sense of "optimal" code meaning the best possible code---just better than the original
 
-- note that traditionally DFA actually flips the lattices: the most precise element is on the top and the least precise is on the bottom, while a.i. does it like we're doing it here; it can be confusing when reading both the dfa and a.i. literature
+    - the more optimizations we apply the better the result (with diminishing returns) but the longer compilation takes
 
-    + the a.i. version matches the math better, but really it doesn't matter as long as we're consistent
+- once the code has been optimized as much as desired we're done with the middle-end
 
-- why is all this math useful? because we can formally define when the MFP exists and is computable
+## back end
 
-## computability
-### FIXPOINTS
+- the primary job of the back end is to translate the IR into whatever ISA we're targeting (we'll be targeting x86 in this class)
 
-- recall:
+    - a secondary job is to apply ISA-specific optimizations
 
-    + a fixpoint of `F` is an input `x` s.t. `F(x) = x`
+    - the particular ISA-specific optimization we'll look at is _register allocation_
 
-    + `lfp_x F = u` s.t. `x ⊑ u`, `F(u) = u`, `∀y. F(y) = y ⇒ u ⊑ y`
+- step 1: translate the IR into assembly assuming an infinite number of registers are available
 
-    + pre-fixpoint: `x ⊑ F(x)`
+    - i'll use a pseudo assembly to keep things simple
 
-    + post-fixpoint: `F(x) ⊑ x`
+- EXAMPLE using original source code and assuming each variable corresponds to its own register [see OneNote] // FIXME:
 
-- notice that these last three definitions only make sense for an ordered set (and now we know exactly what that means)
+```
+    MOV #0, sum    // move constant into register
+    MOV #5, total
+    MOV #2, x
+L1: CMP sum, total // set condition flag
+    JLT L2         // jump if less-than
+    EXIT
+L2: MOV #10, tmp
+    MUL x, tmp     // tmp = x * tmp
+    ADD sum, tmp   // tmp = sum + tmp
+    MOV tmp, sum   // sum = tmp
+    JMP L1
+```
 
-- note that a function may have 0—∞ fixpoints, and just because there's more than one _doesn't_ mean that there's a least one
+- step 2: register allocation
 
-    + f(x) = x + 2  [0 fixpoints]
+    - in reality no ISA has an infinite number of registers; we need to map an arbitrary number of variables into a fixed number of registers
 
-    + f(x) = x² - x [2 fixpoints (0 and 1)]
+    - no instruction will use more than two variables; the easy fix is to always use the following process so that we only ever need two registers:
 
-    + f(x) = x² ÷ x [∞ fixpoints; no least fixpoint if x ∈ 𝐙]
-
-- our worklist algorithm for computing the MFP is trying to compute this, but how can we be sure that it exists and is computable?
-
-### MONOTONICITY
-
-- function `F` is _monotone_ iff `x ⊑ y ⇒ f(x) ⊑ f(y)`, or equivalently `f(x) ⊔ f(y) ⊑ f(x ⊔ y)`
-
-- [SKIP] PROOF (1st direction; 2nd direction left as exercise):
-
-    1. f(x) ⊔ f(y) ⊑ f(x ⊔ y)      [given]
-    2. x ⊑ y ⇒ x ⊔ y = y           [by definition]
-    3. x ⊑ y ⇒ f(x) ⊔ f(y) ⊑ f(y) [by 1, 2]
-    4. f(x) ⊑ f(x) ⊔ f(y)          [by definition]
-    5. x ⊑ y ⇒ f(x) ⊑ f(y)        [by 3,4]
-
-- example: `f(x) = x - 1`
-
-- counterexample: `f(x) = x+2 if x ≤ 0, else x`
-
-- an _extensive_ function is one for which x ⊑ F(x); note that monotone and extensive are orthogonal properties (people often confuse them)
-
-### FIXPOINT THEOREMS
-
-- `TARSKI`: let `L` be a complete lattice and `F:L→L` be monotone; then the set of fixpoints of `F` is a complete lattice (and thus there exists a least fixpoint)
-
-    + so we know a least fixpoint exists, since our abstract domains are complete lattices
-
-    + however, it doesn't tell us how to _find_ the least fixpoint
-
-- `KLEENE`: let `L` be a complete _noetherian_ lattice and `F:L→L` be monotone and `x` be a pre-fixpoint of `F`; then ∃n ≥ 0 s.t. `Fⁿ(x)` is stationary and `lfp_x F = Fⁿ(x)`
-
-    + so start from a solution that is less than the fixpoint, then keep applying `F` over and over; eventually we'll reach a fixpoint and it will be the least fixpoint
-
-    + `KLEENE ITERATIONS`: ⊥ ⊑ F(⊥) ⊑ F(F(⊥)) ⊑ ... ⊑ Fⁿ(⊥) ⊑ ...
-
-    + it turns out that this is what we're doing when we use our worklist algorithm (though in an optimized way because we only re-evaluate the parts that have changed, rather than re-evaluating everything every time)
-
-### ABSTRACT SEMANTICS
-
-- these theorems tell us that if (1) our abstract domains are noetherian lattices, and (2) our transfer functions are monotone, then the least fixpoint exists and is computable, and our worklist algorithm will compute it
-
-    + note that the worklist is an optimization of kleene iterations that avoids computing transfer functions that are guaranteed to have not changed their values
-
-    + for us, our function `F` is a system of equations based on the program being analyzed:
-
-      ```
-      IN_k = ⊔ { OUT_i | i→k ∈ CFG }
-      OUT_k = F♯(IN_k)
-      ```
-
-    + here `F♯` is the abstract execution of a basic block and its argument is the initial abstract store for that basic block
-
-### EXAMPLES
-
-- show for the following integer abstract domains that they are noetherian lattices and the appropriate transfer functions are monotone:
-
-#### signedness {-, 0, +}
-
-- [show abstract domain, abstract `+`]
-
-- is the abstract domain a noetherian lattice? YES
-
-- abstract `+` is monotone if: `a ⊑ a'` and `b ⊑ b'` => `a + b ⊑ a' + b'`
-
-    + case 1: `a' or b' = ⊥`; then `a or b = ⊥` and thus `a + b = ⊥` and also `a' + b' = ⊥`, thus `a + b = a' + b'`
-
-    + case 2: `a' or b' = ⊤`; then `a' + b' = ⊤` and thus `a + b ⊑ a' + b'`
-
-    + case 3: `a' ∈ {+,0,-}`, `b' ∈ {+,0,-}`, `a, b ̸= ⊥`; then `a = a'` and `b = b'` thus `a + b = a' + b'`
-
-#### constant lattice
-
-- [show abstract domain, abstract `+`]
-
-- is the abstract domain a noetherian lattice? YES
-
-- is the abstract `+` function monotone? [similar to proof for sign abstract `+`]
-
-# widening redux
-## context
-
-- DFA enforces computability by requiring that abstract domains be noetherian lattices, but this limits the precision of what an analysis can compute
-
-    - remember that the abstract domain defines what solutions an analysis can return; a noetherian lattice may not even be able to express the kind of solution that we want
-
-    - example: the integer interval abstract domain
-
-    - however, since the integer interval lattice is _not_ noetherian it cannot be used with DFA without some additional trickery
-
-- we saw that there is a way around this problem that allows us to use non-noetherian abstract domains but still guarantees computability: _widening_
-
-    - previously we looked at it intuitively
-
-    - now let's look at the math
-
-## definition
-
-- recall that while complete lattices with monotone functions are guaranteed to have a fixpoint (TARSKI), the only way we're guaranteed to be able to _find_ the fixpoint is if the lattice is noetherian (i.e., no infinite ascending chains)
-
-    + essentially, if the function is monotone then we can only stay in one place (we've found a fixpoint) or go up the lattice; if the lattice is noetherian we can only go up the lattice a finite number of times before we reach ⊤
-
-- but what if we want to use an abstract domain that isn't noetherian, in order to get greater precision?
-
-- what we want is a way to accelerate/guarantee convergence, i.e., if the normal fixpoint computation is working up along the abstract lattice in a chain, what we need to is leap-frog up that chain past potentially an infinite number of lattice elements
-
-- solution: _widening_. we replace the lattice join operator with a _widening operator_, then apply the usual worklist algorithm for computing a fixpoint
-
-    + this comes with a cost: the fixpoint we reach is not guaranteed to be the least fixpoint of the original lattice (or even a fixpoint of the original lattice at all); all we know for sure is that `lfp_orig ⊑ lfp_widened`
-
-    + the idea is that while we aren't getting as precise an answer as we could be getting for that abstract domain, since the abstract domain itself is more precise than one that is noetherian, hopefully we're getting a more precise answer than we would be getting with that noetherian lattice (this isn't a guarantee, though)
-
-        - example: we need to use widening for integer intervals, but we'll still often get a better solution than using the constant abstract domain
-
-    + an additional cost is that before, we had a simple checklist for proving our analysis is computable: we have a noetherian lattice and monotone transfer functions; now we need to prove that the widening operator we choose is, in fact, a proper widening operator (there are many possible operators, and we need to prove this fact for each one we want to use)
-
-- an operator `▽ ∈ DxD -> D` over some poset `D` is a widening operator iff:
-
-    + `x ⊑ (x ▽ y)` and `y ⊑ (x ▽ y)`
-
-    + for all ascending chains `x₀ ⊑ x₁ ⊑ x₂ ⊑ ...`, the following chain stabilizes in a finite number of steps:
-
-        - `acc₀ = x₀`
-        - `acc_{n+1} = accₙ ▽ x_{n+1}`
-
-- the first condition says that the widening operator overapproximates its inputs
-
-- the second condition says that if we apply the widening operator to an ascending chain, then the result is a finite ascending chain
-
-    + recall that our worklist algorithm is essentially computing kleene iterations (`Fⁿ(⊥)`), which is computing an ascending chain; so if we use widening instead of join for the worklist algorithm we're guaranteed to reach a fixpoint and terminate
-
-## example: integer intervals
-
-- recall the integer interval abstract domain
-
-- this is a complete lattice, but non-noetherian
-
-- our example widening operator (one out of many possible):
-
-    + `∀x ∈ L: ⊥ ▽ x = x ▽ ⊥ = x`
-
-    + `[a1, b1] ▽ [a2, b2] = [a', b']` s.t.
-
-        - if `a1 <= a2` then `a' = a1`, else `a' = -∞`
-        - if `b1 >= b2` then `b' = b1`, else `b' = ∞`
-
-    + essentially, if we're growing down jump straight to -∞ and if we're growing up jump straight to ∞
-
-- note again that this widening operator is _not_ commutative (unlike join, which is commutative)
-
-    - this means that the order we apply the widening operator in matters, thus the order we visit basic blocks in matters (which it didn't when we used ⊔)
-
-    - example: two edges into a loop header, one that propagates `a -> [0, 0]` and one `a -> [1, 1]`; depending on which one propagates first we'll get either `[0, ∞)` or `(-∞, 1]`
-
-# practice designing DFA analyses
-
-- [go through designing a string constant analysis with the class as a warm-up, then give the prefix and regex analyses as exercises; see the pdfs in `docs/` for details]
-
-- for each analysis give:
-
-    + the elements of the lattice
-    + which element is ⊤, which is ⊥
-    + the join and meet operators and the ordering relation
-    + whether the lattice is finite, infinite but noetherian, or non-noetherian
-    + the alpha and gamma functions
-    + the definitions of `+`
-    + proof that `+` is monotone
-
-- prefix:
-
-    + the cases are handling various cells in the `+` table: case 1 is the leftmost column and the top row; case 2 is the middle cell; case 3 is rightmost middle cell; case 4 is the bottom middle and rightmost cells
-
-    + for case 3 we're saying that `b <= b'` which means all the strings in `b` are contained in `b'`, and all we're doing is sticking the same prefix to both sides, so `a . b <= a . b'`
-
-    + for case 4 we're saying that `a <= a'`, which means all strings starting with `a` are in `a'`, so no matter what `b` is it must be the case that `a . b <= a'`
-
-- regex:
-
-    + remember that it's only a lattice if we use normalized regexes
-
-    + while a lattice, it isn't a _complete_ lattice (e.g., the least upper bound of the chain `01 <= 0011 <= 000111 <= ...` is the language `0{n}1{n}`, which is context-free, and there is no _least_ regex that contains it); this is a problem, but since the lattice is non-noetherian it doesn't really matter---we can't guarantee finding a fixpoint anyway
-
-# set constraint-based analysis
-## intro
-
-- we're going to use the problem of pointers to explore a totally different method for program analysis: set constraint-based analysis
-
-- we've had to treat pointers conservatively, and this has really hurt precision; pointers allow indirect data- and control-flow: we can't tell syntactically what is being used/defined by an instruction or where control is going (e.g., function pointers)---if we want useful, non-trivial analysis information we really need to deal with pointers somehow
-
-- in theory we can use DFA to analyze pointer information, using our standard formula: abstract domain, abstract semantics, abstract execution; in practice, it turns out that the domain is large enough and semantics complex enough that this isn't really scalable (we'd be lucky to be able to analyze programs with just 10,000 LOC)
-
-    + it's possible to make it more scalable (part of my phd dissertation was about how to make DFA-based pointer analysis two orders of magnitude more scalable), but (1) it isn't commonly used because it's still expensive; and (2) doing so is complex and requires set constraint-based analysis as a sub-procedure anyway
-
-- to be clear, set constraint-based analysis isn't specifically for pointer analysis, it can be used for many different things (just like DFA); we're going to be using pointers as the motivating example because it turns out that it's probably the most common technique for doing pointer analysis in current use
-
-- recall that DFA gives us a `flow-sensitive` analysis (one solution per program point); set constraint-based analysis is going to give us a `flow-insensitive` analysis (one solution over the entire program)
-
-    + a flow-sensitive sign analysis: at this program point `x` is ZERO, at this other program point `x` is POS
-
-    + a flow-insensitive sign analysis: over the entire program, `x` is TOP
-
-- flow-insensitive analysis is clearly less precise because it can't give different answers per program point but instead must give a single answer that is sound over the entire program; the tradeoff is that it is usually much more scalable than flow-sensitive analysis
-
-- we'll begin by talking about set constraint-based analysis in general, then show how to apply it to pointer analysis
-
-## inclusion set constraint language
-
-- there are a number of possible set constraint languages with various tradeoffs in expressiveness and computability (the most general set constraint language is undecidable)
-
-- one useful point in this space is the _inclusion constraint language_:
-
-  ```
-  X ∈ Variable
-  c ∈ Constructor
-
-  T ∈ Term ::= X | c(T1,...,Tn)
-  E ∈ Expr ::= T | c⁻ⁱ(X)
-  S ∈ Stmt ::= E1 ⊆ E2 | S1 ∧ S2  // (E1 and E2 cannot both be projections)
-  ```
-
-- what are constructors? think of them as _uninterpreted functions_ that take sets as arguments and return sets as results
-
-    + the analysis doesn't care what they mean---it's up to us to give them a meaningful interpretation when we're defining an analysis
-
-    + example: type constructors (think of a type as representing a set of values)
-
-        - nullary constructors: `int`, `string`, `bool`
-        - unary constructors: `Set[·]`, `List[·]`
-        - binary constructors: `·→·`, `Map[·,·]`
-
-    + characteristics of constructors:
-
-        - _arity_: the number of arguments it takes
-        - _variance_: each argument position is either:
-
-            + _covariant_ (the constructor is monotone wrt that position)
-            + _contravariant_ (the constructor is antitone wrt that position)
-
-- variance is answering the question "if i know `A ⊆ B`, what do i know about the relation between `c(A)` and `c(B)` (or vice versa)?
-
-    + as an example consider a constructor `foo` with arity 2 where `foo`'s first argument is covariant and its second is contravariant, and suppose `foo(A, B) ⊆ foo(C, D)`; what can we determine about the relations between `A` and `C` and between `B` and `D`?
-
-        - `foo`'s first argument (`A` and `C` here) is covariant, therefore `A ⊆ C` (notice that the direction of the subset is preserved)
-
-        - `foo`'s second argument (`B` and `D` here) is contravariant, therefore `D ⊆ B` (notice that the direction of the subset is reversed)
-
-    + we need specify variance explicitly because the constructors are essentially uninterpreted functions---what they really _mean_ is up to us when we design our analyses and so we need to explicitly specify this piece of information to allow the set constraints to be correctly solved wrt what the constructors really stand for
-
-    + for now we'll just assume everything is covariant; we'll need contravariance later but we'll talk more about it then
-
-- what does projection do? take the constructors denoted by the given expression, filter out the ones that don't match the given constructor, take the i'th argument of each remaining constructor, and put all of them in a set
-
-    + we'll number positions starting from 0
-
-    + example projection: suppose
-
->     X -> { a(b, C), a(D, e), f(g), h(i, j, k) }
->     C -> { l, m }
->     D -> { n, o, p }
-
-    + then `a⁻¹(X)` = `{ e, l, m }`
-
-- example set constraint system:
-
-  ```
-  f(X,Y) ⊆ A
-  A ⊆ B
-  B ⊆ C
-  C ⊆ E
-  g ⊆ D
-  h ⊆ D
-  h ⊆ f⁻¹(B)
-  D ⊆ f⁻⁰(C)
-  f⁻⁰(C) ⊆ E
-  f⁻¹(B) ⊆ F
-  ```
-
-- what is a solution to a set constraint system?
-
-    + let H = the set of all constructor calls
-
-    + a solution is an assignment `σ ∈ Variable → 𝒫(H)` that maps each set variable to a set of constructor calls s.t. all constraints are satisfied
-
-- for the above example, a valid solution would be:
-
-  ```
-  A -> { f(X,Y) }
-  B -> { f(X,Y) }
-  C -> { f(X,Y) }
-  D -> { g, h }
-  E -> { f(X,Y), g, h }
-  F -> { h }
-  X -> { g, h }
-  Y -> { h }
-  ```
-
-- this is not the only possible set constraint language that yields a decidable analysis, but this one has two nice properties:
-
-    1. it is guaranteed to have a minimal solution
-    2. it is guaranteed to have cubic complexity
-
-- analyses defined using this particular restricted set constraint language are called _inclusion-based analyses_
-
-    + as a sidenote, another common class of analyses is _equality-based analyses_, which uses the same language except with `E1 = E2` instead of `E1 ⊆ E2`; this is even less precise than inclusion-based, but can run in near-linear time complexity
-
-## solving inclusion constraints
-### representing constraints as a graph
-
-- it will be convenient for solving the constraints to represent them as a graph
-
-    + a node for each set variable, projection, and constructor call
-    + an edge for each constraint from the lhs to the rhs
-
-- edges can be represented in many ways; we'll use two kinds:
-
-    + successor edges: the edge is stored in the source node
-    + predecessor edges: the edge is stored in the destination node
-
-- the rules are:
-
-    + any edge from a constructor call is a predecessor edge
-    + any edge to a projection is a predecessor edge
-    + all other edges are successor edges
-    + [there cannot be any edges between projections]
-
-- why we do it this way will become evident when we show how to solve the constraints
-
-- example:
-
-  ```
-  f(X,Y) ⊆ A
-  A ⊆ B
-  B ⊆ C
-  C ⊆ E
-  g ⊆ D
-  h ⊆ D
-  h ⊆ f⁻¹(B)
-  D ⊆ f⁻⁰(C)
-  f⁻⁰(C) ⊆ E
-  f⁻¹(B) ⊆ F
-  ```
-
-  ```
-  [--> == predecessor edge]
-  [==> == successor edge]
-
-  f(X,Y) --> A ==> B ==> C
-                          \\
-  g --> D --> f⁻⁰(C) =======> E
-       /
-  h --<
-       \
-        f⁻¹(B) ==> F
-  ```
-
-### solving the constraint graph
-
-- solving the constraints corresponds to computing the dynamic transitive closure of the graph
-
-    + the predecessor edges from the constructor calls to the set variables are the solution to the constraints
-
-    + remember that a solution maps set variables to sets of constructors, so we map each set variable to the set of constructors that have a predecessor edge to that set variable
-
-- [solve above example]
-
-  ```
-  A -> { f(X,Y) }
-  B -> { f(X,Y) }
-  C -> { f(X,Y) }
-  D -> { g, h }
-  E -> { f(X,Y), g, h }
-  F -> { h }
-  X -> { g, h }
-  Y -> { h }
-  ```
-
-- initialize worklist with all variables that have a predecessor edge (i.e., all variables that currently have something in their solution set); the worklist will only contain set variables
-
-- perform the usual worklist algorithm (i.e., loop as long as the worklist is non-empty); when popping set variable X:
-
-    1. propagate X's predecessor edges along all of X's successor edges; if the predecessor edges of the destination node changed, put it onto the worklist
-
-    2. if X has any projections, process each projection node P:
-
-        + let Y = the value of P's projection (i.e., a set of variables and/or constructor calls from projecting X)
-
-        + for each predecessor p_i of P and successor s_i of P and each y_i ∈ Y, add edges p_i -> y_i -> s_i (using the standard rules for pred vs succ edges)
-
-        + if a node has a new pred or succ edge added to it, add that node to the worklist
-
-- what if we add an edge between two constructors (e.g., `c(T1,...,Tn) ⊆ c(T1',...,Tn')`)? this is where knowing the variance of each constructor argument position matters:
-
-    + `c(T1,...,Tn) ⊆ c(T1',...,Tn')` =>
-
-        - `Ti ⊆ Ti'` if position `i` of constructor `c` is covariant
-        - `Ti' ⊆ Ti` if position `i` of constructor `c` is contravariant
-
-    + what if the constructors don't match? technically this is an error, but in a practical implementation we usually just ignore mismatched constructors
-
-- when the worklist is empty, we've computed a solution to the original constraints: for each set variable, look at its predecessor edges to get its solution
-
-### implementing the constraint graph and solver
-
-- this is just a high-level suggestion for how to implement them---the details for how to best implement them depend on the language you're using
-
-    + feel free to implement them a different way in your solution, this is not mandatory
-
-- define the following data structures:
-
-    + `Constructor`: containing name, arity, and variance info for that constructor
-
-    + `SetVariable`: containing name, list of predecessors (e.g., a set of nodes), and list of successors (e.g., another set of nodes)
-
-    + `ConstructorCall`: containing a reference to the Constructor and a list of arguments (e.g., a vector of nodes)
-
-    + `Projection`: containing a reference to the SetVariable the projection is being done on, a reference to the Constructor being projected, the position of the Constructor argument being projected, the list of predecessors, and the list of successors
-
-- `SetVariables`, `ConstructorCalls`, and `Projections` are the nodes of the constraint graph, and the lists of predecessors and successors are the edges of the constraint graph
-
-- the specific set of constructors, constructor calls, set variables, and projections will vary with the problem being solved, so you also need a way for the _user_ of the constraint solver (in our case this will be the pointer analysis) to register specific constructors, set variables, constructor calls, and projections
-
-    + generally the easiest way to do this is to have a `register` function take all the relevant information (_except_ for edges) and return some handle to the created constructor or node (e.g., a pointer or an index into a vector)
+        - load the first variable from memory to a register
+        - load the second variable from memory to a register
+        - perform the operation
+        - store the result to memory
     
-    + then there is a separate `add_edge` function that takes two handles and adds an edge between them (either predecessor or successor depending on what kind of nodes they are)
+    - memory is _really_ slow, this has a huge performance penalty
 
-## solver optimization
+    - register allocation gives us a smarter way to assign variables to registers so that we have to go to memory as few times as possible
 
-- cubic time complexity is still not great; we can't make the complexity go down but we can still optimize the constraint solver to make it much faster in practice (e.g., reduce the `n` in `O(n³)`)
+## putting it all together
 
-- there are a variety of known optimizations; we won't spend time on them here but there are a number of relevant papers that describe them (including some of mine)
+```
+[source code] --LEXER--> [token stream] --PARSER--> [AST] --LOWERING--> [LIR] --CODEGEN--> [x86]
+                                                      ⇵                  ⇵                  ⇵
+                                                 VALIDATION         OPTIMIZATION       REGISTER ALLOC.
+```
 
-## defining a program analysis
+## what we'll be doing
 
-- there are two steps for defining an analysis using set constraints:
+- we will be covering all these pieces, and you will be implementing them for your projects
 
-    1. define the universe of discourse, i.e., the set variables and the set of constructors
+    - lexer
+    - parser/validation
+    - lowering
+    - codegen
+    - register allocation
+    - optimization
 
-    2. define constraint generation, mapping a program to a set of constraints whose solution will be the solution to the analysis
+- the language we'll be implementing is a C-like language
 
-- notice that we don't need to describe how to solve the analysis, because no matter what the analysis is they're always inclusion constraints and can be solved using the method we described earlier
+    - ints and arithmetic
+    - pointers, arrays, and dynamic memory allocation
+    - structs
+    - functions
+    - assignment, conditionals, and loops
 
-    + that is, the only new thing we need to do to define an analysis is the two points above; we can always use the same solver for all analyses
+- note that these language features are sufficient to implement things like object-oriented and functional languages
 
-- this process is easiest to explain by example; the example we'll be using henceforth is pointer analysis.
+    - an object is a struct + function pointers
+    - so is a closure
 
-# andersen-style pointer analysis
-## intro
+## things we're leaving out
 
-- recall that pointer analysis is computing an overapproximation of program behavior wrt pointers
+- compiler implementations often have other goals in addition to just emitting executable code, like:
 
-    + i.e., for a given pointer access (load, store, indirect call, etc) what object/function might be accessed?
+    - fast compilation
+    - optimal instruction selection
+    - good error messages
+    - IDE support
+    - debugger support
+    - testing and/or verified compilation
 
-- andersen-style pointer analysis is just one form of pointer analysis, defined using the inclusion set constraint language
+- we won't discuss these, but they are important for real-world compilers
 
-    + this is one of the most common kinds of pointer analysis in regular use (e.g., in compilers)
+## final thoughts
 
-    + there are many other kinds of pointer analysis, that explore various points in the precision/performance design space
+- adding language features can make every part of the compiler more complicated; language designers have to be careful to balance useful language features with how complicated they make the language implementation
 
-- we need an abstraction for pointer values (i.e., memory addresses)
+- building a compiler is easy as long as (1) you control the language definition and can make it (and its syntax) simple and easy to handle; (2) you don't care how efficient the compiler itself is; (3) you don't care how efficient the resulting executable is; and (4) you don't care about having good error messages
 
-    + memory is conceptually infinite, so we need to make a finite abstraction: we need abstract values for pointers that over-approximate memory addresses
-    
-    + a common choice is _static allocation site_: we label the `$alloc` instruction that creates object on the heap and use that label to stand for all objects allocated by that instruction; since there are finite allocation instructions the abstract domain is finite
+- of course, for real compilers we want _all_ of these things, and building a real compiler for a language you don't control is very difficult
 
-    + conveniently, LIR already gives every `$alloc` instruction its own unique label, so we'll just use that
+# introducing cflat TODO:
 
-    + example: for `x = $alloc 1 [_a1]`, all addresses returned by the `$alloc` will be represented by `_a1`
+# lexing TODO:
 
-    + note that a single abstract value can represent an unbounded number of concrete memory addresses (e.g., if the instruction is located inside a loop); this is why it's called a _static_ allocation site
+# parsing TODO:
 
-    + there are other abstractions, but they tend to be much more expensive and hence difficult to scale in practice
+# validation TODO:
 
-- recall that an inclusion-based program analysis is defined as:
+# lowering TODO:
 
-    + a set of set variables
-    + a set of constructors
-    + a constraint generation scheme (i.e., a way to map a program to a set of inclusion constraints)
-    + then we just pass the generated constraints to the pre-existing constraint solver
+# codegen TODO:
 
-- contrast this with DFA, where we defined a program analysis as:
+# register allocation TODO:
 
-    + abstract domain + abstract semantics + abstract execution
-    + we had to define the first two, then we could use the same abstract execution engine for any DFA
+# IR optimization TODO:
 
-## start with no structs or calls
-### setup
+# ==== OLD ===================================================================
 
-- we'll assume for now that programs contain no struct definitions or function calls
+RETROSPECTIVE
+=============
 
-- remember that a solution is a map from set variables to sets of constructor calls; we want to define the analysis so that the constaint solution translates to the information we're trying to compute, i.e., points-to sets (in this case)
+for the lexer, the students seem to have difficulty translating an
+NFA/DFA into code; maybe next time go a little deeper into the
+definition of \'delta\' and show them how to implement it as a table
+lookup.
 
-- universe of discourse:
+as a note, not just for this class but others involving type systems,
+having the AST nodes have explicit names (like ADD, FUNDEF, etc) makes
+it easier for students to map the AST nodes to the type system rules and
+vice versa. i should do this for all abstract syntax definitions instead
+of making it look like the concrete syntax.
 
-    + a constant (i.e., nullary constructor) and set variable for each program variable and static allocation site
+initial language/compiler (L1/C1)
+=================================
 
-        - the constant represents the program variable / allocated object
+L1 language
+-----------
 
-        - the set variable represents the associated points-to set
+-   single datatype: int32
+-   arithmetic and relational operations on int32 (treating booleans as
+    int32)
+-   assignment, conditionals, loops, functions
 
-    + a `ref/2` constructor s.t. that first argument is a constant and the second argument is a set variable, connecting a program variable / allocated object with its points-to set
+concrete syntax (naive)
+-----------------------
 
-        - `ref(x, X)` means that `X` is the points-to set of `x`, where, e.g., both the set variable `X` and constant `x` come from the program variable `x`
+\[maybe start with example program and use that to motivate the
+grammar.\]
 
-### constraint generation
+### grammar
 
-- we only care about pointers for pointer analysis, so for all instructions with a lhs ignore it if the type of lhs is not a pointer and for `$store` instructions ignore it if the type of the operand is not a pointer
+\[see handout L1-concrete-syntax.pdf\]
 
-- we can also ignore null pointers (i.e., `0` instead of a pointer variable)
+### keywords and symbols
 
-    - just don't generate a constraint involving null pointers
+keywords = { \'int\', \'if\', \'else\', \'while\', \'def\', \'return\',
+\'output\' } symbols = { \'//\', \'+\', \'-\', \'\*\', \'(\', \')\',
+\'\<\', \'`', '<`\', \'&&\', \'\|\|\', \'!\', \';\', \':=\', \':\',
+\'{\', \'}\', \',\' }
 
-    - this won't be sufficient for indirect calls, but we'll get to that later
+### example program
 
-- given a program variable `x`, we'll use the notation:
+\[see handout\]
 
-    + `[x]` to mean translate `x` into a set variable (creating it if it doesn't already exist) and return the set variable
-    + `const(x)` to mean translate `x` into a constant (creating it if it doesn't already exist) and return the constant
+overall strategy
+----------------
 
-- `x = $copy y`
+remember our overall strategy for a simplified compiler:
 
-    + `[y] ⊆ [x]`
+1.  lex the input to get a token stream
+2.  parse the token stream using an LL(1) parser
+3.  construct an abstract syntax tree (AST)
+4.  generate x86 assembly code
 
-- `x = $alloc op [id]`
+we\'ll take each piece in turn.
 
-    + `ref(const(id), [id]) ⊆ [x]`
+lexing
+------
 
-    + notice that since the left-hand side is a constructor call this constraint will be represented as a predecessor edge in the constraint graph---i.e., it will be part of the solution for the `[x]` set variable
+we\'ve seen that lexing involves translating the input stream of
+characters into meaningful elements of the programming language:
+keywords, symbols, variable identifiers, etc. how do we do that?
 
-- `x = $addrof y`
+### identifying tokens
 
-    + `ref(const(y), [y]) ⊆ [x]`
+the first step is to look at our language grammar and identify what the
+meaningful elements are; that is, what are the elements of the grammar?
 
-    + similarly to `$alloc`, this call will be part of `[x]`'s solution
+typical candidates:
 
-- `x = $gep y <op>`
+-   language keywords like \'if\', \'else\', \'while\', etc.
+-   constant values such as integers, etc.
+-   operator symbols like \'+\', \'\*\', \'\<=\', etc.
+-   grouping symbols like \'(\', \')\', \'{\', \'}\', etc.
+-   miscellaneous symbols like \',\', \';\', etc.
 
-    + `[y] ⊆ [x]`
+some of these elements need to be associated with more information. for
+example, in terms of parsing all we need to know is that something is an
+indentifier (token \<ID\>). but for the rest of compilation we need to
+know [which]{.underline} identifier, so we need to include that
+information: token \<ID,string\>.
 
-    + note that we're being 'array-insensitive', i.e., collapsing all elements of an array into one, which is common in these kinds of analyses
+so what are the tokens for the L1 language?
 
-- `x = $load y`
+identifiers = \<regex\> integers = \<regex\> keywords = { \'int\',
+\'if\', \'else\', \'while\', \'def\', \'return\', \'output\' } symbols =
+{ \'//\', \'+\', \'-\', \'\*\', \'(\', \')\', \'\<\', \'`', '<`\',
+\'&&\', \'\|\|\', \'!\', \';\', \':=\', \':\', \'{\', \'}\', \',\' }
 
-    + `ref⁻¹([y]) ⊆ [x]`
+\<ID, string\> \<NUM, integer\> \<TYPE, type\> \<IF\> \<ELSE\> \<WHILE\>
+\<DEF\> \<RETURN\> \<OUTPUT\> \<AOP,{+,-,\*}\> \<ROP,{\<,=,\<=}\>
+\<LBINOP,{&&,\|\|}\> \<LNEG\> \<LPAREN\> \<RPAREN\> \<LBRACE\>
+\<RBRACE\> \<SEMICOLON\> \<ASSIGN\> \<HASTYPE\> \<COMMA\>
 
-    + why? the projection is modeling pointer dereference: concretely we get the value of `y` (an address), go to that address to get the value of what `y` points to (which is also an address, since `x` is a pointer), then copy that value to `x` [draw a picture]
-    
-    + this constraint gets the current solution for `[y]` (which is a set of `ref` calls representing the value of `y`), projects the second argument of those `ref` calls (which are the set variables representing the value of what `y` points to, i.e., their points-to sets), then copies their values to `[x]`
+notice that we don\'t have tokens for comment or whitespace. these are
+irrelevant to the parser and so we just strip them out instead of
+creating tokens. there are languages where whitespace is not irrelevant
+(e.g., python) and we would need to keep track of it more carefully.
 
-- `$store x y`
+### identifying lexemes
 
-    + `[y] ⊆ ref⁻¹([x])`
+now we know what the tokens are; how do we identify
+[lexemes]{.underline} (a sequence of characters that maps to a token)
+and map them to the appropriate token?
 
-    + why? similar to load except the information is flowing _into_ the pointed-to variables instead of _from_ them
+we can use the techniques you learned in 138, specifically, regular
+expressions, NFAs, and DFAs.
 
-- we can ignore:
+1.  regex extended notation
 
-    + `$gfp` (because there are no structs for now)
-    + `$arith`, `$cmp` (because they don't affect pointer values)
-    + `$jump`, `$branch` (because the analysis is flow-insensitive)
-    + `$call_*`, `$ret` (because we're not considering function calls for now)
+    -   x+ → xx\*
+    -   x? → x\|ε
+    -   \[abc\] → a\|b\|c
+    -   \[a-z\] → a\|b\|...\|z
+    -   \[0-9a-z\] → 0\|1\|...\|9\|a\|b\|...\|z
+    -   \[^abc^\] → \^ is negation, matches anything [but]{.underline}
+        a\|b\|c
+    -   . → \[\^`\n`{=latex}\], i.e., any character except newline
+    -   \\( → matches the character (, used to match metacharacters
+
+2.  strategy
+
+    1.  specify each class of lexemes (that is, the set of strings that
+        correspond to a particular token) as a regular expression.
+
+    2.  convert the regular expressions into NFAs.
+
+    3.  tag each accepting state with the token it corresponds to.
+
+    4.  union all the NFAs into a single NFA.
+
+    do one of the following:
+
+    5a. implement the NFA in code using the subset construction (string
+    acceptance is O(mn) where m = size of NFA, n = size of input).
+
+    5b. convert the NFA to a DFA and implement that (string acceptance
+    is O(n) where n = size of input, but size of DFA can be exponential
+    in size of NFA).
+
+3.  example
+
+    let\'s take a subset of L1 as an example: while, if, else, and
+    integers.
+
+    \[show NFA\] \[walk through examples, including errors\] \[after
+    getting a match, restart at new input position\] \[for NUM, explain
+    how to collect token info\]
+
+    the corresponding DFA is trivial, just collapse the starting state
+    and epsilon transitions together.
+
+4.  exercises
+
+    assume you have the following lexeme-\>token mappings:
+
+    aa\[a-d\]\*gg --\> \<T1\> aaaf+e --\> \<T2\>
+
+    create the corresponding NFA and DFA, then confirm that you can
+    recognize the following input:
+
+    aaabcdggaaaffe --\> \<T1\>\<T2\>
+
+### implementing the lexer, take 1
+
+how do we actually implement this idea in code? i\'ll explain for the
+DFA strategy; the NFA strategy is similar except you need to keep track
+of a set of current states instead of a single current state.
+
+we\'ll assume that we have defined a set of states S0, S1, ... where S0
+is the start state, and a transition function delta that takes a state
+and a character and returns the next state.
+
+CODE:
+
+curr~state~ = S0; curr~inputpos~ = 0; curr~scanpos~ = 0;
+
+while (curr~scanpos~ \< input~length~) { curr~state~ =
+delta(curr~state~, input\[curr~scanpos~\]); curr~scanpos~++;
+
+if (curr~state~ is an error state) { report error and abort; }
+
+if (curr~state~ is final) { info = string~subset~(input, curr~inputpos~,
+curr~scanpos~); emit curr~state~\'s token (with info if required);
+
+curr~state~ = S0; curr~inputpos~ = curr~scanpos~; } }
+
+if (curr~inputpos~ != curr~scanpos~) { raise error and abort; }
+
+1.  example
+
+    show how this works with the previous DFA and the input
+    \"whileelse\".
+
+2.  exercise
+
+    go through the previous exercise but using the above pseudocode and
+    be sure that you get the right answer.
+
+### handling ambiguity
+
+unfortunately things aren\'t quite as easy as we\'ve made them out to
+be. the big problem is ambiguity: a string that could be legitimately
+tokenized in different ways. this is easy to see if we add variable
+identifiers to the mix.
+
+1.  ambiguity examples
+
+    take the input \"abc\": it can be tokenized as
+
+    -   \<ID,abc\>
+    -   \<ID,a\>\<ID,bc\>
+    -   \<ID,ab\>\<ID\<c\>
+    -   \<ID,a\>\<ID,b\>\<ID,c\>
+
+    now take the input \"whilex\": it can be tokenized as
+
+    -   \<WHILE\>\<ID,x\>
+    -   \<ID,whilex\>
+
+    in fact, take the input \"while\": it can be tokenized as
+
+    -   \<WHILE\>
+    -   \<ID,while\>
+
+    we need some way to resolve these ambiguities so that we get the
+    expected sequence of tokens from the lexer.
+
+2.  solutions
+
+    the first solution is to take the longest possible match (also
+    called \"maximal munching\").
+
+    -   example \"abc\": the longest match is \<ID,abc\>
+    -   example \"whilex\": the longest match is \<ID,whilex\>
+
+    this doesn\'t help with the \"while\" example which can be either an
+    identifier or a keyword. to handle this problem we assign priorities
+    to the matches, so that if multiple matches are possible we use the
+    one with highest priority.
+
+    -   example \"while\": we assign keyword matches as having priority
+        over identifier matches, so we get \<WHILE\>.
+
+    so our strategy will be to take the longest possible match, then if
+    there are still multiple possible matches take the one with highest
+    priority.
+
+### implementing the lexer, take 2
+
+curr~state~ = S0; curr~inputpos~ = 0; curr~scanpos~ = 0;
+curr~acceptedpos~ = -1; accepting~state~ = S0;
+
+while (curr~scanpos~ \< input~length~) { curr~state~ =
+delta(curr~state~, input\[curr~scanpos~\]); curr~scanpos~++;
+
+if (curr~state~ is final) { curr~acceptedpos~ = curr~scanpos~;
+accepting~state~ = curr~state~; }
+
+if (curr~state~ is an error state \|\| curr~scanpos~ == input~length~) {
+if (curr~acceptedpos~ == -1) { report error and abort; } else {
+curr~scanpos~ = curr~acceptedpos~; curr~acceptedpos~ = -1;
+
+info = string~subset~(input, curr~inputpos~, curr~scanpos~); emit
+accepting~state~\'s highest priority token (with info if required);
+
+curr~state~ = S0; curr~inputpos~ = curr~scanpos~; } } }
+
+note that there are pathological cases where we continually have to go
+all the way to the end of the input to figure out the next token to
+emit, which can make this algorithm expensive. however, these cases
+don\'t tend to happen in realistic languages and so this scheme performs
+well in practice (and is what pretty much all modern lexers use).
+
+1.  example
+
+    let\'s take the \'while\' keyword, \'+\' symbol, and identifiers
+    from L1.
+
+    \[show NFA\] \[walk though example for inputs \'abc+whilex\',
+    \'while\'\]
+
+2.  exercise
+
+    suppose that we have the following lexeme--\>token mapping:
+
+    -   aa --\> \<T1\>
+    -   bb --\> \<T2\>
+    -   aabb --\> \<T3\>
+    -   aabbccdd --\> \<T4\>
+    -   ccff --\> \<T5\>
+
+    construct the NFA/DFA and confirm that the input \"aabbccff\" yields
+    the tokens \<T3\>\<T5\>.
+
+### automating lexer generation
+
+creating the NFAs and DFAs by hand is tedious and error-prone. wouldn\'t
+it be better for the computer to do it? yes, and it can! just implement
+the RE--\>NFA--\>DFA conversions in code.
+
+we aren\'t using these tools in this class because you should understand
+how they work underneath the hood, but normally compiler developers will
+use them.
+
+### lexing difficulties
+
+if we are careful when defining our language syntax, lexing is easy. but
+if we aren\'t, there can be all sorts of problems
+
+reserved words are important
+
+-   in PL/I there are no reserved words, allowing statements like \"if
+    then then then = else; else else = then\"
+
+significant whitespace is important
+
+-   in Fortran whitespace isn\'t significant:
+    -   do 10 i = 1,25 ⇒ do loop
+    -   do 10 i = 1.25 ⇒ assignment to variable \"do10i\"
+
+in general, making lexemes easy to distinguish is important:
+
+-   C++ example:
+    -   \"vector\<vector\<int\>\> v;\" results in an error because the
+        lexer mistakes \"\>\>\" as the bitwise shift operator. you have
+        to use \"vector\<vector\<int\> \> v;\" instead
+
+### limitations of the lexer and regular languages
+
+\[lexemes must be regular\] \[why not use CFG for everything?
+scannerless parsing\]
+
+LL(1) parsing
+-------------
+
+### general parsing intro
+
+1.  describing PL with CFG
+
+    the tokens we get from the lexer are the terminal symbols of our
+    programming language. we describe the syntax of the programming
+    language as a context-free grammar over those terminals.
+
+    \[refer to L1-concrete-syntax.pdf, and that the keywords, symbols,
+    etc should be interpreted as representing tokens rather than ASCII
+    characters\]
+
+2.  CFG review
+
+    let\'s review some CFG concepts from 138.
+
+    1.  CFG as generator
+
+        here is an example CFG: \[remember to be consistent with
+        L1-concrete-syntax in how the grammar is written\]
+
+        Exp ::= \[1\]Id \| \[2\]Exp Op Exp \| \[3\](Exp) Op ::= \[4\]+
+        \| \[5\]− \| \[6\]× \| \[7\]÷
+
+        we can think of a CFG as a generator of strings:
+
+        Exp -\[2\]-\> Exp Op Exp -\[2\]-\> Exp Op Exp Op Exp -\[1\]-\> x
+        Op Exp Op Exp -\[5\]-\> x - Exp Op Exp -\[1\]-\> x - y Op Exp
+        -\[6\]-\> x - y \* Exp -\[1\]-\> x - y \* z
+
+        we say that Exp derives the string \"x - y \* z\". we could also
+        represent the derivation another way, as a tree:
+
+        \[show derivation tree for above\]
+
+        the start symbol, where we begin the derivation, is at the root
+        of the tree and the derived string (a sequence of terminals) is
+        read off of the leaves of the tree.
+
+        a derivation tree is also called a parse tree; it shows the
+        syntactic structure of the string being derived. a parse tree
+        isn\'t quite the same as an AST, but we\'ll talk about the
+        difference later.
+
+        1.  exercise
+
+            for the expression grammar, give a parse tree for the
+            following input (there\'s more than one possible parse
+            tree):
+
+            x + y - x \* z + z
+
+    2.  leftmost and rightmost derivations
+
+        the derivation i gave for this example is called a \"leftmost
+        derivation\" because i always expanded the leftmost nonterminal.
+        we could choose to expand any nonterminal in any order; for
+        example we could do a rightmost derivation:
+
+        \[show rightmost derivation sequence and tree\] \[be sure to
+        choose same expansions to get same parse tree!\]
+
+        notice that we get exactly the same parse tree either way; in
+        order words, the parse tree is independent of what order we
+        expand the nonterminals in.
+
+    3.  CFG as recognizer
+
+        we\'ve thought of a CFG as a string generator, but we can also
+        think of it as a string recognizer: given an input string, does
+        there exist a derivation from the start symbol to that string?
+
+        input string: x \* (y + x) Exp --\>\*? x \* (y + x) \[show parse
+        tree\]
+
+        this is the essence of parsing: proving that a string is
+        recognized by a grammar by producing a parse tree showing the
+        derivation.
+
+    4.  ambiguity
+
+        there is a fly in the ointment, the same one we ran into with
+        lexing: ambiguity. a grammar is ambiguous is there exists at
+        least one string that has more than one parse tree.
+
+        let\'s take the first example grammar and the string \"x - y \*
+        z\":
+
+        \[show parse tree 1\] \[show parse tree 2\]
+
+        this is a problem for programming languages: we need a specific
+        input (the source code) to always create exactly one parse tree.
+        why?
+
+        \[show difference between interpreting parse trees 1 and 2\]
+
+        in other words, the syntactic structure of the program
+        influences its meaning. this is the same as english; consider
+        the sentence \"she saw the man with a telescope\". does it mean:
+
+        she used a telescope in order to see the man she saw the man,
+        who was holding a telescope
+
+        for PL i showed the problem with arithmetic expressions already,
+        but it can come up in lots of different places. a famous example
+        is the following grammar:
+
+        Stmt ::= if Exp then Stmt else Stmt
+
+          ------------------
+          if Exp then Stmt
+          Assignment
+          ------------------
+
+        and consider the following program:
+
+        a:= 1; if x then if y then a := 2; else a := 3;
+
+        suppose that x is false; what is the value of a? we can parse
+        this program in two ways:
+
+        \[show parse trees\]
+
+        in one version the \'else\' is bound to the first \'if\', so a
+        is 3; in the other the \'else\' is bound to the second \'if\'
+        (which is never reached if x is false), so a is 1.
+
+        1.  exercise
+
+            for expression grammar and input from exercise 1, give two
+            more parse trees.
+
+            x + y - x \* z + z
+
+            for each of the three parse trees, give the result assuming
+            x = 1, y = 2, z = 3.
+
+    5.  determinism
+
+        so ambiguity is bad. unfortunately, it turns out that
+        determining whether a grammar is ambiguous or not is
+        undecidable. but there is a characteristic that is decidable,
+        and efficiently so: determinism.
+
+        determinism is easiest to explain for PDAs. recall that a PDA is
+        basically an FA along with a stack; the transitions between
+        states can depend both on the current input character and the
+        top of the stack. also recall that, unlike DFAs and NFAs which
+        are equivalent, deterministic PDAs (DPDA) and nondeterministic
+        PDAs are not equivalent: PDAs are strictly more powerful than
+        DPDAs. a PDA is deterministic if the FA can make exactly one
+        transition from each state given the current input character and
+        top of the stack.
+
+        PDAs are equivalent to CFGs; we can transform PDA--\>CFG and
+        CFG--\>PDA. since DPDAs are strictly weaker than PDAs, it
+        follows that there are CFGs that cannot be expressed as DPDAs.
+        it turns out that this includes all ambiguous CFGs (along with
+        some unambiguous ones as well).
+
+        a CFG that can be expressed as a DPDA is called a DCFG. DCFGs
+        are guaranteed to be unambiguous, and there is a well-defined
+        algorithm for determining whether a grammar is a DCFG or not.
+
+    6.  dealing with ambiguity
+
+        \[from here out we may be getting into things that weren\'t
+        covered in 138, so this material may be new\]
+
+        remember that ambiguity is a characteristic of a grammar, not a
+        language: the same language can have multiple grammars that
+        describe it, and some of them may be ambiguous while others may
+        not (though there provably exist languages s.t. all grammars
+        describing it must be ambiguous, this doesn\'t happen for
+        practical PLs).
+
+        what this means is that even if we start with an ambiguous
+        grammar for our PL (such as the concrete grammar given in the
+        handout, which is definitely ambiguous), we can transform that
+        grammar into a new, deterministic (and thus unambiguous) grammar
+        that describes the same language. of course this can\'t work for
+        all context-sensitive languages because DCFGs are strictly
+        weaker than CFGs, but again it\'s true for practical PLs
+
+        so our general strategy will be to take the original,
+        potentially ambiguous grammar and transform it to be
+        deterministic while still describing the same language. if it
+        turns out that the original language can\'t be described with a
+        DCFG then we\'ll have to change that language so that it can be.
+
+        let\'s look at an example, the ambiguous if..else..else case:
+
+        Stmt ::= if Exp then Stmt else Stmt
+
+          ------------------
+          if Exp then Stmt
+          Assignment
+          ------------------
+
+        and the input
+
+        a:= 1; if x then if y then a := 2; else a := 3;
+
+        which could be parsed in two different ways. we can transform
+        the grammar as follows:
+
+        Stmt ::= if Exp then WithElse else Stmt
+
+          ------------------
+          if Exp then Stmt
+          Assignment
+          ------------------
+
+        WithElse ::= if Exp then WithElse else WithElse
+
+          ------------
+          Assignment
+          ------------
+
+        this new grammar recognizes exactly the same set of strings, but
+        only admits one possible parse tree for every input. it requires
+        that every \'else\' be associated with the nearest unclosed
+        \'if\'. so for the example input we\'ll necessarily get:
+
+        \[show parse tree\]
+
+        note that this simple example grammar doesn\'t have a way to
+        express that we want that last \'else\' to be associated with
+        the outermost \'if\'; in a more complete grammar we could
+        indicate that using braces. also note that the L1 concrete
+        syntax requires braces for all conditionals and thus this
+        \"dangling else\" problem isn\'t an issue for us (but it is for
+        C/C++, which allow the programmer to either use braces or not).
+
+        1.  exercise
+
+            given the following input, show that it has at least two
+            parse trees using the original conditional grammar and that
+            it has a single parse tree using the new conditional
+            grammar.
+
+            if x then if y then if z then a := 1; else a := 2; else a :=
+            3;
+
+    7.  another solution
+
+        i should point out that another solution to this whole ambiguity
+        problem is just to change the languauge itself, i.e., the
+        concrete syntax, so that ambiguity can\'t happen:
+
+        -   change the syntax for arithmetic expressions to require
+            explicit parentheses everywhere
+        -   change conditionals to use \'ifelse\' and \'endif\'
+            explicitly everywhere
+        -   etc
+
+        lisp-like languages go to an extreme and every possible
+        expression is parenthesized to make it completely and trivially
+        unambiguous, which makes it extremely easy to parse.
+
+        however, programmers mostly tend to dislike this solution
+        because it makes them type more and can make the program harder
+        to read. since programmers are the main consumers of PLs, this
+        means that most PLs have to work at dealing with ambiguity
+        without messing with the language syntax too much.
+
+3.  parsing strategies
+
+    so now we know what parsing is, but how do we do it? let\'s survey
+    the landscape before we drill down on LL(1), the specific strategy
+    we\'ll be discussing (and implementing) first.
+
+    there are many different strategies, but they can all be divided
+    into two basic approaches: top-down and bottom-up. let\'s look at
+    the example expression grammar from before:
+
+    Exp ::= \[1\]Id \| \[2\]Exp Op Exp \| \[3\](Exp) Op ::= \[4\]+ \|
+    \[5\]− \| \[6\]× \| \[7\]÷
+
+    and some input like \"x + y \* z\". our goal is to create a parse
+    tree (for now don\'t worry about the fact that this grammar is
+    ambiguous).
+
+    TOP-DOWN: start from the root of the parse tree and work our way
+    down to the leaves, selecting productions s.t. when we get to the
+    leaves they\'ll match the string. this seems like it involves a lot
+    of guess-work, but clever versions of this approach won\'t need to
+    guess anything.
+
+    \[show example using above grammar and input\]
+
+    BOTTOM-UP: start from the leaves (i.e., the input) and work our way
+    up the tree, picking productions in reverse.
+
+    \[show example using above grammar and input\]
+
+    the parsing strategies can also be divided based on which grammars
+    they actually work for. there are parsing algorithms that will
+    handle any CFG: CYK, Earley, GLL, GLR, ...
+
+    these algorithms are all O(n^3^), which is way too expensive to be
+    desirable for compilers that operate on large programs (millions of
+    lines of code). they also result in parse forests instead of parse
+    trees because of ambiguity, which means that after parsing we need
+    some way to deterministically select which parse tree we actually
+    want.
+
+    GLL and GLR are actually somewhat recent additions that have the
+    nice property that their complexity depends on the grammar: if the
+    grammar is unambiguous they are O(n); the more ambiguous the grammar
+    is the more the asymptotic complexity grows until it hits O(n^3^).
+    this means that we can have grammars that are only a little bit
+    ambiguous (which can be convenient in some cases) without a big
+    penalty. however, they are fairly complicated algorithms and even
+    when O(n) the constant factor is pretty high. still, there are
+    commercial frontends for languages like C++ that use GLL or GLR.
+
+    classically, compilers focus on parsing algorithms for deterministic
+    grammars.
+
+    \[draw venn diagram: DCFG inside CFG\]
+
+    there is a classic parsing algorithm called LR, a bottom-up
+    algorithm, that can work for any deterministic grammar.
+
+    there is another classic parsing algorithm called LL(k), a top-down
+    algorithm, that works for a large subset of deterministic grammars.
+    the different in expressiveness between LL(k) and LR is exactly due
+    to the fact that LR is bottom-up and LL(k) is top-down.
+
+    \[extend venn diagram\] \[for reference, include regular\]
+
+    even though LL(k) is not as expressive as LR, it\'s still a very
+    popular choice and one that can work for most PLs. for example, both
+    gcc and clang/llvm use parsers based on LL(k) for their C/C++
+    frontends. we\'ll see why it\'s a popular choice once we describe
+    how it works.
+
+### recursive descent and LL(1)
+
+let\'s go over how we can implement an LL(1) parser for a suitable
+grammar; once we understand how it works we\'ll discuss how to try to
+transform a grammar into something suitable for LL(1).
+
+a common implementation strategy for top-down parsers in general is
+called \"recursive descent\". there are other ways to implement them,
+but recursive descent is used a lot. i\'ll describe a naive recursive
+descent implementation first, then show how LL(1) can make it efficient.
+
+to illustrate the concepts, let\'s use the following CFG:
+
+S ::= aSa \| bSb \| c
+
+1.  naive recursive descent
+
+    we know that we can convert any CFG into an equivalent PDA (there
+    are, in fact, a number of possible transformations). we\'ll use the
+    transformation that yields a top-down strategy:
+
+    \>q0 --\[ε/ε-\>S\]-\> q1 \[reflexive transitions: ε/S-\>aSa,
+    ε/S-\>bSb, ε/S-\>c, a/a-\>ε, b/b-\>ε, c/c-\>ε\]
+
+    note that this is not a DPDA because there are three possible
+    transitions that can happen if an S in on top of the stack; for now
+    we\'ll assume we have access to an oracle that always let\'s us make
+    the right choice. let\'s see what happens with the input \"abcba\";
+    obviously we\'ll go from q0 to q1 and stay in q1, the interesting
+    part is what happens to the stack:
+
+    S --\> aSa --\> \[a\]Sa --\> \[a\]bSba --\> \[ab\]Sba --\> \[ab\]cba
+    --\> \[abc\]ba --\> \[abcb\]a --\> \[abcba\]
+
+    the stack is going through a derivation of the string: we start by
+    pushing the start symbol, then one of two things happens:
+
+    1.  the top symbol is a terminal, so we try to match it against the
+        input
+    2.  the top symbol is a nonterminal, so we expand it
+
+    this builds a derivation starting from the start symbol and working
+    towards the input string, i.e., a top-down strategy. in fact,
+    because of the way we\'re pushing things on the stack we\'re always
+    going to expand the leftmost nonterminal, so we\'re getting a
+    leftmost derivation.
+
+    what if we didn\'t have the oracle to tell us the right choice? then
+    we would need to guess, and if we guess wrong we would have to
+    backtrack: roll everything back to a previous guess and guess
+    something different.
+
+    example: S --\> bSb --\> !! backtrack
+
+    notice that the PDA stack is what\'s keeping track of the derivation
+    and what we need to match with the input. it turns out that we
+    don\'t actually need to explicitly translate the CFG into a PDA to
+    parse the input; instead we can take advantage of the implicit
+    function stack that progamming languages use to enable recursion.
+
+    you should know that every time you recursively call a function you
+    get a new instance of all the parameters and local variables. this
+    happens because the parameters and locals are stored on the function
+    stack; whenever a function is called a new \"stack frame\" is pushed
+    onto the stack; whenever a function returns its stack frame is
+    popped off of the stack.
+
+    \[draw a simple picture\]
+
+    we can use this function stack as the PDA stack so that we can track
+    the derivation without having to create an explicit PDA. here\'s the
+    idea:
+
+    create a set of mutually recursive functions, one per nonterminal.
+    each function A() will have a case for each rule A ::= α. when the
+    function is called it will try each case in turn until successful
+    (or it runs out of cases and signals failure).
+
+    suppose we\'re in a case for the rule A ::= α1 α2 ... α~n~, where
+    each α may be a terminal or nonterminal. loop starting from i == 1:
+
+    1.  if α~i~ is a terminal, try to match it to the current input
+        character. a. if successful, consume the character and set i =
+        i+1. b. if failed, backtrack to the state when the function was
+        entered and try the next case.
+
+    2.  if α~i~ is a nonterminal, call the corresponding function. a. if
+        the function returns successfully, set i = i+1. b. if the
+        function signals an error, backtrack to the state when the
+        function was entered and try the next case.
+
+    let\'s look at our example again:
+
+    S ::= aSa \| bSb \| c
+
+    we only have one nonterminal, S, so we\'ll have one recursive
+    function S():
+
+    S() { old~inputpos~ = curr~inputpos~;
+
+    try { // case: aSa match(a); S(); match(a); } else try { // case:
+    bSb curr~inputpos~ = old~inputpos~; match(b); S(); match(b); } else
+    try { // case: c curr~inputpos~ = old~inputpos~; match(c); } else {
+    raise failure; } }
+
+    match(token) { if (token == input\[curr~inputpos~\]) {
+    curr~inputpos~++; } else raise failure; }
+
+    let\'s see what happens with the input \"abcba\":
+
+    call S() enter case 1 match(a): success call S() enter case 1
+    match(a): failure enter case 2 match(b): success call S() enter case
+    1 match(a): failure enter case 2 match(b): failure enter case 3
+    match(c): success return from S() match(b): success return from S()
+    match(a): success return from S()
+
+    the obvious problem with this approach is that it\'s extremely
+    inefficient: exponential in the size of the input (in fact, for some
+    grammars it never terminates at all).
+
+2.  LL(1) recursive descent
+
+    let\'s go back to our PDA for our example grammar. note that we can
+    make it a DPDA by adding something called \"lookahead\":
+
+    \[show old version, then new version\]
+
+    \>q0 --\[ε/ε-\>S\]-\> q1 --\[\$/ε-\>ε\]-\> qF
+
+      ----
+      \^
+      ----
+
+    \[a/ε-\>ε\]\|\|
+
+      -- -------------
+         \[ε/a-\>ε\]
+      -- -------------
+
+    v\| qa \[reflexive transition: ε/S-\>aSa\]
+
+    !! repeat for qb, qc
+
+    let\'s see what happens on the input \"abcba\"; it\'s completely
+    deterministic! what does that mean for the recursive descent
+    version? it means no backtracking:
+
+    S() { if (next~token~ is a) { // case: aSa match(a); S(); match(a);
+    } else if (next~token~ is b) { // case: bSb match(b); S(); match(b);
+    } else if (next~token~ is c) { // case: c match(c); } else { raise
+    failure; } }
+
+    match(token) { if (token == input\[curr~inputpos~\]) {
+    curr~inputpos~++; } else raise failure; }
+
+    what happens on input \"abcba\"?
+
+    call S() enter case 1 match(a): success call S() enter case 2
+    match(b): success call S() enter case 3 match(c): success return
+    from S() match(b): success return from S() match(a): success return
+    from S()
+
+    1.  special case: ε
+
+        what happens if a nonterminal has an ε production? just treat it
+        as the default case (i.e., the thing to do if none of the other
+        cases are true). because of the structure of an LL(1) grammar,
+        this is guaranteed to be safe.
+
+        example:
+
+        A ::= xy \| Bz B ::= wy \| ε
+
+        implementation:
+
+        A() { if (next~token~ is x) { match(x); match(y); } else { B();
+        match(z); } }
+
+        B() { if (next~token~ is w) { match(w); match(y); } }
+
+    2.  wrap-up
+
+        a grammar with the property that we can use 1 token of lookahead
+        to make it completely deterministic is an LL(1) grammar. we\'ll
+        formalize this property soon and show how we can try to
+        transform a grammar so that it has this property. it doesn\'t
+        work for all grammars (even all deterministic grammars), but it
+        works often enough.
+
+3.  exercise
+
+    given the following grammar:
+
+    S ::= aPb \| Qc \| cRd \| TcP P ::= QR \| TR \| ε Q ::= fR \| b R
+    ::= d \| gbc T ::= ea \| Ra
+
+    write pseudocode for a recursive descent LL(1) parser, then trace it
+    for the inputs \"afgbcdb\" and \"daceagbc\".
+
+    \[show answer\]
+
+4.  why \"LL(1)\"?
+
+    if we look at the operation of the LL(1) parser, we can observe the
+    following:
+
+    1.  it reads the input from left to right.
+    2.  it tracks a leftmost derivation.
+    3.  it uses 1 token of lookahead.
+
+    thus, it\'s \"\[L\]eft-to-right, \[L\]eftmost derivation, \[1\]
+    token of lookahead\", or LL(1). we can actually use any constant
+    number of lookahead symbols, though the more we use the more
+    expensive things get; the general class is called LL(k). there are
+    more general algorithms (like the one used by ANTLR) called LL(\*)
+    that use a DFA for lookahead instead of a constant number of tokens.
+
+### transforming to LL(1)
+
+1.  intro
+
+    we know now how to implement a suitable grammar using a recursive
+    descent LL(1) parser; now we\'ll talk about how to make a grammar
+    suitable.
+
+    note that so far we haven\'t covered how to build an actual parse
+    tree or AST, we\'ve just returned a boolean; we\'ll ignore building
+    the AST for now and once we have a suitable grammar i\'ll show how
+    to tweak it to build the AST.
+
+2.  establishing precedence
+
+    the initial example of an ambiguous grammar i gave earlier was a
+    simple expression grammar, something like:
+
+    E ::= id \| E + E \| E \* E \| (E)
+
+    the problem was that a string such as \"x + y \* z\" could be parsed
+    two ways:
+
+    (x+y)\*z x+(y\*z)
+
+    the grammar admits either one. we need to enforce a single
+    interpretation for the parser; we do this by specifying the relative
+    precedence of the operators. conventionally, for example,
+    multiplication has a higher precedence than addition so we would
+    want \"x + y \* z\" to be parsed as x+(y\*z).
+
+    there are several strategies that have been developed to enforce
+    precedence in a grammar, but we\'re going to go with the classical
+    solution which involves modifying the grammar itself to enforce the
+    levels of precedence. how do we do this?
+
+    1.  decide on the levels of precedence, e.g., {()} {\*,÷} {+,-}
+
+    2.  create a nonterminal for each level of precedence (we can reuse
+        the original nonterminal for the lowest level of precedence).
+
+    3.  factor out the operations into the appropriate nonterminal for
+        their level of precedence, e.g.:
+
+        E ::= E + F \| F F ::= F \* G \| G G ::= (E) \| id
+
+    here we have three precedence levels, so three nonterminals: E is
+    for the lowest precedence operator +, F is for the next precedence
+    level \*, and G is for the highest precedence level ().
+
+    notice the following properties:
+
+    1.  each nonterminal rule that applies an operator has one operand
+        that is the same nonterminal again and the other is the next
+        highest precedence level nonterminal
+
+        this allows the expression to have multiple of the same
+        precedence level operators in a row. choosing which side is
+        which controls the associativity of the operator: having the
+        same nonterminal on the left makes the operator left
+        associative; having it on the right makes the operator right
+        associative.
+
+    2.  each nonterminal (except the highest precedence, G) allows for
+        applying an operator at the level of predecence or directly
+        falling through to the next level.
+
+        this allows the expression to not have any operators at the
+        lower precedence level, e.g., an expression that doesn\'t have +
+        in it.
+
+    3.  the base cases for expressions (identifiers, constants, etc) are
+        always at the highest level of precedence.
+
+        this allows the expression to just be an identifier or constant
+        without any operators at all.
+
+    let\'s look at some examples:
+
+    1.  x + y \* z
+    2.  x + y + z
+    3.  x \* y + z
+    4.  (x + y) \* z
+
+    we\'ve looked at this using arithmetic operators as our examples,
+    but it applies in many other situations:
+
+    1.  relational and logical operators: !(x \< y) && (z \< y)
+
+    2.  subscript operators: a + b\[i\]
+
+    3.  type casts: (double)a / b
+
+    etc.
+
+    1.  exercise
+
+        here is a toy grammar:
+
+        A ::= A R A \| p A \| a R ::= w \| x \| y \| z
+
+        suppose we define the following precedence levels: {p} {w,x}
+        {y,z}
+
+        and say that the operators are left associative. rewrite the
+        grammar to enforce the correct prededence, then verify the
+        following example inputs are handled correctly:
+
+        p a y a w a z a x a ==\> (((p a) y (a w a)) z (a x a)) a z p a w
+        p a x a y a ==\> ((a z (((p a) w (p a)) x a)) y a)
+
+        solution:
+
+        A ::= A y B \| A z B \| B B ::= B w C \| B x C \| C C ::= p C \|
+        a
+
+3.  dealing with left recursion
+
+    1.  what is left recursion
+
+        once we\'ve established precedence, we have another problem to
+        worry about: nontermination. this problem is an artifact of the
+        way we\'re implementing the parser using recursive descent,
+        i.e., implementing the PDA implicitly using recursive function
+        calls. consider the factored grammar from before:
+
+        E ::= E + F \| F F ::= F \* G \| G G ::= (E) \| id
+
+        assume that we implement this using a recursive descent parser,
+        as explained in a previous lecture, and let\'s see what happens
+        on an example input \"x + y \* z\".
+
+        call E() enter case E + F call E() enter case E + F call E() ...
+
+        notice that we just keep recursively calling E() forever (or
+        until we get a stack overflow). why does this happen? because
+        there is a recursive cycle in the grammar E --\>\* E that does
+        not consume any input tokens, i.e., there is no call to match()
+        between invocations of E().
+
+        this is an example of what\'s called [left
+        recursion]{.underline}. a grammar is left recursive if there
+        exists a derivation A --\>\* Aα for some nonterminal A. any
+        recursive descent parser may fail to terminate for a left
+        recursive grammar.
+
+    2.  direct, indirect, and hidden left recursion
+
+        we can define three different kinds of left recursion (though
+        some texts lump the second two into a single category):
+
+        direct left recursion: there is a production of the form A ::=
+        Aα.
+
+        -   there are two examples of direct left recursion in the
+            previous grammar example.
+
+        indirect left recursion: there is a set of mutually recursive
+        productions the allow a left-recursive derivation.
+
+        -   example:
+
+            A ::= B \| alice B ::= C \| bob C ::= A charlie
+
+            consider the derivation A --\> B --\> C --\> A charlie
+
+        hidden left recursion: like indirect except there is an epsilon
+        rule that hides the left recursion.
+
+        -   example:
+
+            A ::= B \| alice B ::= C \| bob C ::= DA charlie D ::= dave
+            \| ε
+
+            consider the derivation A --\> B --\> C --\> DA charlie --\>
+            A charlie
+
+        in order to create an LL(1) recursive descent parser for a
+        grammar, we must transform the grammar to remove all left
+        recursion.
+
+    3.  removing direct left recursion
+
+        direct left recursion is the easiest to fix: any left-recursive
+        production can be changed to an equivalent right-recursive set
+        of rules as follows:
+
+        given: A ::= Aα \| β \| γ
+
+        where the greek letters are sequences of terminals and
+        nonterminals not starting with A. this grammar specifies βα\* or
+        γα\*. we can transform it into a non-left-recursive grammar that
+        specifies the same language:
+
+        A ::= βA\' \| γA\' A\' ::= αA\' \| ε
+
+        we\'re expressing the same strings in different ways. a left
+        recursive rule must have some non-recursive base case (β and γ
+        above); the left recursion is saying that we can repeat the
+        recursive part as many times as we want (α above) and then
+        finish with the base cases. the rewritten rules says the same
+        thing, but puts the recursion on the right instead of the left.
+        this means that a recursive descent parser must consume a
+        terminal from the input before making the recursive call; since
+        the input is finite the parser must terminate.
+
+        note that we assume α is not ε. if it is then we have the rule
+        \'A ::= A\', which we can trivially delete.
+
+        what if we have multiple left recursive rules for A?
+
+        given: A ::= Aα \| Aβ \| γ
+
+        then:
+
+        A ::= γA\' A\' ::= αA\' \| βA\' \| ε
+
+        again, there always has to be at least one rule that is not left
+        recursive or we can trivially delete all the rules.
+
+        EXAMPLE 1:
+
+        E ::= E + T \| E - T \| T T ::= (E) \| id
+
+        becomes
+
+        E ::= T E\' E\' ::= + T E\' \| - T E\' \| ε T ::= (E) \| id
+
+        \[go through parsing example: x + y - z\] \[notice that left
+        associative has become right associative\]
+
+        EXAMPLE 2:
+
+        E ::= E + F \| F F ::= F \* G \| G G ::= (E) \| id
+
+        changes to
+
+        E ::= FE\' E\' ::= + FE\' \| ε F ::= GF\' F\' ::= \* GF\' \| ε G
+        ::= (E) \| id
+
+        \[go through parsing example: x + y \* z\]
+
+    4.  removing indirect left recursion
+
+        to remove indirect recursion there are several possible
+        strategies, of which we\'ll look at the classical solution. the
+        basic idea is to inline productions to turn the indirect
+        recursion into direct recursion, then apply the transformation
+        that removes direct recursion.
+
+        let\'s see an example of that in action:
+
+        A ::= B \| alice B ::= C \| bob C ::= A charlie
+
+        we can start from A, B, or C to expose the indirect left
+        recursion:
+
+        A --\> B --\> C --\> A charlie B --\> C --\> A charlie --\> B
+        charlie C --\> A charlie --\> B charlie --\> C charlie
+
+        it doesn\'t matter which one we choose, as long as we break the
+        left recursive cycle. let\'s pick A and inline once:
+
+        A ::= C \| bob \| alice B ::= C \| bob C ::= A charlie
+
+        then inline again:
+
+        A ::= A charlie \| bob \| alice B ::= C \| bob C ::= A charlie
+
+        then remove the direct left recursion:
+
+        A ::= bob A\' \| alice A\' A\' ::= charlie A\' \| ε B ::= C \|
+        bob C ::= A charlie
+
+        notice in this example that B and C are no longer reachable from
+        the starting nonterminal A; in general this may or may not be
+        true.
+
+        let\'s see what happens if we had picked C instead of A to start
+        with:
+
+        A ::= B \| alice B ::= C \| bob C ::= B charlie \| alice charlie
+
+        and inline again:
+
+        A ::= B \| alice B ::= C \| bob C ::= C charlie \| bob charlie
+        \| alice charlie
+
+        now remove the direct left recursion:
+
+        A ::= B \| alice B ::= C \| bob C ::= bob charlie C\' \| alice
+        charlie C\' C\' ::= charlie C\' \| ε
+
+        it can be tedious and error-prone to manually try to find left
+        recursive cycles. we can apply an algorithm to preventatively
+        transform the grammar so that left recursive cycles can\'t
+        possibly happen. this gives us a larger and more complex grammar
+        than we might get if we did it manually because it transforms
+        rules even when they aren\'t left recursive.
+
+        the key insight of the algorithm is to order the nonterminals
+        arbitrarily. then a left recursive cycle can only possibly
+        happen if a nonterminal with order i directly derives a
+        nonterminal with order j s.t. j \< i. we then inline the
+        lower-ordered nonterminal into this rule. continue this process
+        for all rules, then remove any direct left recursion from the
+        final rule set:
+
+        let the nonterminal be arbitrarily labeled A1..An. then:
+
+        for i = 1 to n: if Ai ::= Aj α for j \< i then inline Aj into
+        Ai\'s right-hand side transform any direct left recursive rules
+
+        let\'s look at the following example again, assuming that A \< B
+        \< C:
+
+        A ::= B \| alice B ::= C \| bob C ::= A charlie
+
+        rule A ::= B `=> CHECK
+        rule A ::` alice `=> CHECK
+        rule B ::` C `=> CHECK
+        rule B ::` bob `=> CHECK
+        rule C ::` A charlie `=> A < C, inline: C ::` B charlie \| alice
+        charlie rule C ::= alice charlie `=> CHECK
+        rule C ::` B charlie `=> B < C, inline: C ::` C charlie \| bob
+        charlie rule C ::= bob charlie `=> CHECK
+        rule C ::` C charlie ==\> CHECK done
+
+        now there is one direct left recursive rule: C ::= C charlie.
+        transform that and we\'re finished.
+
+    5.  removing hidden left recursion
+
+        note that the algorithm for preventing indirect left recursion
+        doesn\'t work if there is hidden left recusion.
+
+        A ::= B \| alice B ::= C \| bob C ::= DA charlie D ::= dave \| ε
+
+        \[go through each rule, show that they all CHECK\]
+
+        there are two basic ways to handle hidden left recursion, which
+        end up actually being pretty similar. the first is transform the
+        grammar to eliminate ε rules. there is a standard algorithm to
+        do so, which you may have learned in 138. the second is to (1)
+        compute which nonterminals are [nullable]{.underline}, i.e.,
+        which nonterminals can derive ε (directly or indirectly),
+        then (2) modify the above algorithm to take this information
+        into account. this end up looking a lot like what you would do
+        to remove ε rules altogether.
+
+        A ::= B \| alice B ::= C \| bob C ::= DA charlie \| A charlie D
+        ::= dave
+
+    6.  exercise
+
+        remove all left recursion in the following grammar:
+
+        A ::= BC B ::= CA \| b C ::= AA \| a
+
+        solution:
+
+        \[after inlining\] A ::= BC B ::= CA \| b C ::= CACA \| bCA \| a
+
+        \[after direct recursion elimination\] A ::= BC B ::= CA \| b C
+        ::= bCAC\' \| aC\' C\' ::= ACAC\' \| ε
+
+4.  lookahead
+
+    1.  basic idea
+
+        now that we\'ve fixed precedence to ensure that we get the
+        correct AST and we\'ve removed left recursion to ensure
+        termination, the remaining thing to worry about is making sure
+        that the grammar is deterministic via lookahead (thus avoiding
+        the need for backtracking).
+
+        remember that [lookahead]{.underline} means peeking ahead in the
+        input to the next token(s) in order to determine which
+        production rule to use next. we\'re specifically going to allow
+        a fixed, constant amount of lookahead (in our case, 1 token),
+        which means that we won\'t be able to handle some grammars. for
+        any fixed amount of lookahead we can come up with a grammar that
+        requires more lookahead to become deterministic. but 1-token
+        lookahead turns out to be good enough in most cases we care
+        about.
+
+        our intuition is that the property we\'re looking for in a
+        grammar is that for any given nonterminal A that has multiple
+        rules, looking at the next token in the input is sufficient to
+        determine which rule we need to pick. a simple example is:
+
+        S ::= aSa \| bSb \| c
+
+        if we have an S symbol and need to expand it with one of these
+        rules, by looking at the next token in the input we can tell
+        which rule to use: \'a\': aSa; \'b\': bSb; \'c\': c.
+
+        \[show with input \"bacab\"\]
+
+        we\'ll say that a grammar with this property is a [predictive
+        grammar]{.underline}. let\'s formalize this property. first
+        we\'ll assume that there are no ε rules; then we\'ll expand the
+        formalization to handle ε rules.
+
+    2.  formal property without ε
+
+        let α, β be strings of grammar symbols (T and NT)
+
+        FIRST(α) = { t ∈ T \| α --\>\* tγ }
+
+        in other words, FIRST(α) is the set of the [first]{.underline}
+        terminals that can be derived from α with 0 or more applications
+        of the grammar\'s production rules.
+
+        there is an algorithm in the textbook to compute FIRST sets, but
+        for simple grammars we can do it by inspection.
+
+        EXAMPLE
+
+        S ::= AB A ::= xBw \| yBz \| Bwz B ::= 0 \| 1
+
+        FIRST(S) = {x,y,0,1} FIRST(A) = {x,y,0,1} FIRST(B) = {0,1}
+        FIRST(xBw) = {x} FIRST(yBz) = {y} FIRST(Bwz) = {0,1}
+
+        a grammar can be parsed with no backtracking using a lookahead
+        of 1 IF the following holds: for any nonterminal A such that A
+        ::= α \| β, FIRST(α) ∩ FIRST(β) = ∅.
+
+        during parsing when we\'re expanding an A node, we just need to
+        look at the next token t in the input to determine which
+        production to use (i.e., the one that has t in its FIRST set).
+
+    3.  formal property with ε
+
+        now suppose that we [do]{.underline} have ε productions (which
+        is likely if we needed to remove left recursion).
+
+        \#\# EXAMPLE 1
+
+        S ::= AB A ::= xBw \| yBz \| Bwz B ::= 0 \| 1 \| ε
+
+        FIRST(S) = {x,y,0,1,w} FIRST(A) = {x,y,0,1,w} FIRST(B) = {0,1}
+        FIRST(xBw) = {x} FIRST(yBz) = {y} FIRST(Bwz) = {0,1,w}
+
+        mostly we can just \"read past\" the ε to fill in the FIRST
+        sets, but sometimes this isn\'t sufficient.
+
+        \#\# EXAMPLE 2
+
+        A ::= xBA \| f B ::= xwB \| ε
+
+        FIRST(A) = {x,f} FIRST(B) = {x} FIRST(xBA) = {x} FIRST(f) = {f}
+        FIRST(xwB) = {x} FIRST(ε) = {}
+
+        at a glance, this looks predictive: for both A and B
+        productions, the FIRST sets of the alternative productions are
+        disjoint. but consider parsing the input \"xxf\":
+
+        A expands to xBA consume x from input B expands to xwB consume x
+        from input ERROR: terminal w doesn\'t match token f
+
+        the correct way to parse this would be to expand B to ε, then A
+        to xBA, then B to ε, then A to f. but we can\'t figure this out
+        just by looking at the next token in the input. what\'s going
+        on? ε allows us to \"throw away\" the nonterminal at any time,
+        and we don\'t know when we should do that or not.
+
+        enter FOLLOW sets. for any NT A, FOLLOW(A) is the set of
+        [first]{.underline} terminals that can immediately follow any
+        expansion of A. the textbook has another algorithm for this, but
+        again for simple grammars we can do it by hand. for the example
+        above:
+
+        FOLLOW(A) = {} FOLLOW(B) = {x,f}
+
+        now we revisit the criteria for being a predictable grammar. in
+        addition to the original requirement for A ::= α \| β, we add
+        the following:
+
+        if α --\>\* ε then FIRST(β) ∩ FOLLOW(A) = ∅
+
+        in other words, we can tell by looking at the next token whether
+        we should expand A to something or use the ε to throw A away.
+
+        consider our previous example and note that FIRST(xwB) ∩
+        FOLLOW(B) = {x} ∩ {x,f} = {x}, and thus this grammar is
+        [not]{.underline} predictive.
+
+    4.  exercise
+
+        compute the FIRST and FOLLOW sets of the following grammar and
+        confirm that it is [not]{.underline} predictive:
+
+        A ::= xBy \| Bx \| zCx B ::= wB \| ε C ::= wC \| DB D ::= yD \|
+        ε
+
+              FIRST   FOLLOW
+          --- ------- --------
+          A   w,x,z   ∅
+          B   w       x,y
+          C   w,y     x
+          D   y       w
+
+        -   for A, FIRST(xBy) and FIRST(Bx) are not disjoint (both
+            have x)
+        -   for C, FIRST(wC) and FIRST(DB) are not disjoint (both
+            have w)
+
+5.  left factoring
+
+    1.  the transformation
+
+        if a grammar is not predictive, sometimes we can transform it to
+        make it predictive. one heuristic we can use is a transformation
+        called [left factoring]{.underline}.
+
+        EXAMPLE: suppose we add arrays and functions to expressions
+
+        Factor ::= Id \| Id \[ ExpList \] \| Id ( ExpList ) ExpList ::=
+        Exp, ExpList \| Exp
+
+        this is not predictive, but we can make it predictive:
+
+        Factor ::= Id Args Args ::= \[ ExpList \] \| ( ExpList ) \| ε
+        ExpList ::= Exp, ExpList \| Exp
+
+        this transformation is called LEFT-FACTORING.
+
+        WHAT\'S HAPPENING:
+
+        A ::= αβ1 \| αβ2 \| αβ3
+
+        becomes:
+
+        A ::= αZ Z ::= β1 \| β2 \| β3
+
+        in other words, we factor out the common prefix α and push the
+        things after α into a different nonterminal.
+
+        there is an algorithm for left-factoring in the textbook, but it
+        essentially just says to repeat the above transformation as
+        necessary. note that not all grammars can be made predictive
+        (and it is undecidable to figure out whether one can be).
+
+    2.  note about ε elimination
+
+        one might think that we could get rid of FOLLOW sets by
+        eliminating ε from the grammar as we said was possible when we
+        discussed dealing with left recursion. the problem is that this
+        elimination can render the grammar non-predictive, and applying
+        left factoring to make it predictive again re-introduces the ε.
+
+        EXAMPLE:
+
+        T ::= F T\' T\' ::= × F T\' \| ÷ F T\' \| ε
+
+        remove ε:
+
+        T ::= F T\' \| F T\' ::= × F T\' \| × F \| ÷ F T\' \| ÷ F
+
+        note that the grammar is no longer predictive and we need to use
+        left factoring, which reintroduces ε.
+
+    3.  exercise
+
+        left-factor the following grammar:
+
+        A ::= Bxy \| Bxz \| Bw \| xyz B ::= p \| q
+
+        solution:
+
+        A ::= BC \| xyz B ::= p \| q C ::= xD \| w D ::= y \| z
+
+### building an AST
+
+1.  what is an AST
+
+    a parse tree of an L1 program contains more information than we
+    really need or want; it shows exactly [how]{.underline} a program
+    was parsed using the grammar, but all we want is the underlying
+    structure of the program. this structure is represented in a data
+    structure called the [abstract syntax tree]{.underline} (AST).
+
+    let\'s look at an example:
+
+    E ::= FE\' E\' ::= + FE\' \| ε F ::= GF\' F\' ::= \* GF\' \| ε G
+    ::= (E) \| id
+
+    and compute the parse tree for \"x + y \* z\": \[show parse tree\]
+
+    this contains a lot of info that we don\'t care about, like exactly
+    how we derived an identifier or an empty string. all we really need
+    to know is the following:
+
+    \[ADD \[x\] \[MUL \[y\] \[z\]\]\]
+
+    this is why we call it an AST; it abstracts out the unimportant
+    information from the parse tree and just gives us what we need. how
+    do we compute the AST during parsing? we just insert the appropriate
+    logic into the parsing functions: given the exact input characters
+    they recognized, they create the appropriate AST nodes and return
+    the root of the tree they created.
+
+    so what we do is (1) define the AST data structure; and (2)
+    determine how to insert the appropriate logic into the parsing
+    functions. let\'s look at this in action on the grammar above.
+
+2.  example
+
+    we can define the AST in a way that looks like a grammar, but we\'ll
+    interpret it as describing a tree instead. for the example grammar,
+    we can define the following AST:
+
+    E ::= id \| add E E \| mul E E
+
+    notice that we don\'t care about ambiguity at all for the AST
+    definition, because the concrete syntax grammar already took care of
+    that for us. we\'re just describing the data structure that will
+    hold the result of the parse. think of E as the abstract base class
+    of the AST and each righthand side as a different type of node in
+    the AST data structure:
+
+    abstract class E { ... } class Id : public E { string name; } class
+    Add : public E { E\* left~child~; E\* right~child~ } class Mul :
+    public E { E\* left~child~; E\* right~child~ }
+
+    now the recursive descent parser for the above grammar would be:
+
+    E() { F(); E\'(); } E\'() { if (next == \'~~\') { match(~~); F();
+    E\'(); } } F() { G(); F\'(); } F\'() { if (next == \'**\') {
+    match(**); G(); F\'(); } } G() { if (next == \'(\') { match(\'(\');
+    E(); match(\')\'); } else { match(id); } }
+
+    to create the AST we modify the functions appropriately:
+
+    E() { a = F(); b = E\'(); if (b != nil) return Add(a, b); else
+    return a; } E\'() { if (next == \'~~\') { match(~~); a = F(); b =
+    E\'(); if (b != nil) return Add(a, b); else return a; } return nil;
+    } F() { a = G(); b = F\'(); if (b != nil) return Mul(a, b); else
+    return a; } F\'() { if (next == \'**\') { match(**); a = G(); b =
+    F\'(); if (b != nil) return Mul(a, b); else return a; } } G() { if
+    (next == \'(\') { match(\'(\'); a = E(); match(\')\'); return a; }
+    else { a = match(id); return Id(a); } }
+
+    \[go through the \"x + y \* z\" input again and show that it returns
+    the AST we want\] \[note that this makes all the operators right
+    associative; if we want them to be left associative we can modify
+    the way we build the AST\]
+
+3.  exercise
+
+    given the following grammar:
+
+    A ::= A y B \| A z B \| B B ::= B w C \| B x C \| C C ::= p C \| a
+
+    and the following AST definition:
+
+    AST ::= a \| wOp AST AST \| xOp AST AST \| yOp AST AST \| zOp AST
+    AST \| pOp AST
+
+    apply left recursion elimination to make the grammar predictive,
+    then write a recursive descent parser that produces an appropriate
+    AST.
+
+    verify the the input \"p a y a w a z a x a\" produces the AST:
+
+    \[yOp \[pOp a\] \[zOp \[wOp a a\] \[xOp a a\] \] \]
+
+    1.  solution
+
+        1.  transformed grammar
+
+            A ::= B A\' A\' ::= y B A\' \| z B A\' \| ε B ::= C B\' B\'
+            ::= w C B\' \| x C B\' \| ε C ::= p C \| a
+
+        2.  parser without AST building:
+
+            A() { B(); A\'(); }
+
+            A\'() { if (next == \'y\') { match(y); B(); A\'(); } else if
+            (next == \'z\') { match(z); B(); A\'(); } }
+
+            B() { C(); B\'(); }
+
+            B\'() { if (next == \'w\') { match(w); C(); B\'(); } else if
+            (next == \'x\') { match(x); C(); B\'(); } }
+
+            C() { if (next == \'p\') { match(p); C(); } else match(a); }
+
+        3.  parser with AST building
+
+            A() { d = B(); e = A\'(); if (A\' matched \'y\') return
+            yOp(d,e); else if (A\' matched \'z\') return zOp(d,e); else
+            return d; }
+
+            A\'() { if (next == \'y\' or \'z\') { if (next == \'y\')
+            match(y); else if (next == \'z\') match(z); d = B(); e =
+            A\'(); if (A\' matched \'y\') return yOp(d,e); else if (A\'
+            matched \'z\') return zOp(d,e); else return d; } return nil;
+            }
+
+            B() { d = C(); e = B\'(); if (B\' matched \'w\') return
+            wOp(d,e); else if (B\' matched \'x\') return xOp(d,e); else
+            return d; }
+
+            B\'() { if (next == \'w\' or \'x\') { if (next == \'w\')
+            match(w); else if (next == \'x\') match(x); d = C(); e =
+            B\'(); if (B\' matched \'w\') return wOp(d,e); else if (B\'
+            matched \'x\') return xOp(d,e); else return d; } return nil;
+            }
+
+            C() { if (next == \'p\') { match(p); d = C(); return pOp(d);
+            } else { match(a); return Id(a); } }
+
+validating AST
+--------------
+
+once we have the AST we\'re almost finished. we need to validate the AST
+to make sure it isn\'t nonsense (i.e., syntactically correct but
+semantically meaningless). for our language there are only a few trivial
+checks that we need to perform:
+
+1.  is every variable declared before it\'s used?
+2.  is every called function defined?
+3.  is every parameter name and defined function name unique?
+
+for (1) we just write a checker to do a recursive traversal of the AST
+with a set DECLARED that contains the variables declared in the current
+scope. it starts empty; each time we enter a block of code we add in
+that block\'s declared variables. for each statement, we look at all
+variables it refers to and verify that they are in the current DECLARED
+set.
+
+the only thing we need to be a little careful of is to distinguish
+between different scopes. consider:
+
+int x; int y; if (x \< y) { int x; int z; y := x + z; } else { y := x -
+z; }
+
+there is an error here because \'z\' is not in scope in the conditional
+false branch. there\'s an easy way to ensure we do it correctly: given a
+DECLARED set D, when the checker makes a recursive call we always pass
+in a copy of D rather than D itself. so in the above example, the
+initial D would have {x,y}. we pass in a copy of D when making a
+recursive checker call to the true branch and modify the copy to contain
+{x,y,z}. when the recursive call returns we throw away the copy and pass
+the orignal D when making a recursive checker call to the false branch.
+this keeps the branches separate and everything works right.
+
+for (2) it\'s even easier: just collect the set of defined functions,
+then go through all call statements and check that they only call one of
+the defined functions. we also need to check that the call uses the
+correct number of arguments.
+
+for (3) all we do is go through the defined functions and check that
+their names are unique, then for every function\'s parameter list go
+through and check that they are all distinct from each other. note that
+many languages don\'t require unique function names as long as the
+function signatures are different; we\'ll keep things simple and require
+uniqueness.
+
+in general the AST validation phase can be much more complicated. type
+checking makes up a big piece, but since we only have one type it
+doesn\'t really matter to us.
+
+### example {#example-4}
+
+def foo(int a, int a) : int { x := bar(42); return x; } def foo() : int
+{ return 42; } output foo(1, 2);
+
+frontend wrap-up
+----------------
+
+we\'ve gone through a lot of steps to get through the frontend; let\'s
+recap what\'s going on and put it all together.
+
+given: grammar for concrete syntax of the language
+
+1.  decide on precedence levels
+2.  factor grammar to enforce desired precedence
+3.  eliminate left recursion
+4.  check if grammar is predictive
+    -   if not, apply left factoring
+    -   recheck if grammar is predictive now
+    -   if not, the concrete grammar needs to change somehow
+5.  define AST data structure
+6.  translate grammar to recursive descent parser
+7.  install AST-building logic into parsing functions
+
+given: a sequence of characters representing the source code
+
+1.  lexer: convert to sequence tokens using DFA/NFA
+2.  parser: convert sequence of tokens into AST
+3.  check AST for validity
+
+i want to emphasize that we\'ve simplified some issues that happen in
+real-world languages like C, C++, Java, etc. these often require some
+creative thinking to get them to fit into the frontend framework we\'ve
+covered here, mostly because of ambiguity in the lexemes and/or grammar
+or because lexemes aren\'t regular.
+
+naive codegen
+-------------
+
+given an AST, our job is to translate it into a sequence of assembly
+instructions for our target architecture. for the purposes of these
+lectures i\'ll use a generic assembly language; the assignments will
+target 32-bit x86 assembly instructions.
+
+### necessary context
+
+1.  linker
+
+    on paper show the stages: source1 --\[compiler\]-\> assembly
+    --\[assembler\]-\> object file 1 --- source2 --\[compiler\]-\>
+    assembly --\[assembler\]-\> object file 2 ---\\ ...
+    \|--\[linker\]-\> executable sourceN --\[compiler\]-\> assembly
+    --\[assembler\]-\> object file N .../
+
+    go through example in terminal showing compiling separate files into
+    object code, then linking them. use objdump to show the assembly for
+    each. point out (1) how calling gcc on them seperately causes an
+    error unless using the -c flag; (2) how the externally defined
+    functions are treated in the object files vs the linked file; (3)
+    the extra functions in the linked file that are run before main.
+    also discuss that gcc is actually just calling as and ld rather than
+    assembling and linking itself; we\'ll use the same strategy for our
+    compiler.
+
+    \[see examples/\]
+
+2.  static vs dynamic libraries
+
+    even after using the linker it\'s possible we still don\'t have all
+    the code. it depends on whether we\'re using [static
+    linking]{.underline} or [dynamic linking]{.underline} for libraries.
+
+    static libraries have a \'\*.a\' extension (\"archive\"). they are
+    linked in with the other code the same way.
+
+    dynamic libraries have a \'\*.so\' extension (\"shared object\").
+    they are not linked in at compilation time. instead, they are linked
+    in at load time when the code is being put into memory.
+
+    there are pros and cons to each approach, and both are widely used.
+
+    -   static: larger executable size, can be multiple copies in memory
+        at once for different executables, but guaranteed to have the
+        right version.
+    -   dynamic: smaller executable size, can be shared by multiple
+        executables, but if the library can get out of synch with the
+        executable.
+
+    you don\'t have to be aware of this for writing the compiler, but
+    you should know the difference in general.
+
+3.  process layout in memory
+
+    it will be useful to know how the process is laid out in memory
+    while executing (note: this is virtual memory, not physical memory;
+    maybe go into what that means a little bit but not too much):
+
+    (address 0) \[code segment \| static segment \| data segment\]
+
+    where the static segment also contains globals and constant strings,
+    and the data segment is laid out as:
+
+    (low address) \[heap \| stack\]
+
+    note that this is where the errors \"segmentation fault\" and
+    \"stack overflow\" come from.
+
+    the heap is where memory is allocated from (e.g., when you call
+    [new]{.underline} or [malloc]{.underline}); it is generally handled
+    by the language runtime.
+
+    the stack is for procedure calls; each call will push a \"stack
+    frame\" onto the stack, so each instance of a procedure will have
+    its own stack frame. stack manipulation is generally handled by the
+    compiler.
+
+    -- the stack frame is where a procedure\'s local variables are
+    stored, among other things; we\'ll get more into procedures and
+    stack frames later.
+
+    note that the stack grows downwards; this is typical for most
+    architectures, including x86, but not always true (there are some
+    where it grows up, and even some where it goes in a circle).
+
+    -- two important values wrt to the stack: the \"stack pointer\"
+    (points to the current top of the stack) and the \"frame pointer\",
+    aka base pointer (points to the bottom of the current stack frame).
+
+4.  alignment and padding
+
+    architectures generally have restrictions on alignment, i.e., how
+    values can match up to word boundaries. when assigning memory
+    locations to variables, we need to respect the alignment
+    restrictions.
+
+    -- example: 32-bit floating point and integer values should begin on
+    a full-word (32-bit) boundary.
+
+    scheme: place values with identical alignment restrictions next to
+    each other; assign offsets from most restrictive to least; if
+    needed, insert padding to match restrictions.
+
+    we won\'t have to worry about this for L1 because we only have one
+    type of thing: int32. but this is something that compiler writers
+    have to worry about in general. for example, consider the following
+    struct:
+
+    struct foo { char a; int b; short c; long long int d; };
+
+    we\'ll assume an architecture where char:8, short:16, int:32, and
+    long long int:64; chars are byte-aligned, shorts are word-aligned,
+    ints are word-aligned, and long long ints are double-word-aligned.
+    so we would have to lay this out in memory as:
+
+      --- -- -- -- --- --- --- --- --- --- -- -- -- -- -- -- --- --- --- --- --- --- --- ---
+      a            b   b   b   b   c   c                     d   d   d   d   d   d   d   d
+      --- -- -- -- --- --- --- --- --- --- -- -- -- -- -- -- --- --- --- --- --- --- --- ---
+
+    this is why it\'s bad practice when c/c++ programmers try to
+    manually index into a struct, like:
+
+    foo x{8,16,32,64}; char y = **((char**)&x + 1);
+
+    this code tries to read the first byte of x.b, but it\'s actually
+    getting the padding between x.a and x.b that was inserted by the
+    compiler, which is garbage.
+
+### symbol table
+
+1.  intro
+
+    during compilation it\'s generally useful to have a single
+    repository of information about symbols in the program, e.g.,
+    functions and variables. -- functions: number of parameters and
+    their types, ... -- variables: type, memory location, array
+    dimensions, ... -- structs and records: their fields, layout, and
+    size, ... -- etc
+
+    we can find this information out by traversing the code whenever we
+    need it, but it\'s more efficient to figure it out once and store
+    the info where we can look it up whenever we need it.
+
+    note that this information is used by the front-end, middle-end, and
+    back-end, and that it isn\'t all available at the same time; the
+    info gets filled in as it becomes available (e.g., variable memory
+    locations).
+
+    naively we might think to implement the symbol table as a global map
+    from symbol to info, but that doesn\'t quite work due to the issue
+    of [scope]{.underline}.
+
+2.  scope
+
+    most PLs have the concept of [scope]{.underline}, i.e., an area of
+    code for which a particular variable is defined. for example, every
+    function has its own scope, and its parameters and locals are
+    entirely independent of any other function\'s parameters and locals
+    even if they are named the same:
+
+    int foo(int a, int b) { int x = a + 1; int y = b + 2; return x \* y;
+    } double bar(double a, double b) { double x = a - 1; double y = b -
+    2; return x / y; }
+
+    clearly we need to keep the info about foo\'s variables separate
+    from the info about bar\'s variables. the first solution we might
+    try is just to keep a separate symbol table for each scope (i.e.,
+    each function):
+
+    foo --\> \[a -\> ..., b -\> ..., x -\> ..., y -\> ...\] bar --\> \[a
+    -\> ..., b -\> ..., x -\> ..., y -\> ...\]
+
+    this also has a problem, namely, [nested scope]{.underline}.
+
+3.  nested scope
+
+    scopes can be nested inside of each other, and variables in an inner
+    scope can shadow variables in an outer scope. consider the following
+    example:
+
+    // SCOPE LEVEL 0 static int w; int x;
+
+    void example(int a, int b) { // SCOPE LEVEL 1 int c; { // SCOPE
+    LEVEL 2a int b, z; } { // SCOPE LEVEL 2b int a, x; { // SCOPE LEVEL
+    3 int c, x; b = a + b + c + x + w; } } }
+
+    all modern PLs use [lexical scoping]{.underline}, which means that a
+    variable always refers to its syntactically nearest definition. in
+    other words, start from the scope the variable is being used in and
+    see if that scope defines that variable; if so then that\'s the
+    definition it refers to. otherwise look in the scope containing the
+    current scope and check there. keep going up the chain of enclosing
+    scopes until you find the nearest one that defines the variable;
+    that\'s the definition that variable use refers to.
+
+    level~0~ --\> level~1~ --\> level~2a~ \\-\> level~2b~ --\> level~3~
+
+    for the above example, if we subscript the variable with the scope
+    they are defined in we see that the assignment becomes:
+
+    b~1~ = a~2b~ + b~1~ + c~3~ + x~2b~ + w~0~;
+
+    note that there\'s no way that any variable used in scope 2b can
+    refer to scope 2a because 2a does not enclose 2b.
+
+    so how do we arrange the symbol table to make the resolution
+    possible? the basic idea is to create a new table for each scope and
+    chain them together in a way that mirrors the scoping tree we just
+    saw. we\'ll use the following data structure and API for symbol
+    table creation:
+
+    -   SymbolTable: \[parent: pointer to enclosing symbol table; table:
+        map from symbol to info\]
+    -   currScope: pointer to current symbol table, initialized to NULL
+    -   CreateScope():
+        -   creates a new symbol table
+        -   sets the table\'s parent to currScope
+        -   sets currScope to the new table
+    -   Insert(symbol, info): inserts symbol and its info in
+        currScope\'s table
+    -   Lookup(symbol): looks up symbol to get its info
+        -   starts in currScope and keeps looking for symbol until it\'s
+            found, walking up the parents.
+    -   EndScope():
+        -   sets currScope to currScope\'s parent
+
+    let\'s see it in action for the example above. \[go through
+    example\]
+
+    note that it looks like the table end up orphaned; in reality we
+    would either:
+
+    1.  keep a pointer at the start of each scope to the appropriate
+        table
+    2.  have each symbol point directly to its entry in the appropriate
+        table
+
+4.  our compiler for L1
+
+    L1 is very simple, and so is our compiler, so a full-fledged symbol
+    table is kind of overkill. all we really need to keep track of is
+    the memory location of each variable. note that we still do need to
+    worry about scope and nested scopes.
+
+    here\'s how we\'ll do it. we\'ll be doing code generation using a
+    recursive traversal of the AST as described below. as part of the
+    recursive traversal we\'ll pass a map from variable to memory
+    location (we\'ll describe how to compute the memory location in a
+    bit). each time we\'re making a recursive call to a new scope,
+    we\'ll pass a copy of the map; inside that new scope we\'ll insert
+    any declared variables and their memory locations.
+
+    -- this is essentially the scheme i talked about in an earlier
+    lecture on validating the AST by checking that all variables were
+    declared before being used.
+
+    we can get away with this scheme because we\'re not keeping around
+    any other information, and once we\'re done with code generation for
+    a given scope we don\'t need the memory location information, so we
+    can just get rid of the maps as we leave each scope.
+
+    also note that this isn\'t a very efficient scheme, because we\'re
+    constantly creating, copying, and destroying these maps. the rest of
+    our compiler isn\'t terribly efficient anyway so it doesn\'t matter,
+    but in a production compiler we would want to heavily optimize the
+    symbol table because it\'s accessed so often during compilation.
+
+    1.  specifics about L1 scope
+
+        \[show example code in L1-concrete-syntax.pdf\]
+
+        -   the global statement block is its own scope and not in scope
+            of the function bodies.
+        -   every function name is in scope for every function body.
+
+### code generation strategies
+
+1.  recursive AST traversal
+
+    a modern optimizing compiler will almost certainly translate the AST
+    to a simpler intermediate representation (IR) before doing code
+    generation. however, for our first compiler we\'ll translate
+    directly from the AST to assembly. the implementation of code
+    generation will be based on a recursive traversal of the AST; as we
+    traverse it we\'ll emit the appropriate assembly so that by the time
+    we\'ve traversed the entire tree we\'ve finished compilation.
+
+    our compiler is written in c++, and the idiomatic way to do
+    something like this in an object oriented language is called the
+    \"Visitor Design Pattern\". the class poll indicated that many of
+    you don\'t know what this is, so i\'ll prepare a separate lecture
+    just quickly going over how it works. but for the purposes of this
+    lecture, just think of it as a standard tree traversal algorithm.
+
+    also note that because we\'re directly generating code from the AST
+    rather than translating to an IR and then optimizing, the code we
+    generate will be very inefficient with lots of redundant loads and
+    stores; this is the price we pay for a simple, uniform code
+    generation strategy.
+
+    1.  visitor pattern
+
+        \[separate video lecture, using a Tree data structure and
+        TreeVisitor to discuss the concepts.\]
+
+2.  stack-based
+
+    often we can (or must) treat the target architecture as a stack
+    machine: there is a system stack (logically distinct from the
+    function stack) and when generating code, the operands and result
+    are always on the stack and don\'t need to be explicitly stated. for
+    those familiar with it, the code looks like reverse polish notation.
+
+    example source: x = (1 + 2) \* 3
+
+    would generate: push 1 push 2 add push 3 mul sto &x
+
+    the JVM is an example of a stack machine, as is the CLR. the x86
+    architecture isn\'t really a stack machine, but we could repurpose
+    the function stack and treat it as a stack machine if we wanted to.
+
+    advantages of stack machines: easy to generate code, no temporary
+    variables, no register allocation, smaller code. disadvantages of
+    stack machines: can be much slower than register-based.
+
+3.  register-based
+
+    a more common target architecture is a register-based machine: it
+    uses high-speed memory integrated directly into the CPU (i.e.,
+    registers) to hold operands and results and requires instructions to
+    explicitly state where the operands are and where the result should
+    be put.
+
+    example source: x = (1 + 2) \* 3
+
+    would generate: mov 1 R1 mov 2 R2 add R1 R2 mov 3 R3 mul R2 R3 sto
+    R3 \[memory location of x\]
+
+    \[i\'m using a somewhat generic assembly language modeled off of x86
+    but not exactly the same; when there are two operands, the operation
+    is applied and the result is put in the second one.\]
+
+    x86, ARM, MIPS, etc are all register-based machines (though most
+    can, as mentioned above, pretend to be stack-based machines by
+    repurposing the function stack).
+
+    the advantages are disadvantages of register-based machines are
+    basically the reverse of those for stack-based machines.
+
+    we\'ll be targeting x86 as a register-based machine for our
+    compiler.
+
+### naive register-based generation
+
+1.  without functions or calls
+
+    we\'ll start by assuming a program without any function definitions
+    or calls; thus all we have is the single global block of statements.
+
+    1.  variable memory locations
+
+        we need to figure out where the variables declared in this block
+        will live and put that information into our symbol table. we\'ll
+        put all the variables on the function stack:
+
+        1.  note that the stack and frame pointers are initialized to
+            the base of the stack.
+        2.  compute how many variables are being declared; call this N.
+        3.  remember that each variable is a 4-byte integer, so we need
+            4\*N bytes of space.
+        4.  advance the stack pointer by 4\*N, giving us a stack frame
+            (from the frame pointer to the stack pointer).
+        5.  all variables are initialized to 0, so write 0 into each
+            word of the stack frame.
+        6.  in the symbol table map each declared variable to an offset
+            from the frame pointer.
+            -   remember that the stack grows downward, so the offset
+                will be non-positive.
+
+        we would have to worry about alignment and padding here except
+        that everything is a 4-byte integer so it all works out.
+
+        now whenever we need to know where a variable is stored in
+        memory, we just look up the offset stored in the symbol table.
+
+        EXAMPLE:
+
+        int x; int y; x := 1 + 2; y := x \* 3; output y;
+
+        -   2 variables == increase stack by 8 bytes.
+
+            emit instruction: sub 8 STACK~REG~
+
+        -   initialize them both to 0.
+
+            emit instructions: sto 0 \[FRAME~REG~-0\] sto 0
+            \[FRAME~REG~-4\]
+
+            note that \[FRAME~REGISTER~-n\] means take the value of
+            FRAME~REGISTER~, subtract n, and access that location in
+            memory.
+
+        -   add info to the symbol table:
+
+            x --\> 0 \[i.e., x is at a 0 offset from the frame pointer\]
+            y --\> -4 \[i.e., x is at a -4 offset from the frame
+            pointer\]
+
+        we\'ll do this each time we enter a new scope, and call this the
+        \"preamble code\" for that scope. in this example, the preamble
+        code we emit is:
+
+        sub 8 STACK~REG~ sto 0 \[FRAME~REG~-0\] sto 0 \[FRAME~REG~-4\]
+
+    2.  expressions
+
+        we\'re targeting a register-based machine, but we don\'t want to
+        do register allocation (at least, for now) so we need to
+        evaluate expressions assuming a very limited set of available
+        registers. to generate code for an expression we\'ll do a
+        recursive traversal in post-order (that is, visit the children
+        first, then the parent).
+
+        1.  arithmetic
+
+            let\'s start with a simple example expression: (1 + 2) \*
+            (3 - 4)
+
+            as a tree, this is \[\* \[+ 1 2\] \[- 3 4\]\]
+
+            here\'s a scheme we might attempt (that will turn out to be
+            broken): when processing the \*,+,- nodes we want the left
+            subtree\'s value to end in one register (let\'s call it
+            LEFT~REG~) and the right subtree\'s value to end in another
+            (call it RIGHT~REG~). to generate code for this example, we
+            might try the following:
+
+            call generate~aexp~(\* node, left): call generate~aexp~(+
+            node, left): call generate~aexp~(1 node, left): emit \"mov 1
+            LEFT~REG~\" call generate~aexp~(2 node, right): emit \"mov 2
+            RIGHT~REG~\" emit \"add RIGHT~REG~ LEFT~REG~\" call
+            generate~aexp~(- node, right): call generate~aexp~(3 node,
+            left): emit \"mov 3 LEFT~REG~\" call generate~aexp~(4 node,
+            right): emit \"mov 4 RIGHT~REG~\" emit \"sub RIGHT~REG~
+            LEFT~REG~\" \"mov LEFT~REG~ RIGHT~REG~\" emit \"mul
+            RIGHT~REG~ LEFT~REG~\"
+
+            the second parameter to generate~aexp~() tells it which
+            register the result should end up in (we can pick
+            arbitrarily for the root node of the expression). the final
+            emitted code is:
+
+            01: mov 1 LEFT~REG~ 02: mov 2 RIGHT~REG~ 03: add RIGHT~REG~
+            LEFT~REG~ 04: mov 3 LEFT~REG~ 05: mov 4 RIGHT~REG~ 06: sub
+            RIGHT~REG~ LEFT~REG~ 07: mov LEFT~REG~ RIGHT~REG~ 07: mul
+            RIGHT~REG~ LEFT~REG~
+
+            we see that there\'s a problem: line 03 puts the result of
+            the add in LEFT~REG~, but then line 04 immediately
+            overwrites it in order to set up computing the result of the
+            sub. if we were doing a stack machine this wouldn\'t matter
+            because we don\'t need registers; if we were doing register
+            allocation we could handle this by assuming that there are
+            an arbitrary number of registers available and then fix it
+            later. but we aren\'t doing either of those things, so how
+            do we handle it?
+
+            the only thing that can store an arbitrary number of values
+            is memory, so we\'re going to have to create some memory
+            locations to hold temporary values during expression
+            evaluation. in other words, we need to add a set of
+            temporary variables in addition to the other variables
+            declared in this scope. how do we know how many to add when
+            we enter a particular scope? we\'ll dynamically add them to
+            the symbol table as we generate code for an expression
+            (remembering to adjust the stack pointer in the preamble
+            code for this scope to allocate memory for them as well).
+
+            -- note that we can reuse temporary variables between
+            different expressions (e.g., for \"x := \<aexp~1~\>; y :=
+            \<aexp~2~\>;\" we only need max(\#tmp(\<aexp~1~\>),
+            \#tmp(\<aexp~2~\>)) temporary variables.
+
+            let\'s see how we can handle the above example now:
+
+            call generate~aexp~(\* node, tmp~num~ = 0): insert ~tmp0~
+            into symbol table call generate~aexp~(+ node, tmp~num~ = 1):
+            insert ~tmp1~ into symbol table call generate~aexp~(1 node,
+            tmp~num~ = 2): emit \"mov 1 RESULT~REG~\" emit \"sto
+            RESULT~REG~ \[~tmp1~\]\" call generate~aexp~(2 node,
+            tmp~num~ = 2): emit \"mov 2 RESULT~REG~\" emit \"ld
+            \[~tmp1~\] OTHER~REG~\" \"add OTHER~REG~ RESULT~REG~\" emit
+            \"sto RESULT~REG~ \[~tmp0~\]\" call generate~aexp~(- node,
+            tmp~num~ = 1): insert ~tmp1~ into symbol table // already
+            there, so no action taken call generate~aexp~(3 node,
+            tmp~num~ = 2): emit \"mov 3 RESULT~REG~\" emit \"sto
+            RESULT~REG~ \[~tmp1~\]\" call generate~aexp~(4 node,
+            tmp~num~ = 2): emit \"mov 4 RESULT~REG~\" emit \"ld
+            \[~tmp1~\] OTHER~REG~\" \"sub RESULT~REG~ OTHER~REG~\" \"mov
+            OTHER~REG~ RESULT~REG~\" emit \"ld \[~tmp0~\] OTHER~REG~\"
+            \"mul OTHER~REG~ RESULT~REG~\"
+
+            notice that each call to generate~aexp~ puts the result of
+            that call into RESULT~REG~, and because we\'re storing the
+            intermediate results in temporary variables we\'re never
+            overwriting anything important. also notice that we can
+            reuse temporary variables once we\'re done with them (as we
+            do above with ~tmp1~). the final emitted code is:
+
+            01: mov 1 RESULT~REG~ 02: sto RESULT~REG~ \[~tmp1~\] 03: mov
+            2 RESULT~REG~ 04: ld \[~tmp1~\] OTHER~REG~ 05: add
+            OTHER~REG~ RESULT~REG~ 06: sto RESULT~REG~ \[~tmp0~\] 07:
+            mov 3 RESULT~REG~ 08: sto RESULT~REG~ \[~tmp1~\] 09: mov 4
+            RESULT~REG~ 10: ld \[~tmp1~\] OTHER~REG~ 11: sub RESULT~REG~
+            OTHER~REG~ 12: mov OTHER~REG~ RESULT~REG~ 13: ld \[~tmp0~\]
+            OTHER~REG~ 14: mul OTHER~REG~ RESULT~REG~
+
+            in total we needed two temporary variables (~tmp0~ and
+            ~tmp1~) and so needed to add two entries to the symbol table
+            and increase the stack pointer by 8 bytes (remember that the
+            stack pointer addition happens at the beginning of the
+            scope, so we need to go back to that code and update it).
+            note that we used the names \"~tmp~\<n\>\", which are not
+            valid variable names in our syntax, thus avoiding name
+            clashes and making it easy to tell which variables were
+            created by the compiler vs the user.
+
+            so now we have it working on an example; let\'s generalize
+            the algorithm for arbitrary arithmetic expressions:
+
+            generate~aexp~(AST\* node, int tmp~num~ = 0) { if (node is a
+            constant number \<n\>) { emit \"mov \<n\> RESULT~REG~\";
+            return; } if (node is a variable \<x\>) { emit \"ld \[x\]
+            RESULT~REG~\"; return; }
+
+            // node must be one of +,-,\* insert ~tmp~\<tmp~num~\> into
+            symbol table; generate~aexp~(node-\>left, tmp~num~+1); emit
+            \"sto RESULT~REG~ \[~tmp~\<tmp~num~\>\]\";
+            generate~aexp~(node-\>right, tmp~num~+1); emit \"ld
+            \[~tmp~\<tmp~num~\>\] OTHER~REG~\";
+
+            // left-hand value is in OTHER~REG~, right-hand value is in
+            RESULT~REG~ if (node is +) { emit \"add OTHER~REG~
+            RESULT~REG~\"; return; } if (node is -) { emit \"sub
+            RESULT~REG~ OTHER~REG~\"; emit \"mov OTHER~REG~
+            RESULT~REG~\"; return; } emit \"mul OTHER~REG~
+            RESULT~REG~\"; }
+
+            remember, it\'s important that inserting a [new]{.underline}
+            temporary variable in the symbol table [also]{.underline}
+            adjusts the amount by which the preamble code for the
+            enclosing scope adds to the stack pointer to create the
+            stack frame. however, we don\'t have to initialize the new
+            memory locations to 0 because we\'re guaranteed to always
+            store a value to them before reading them.
+
+            1.  exercise
+
+                generate code for the following expression:
+
+                ((1 - 2) \* (3 \* 4)) + (5 - (6 + 7))
+
+                tree:
+
+                \[+ \[\* \[- 1 2\] \[\* 3 4\]\] \[- 5 \[+ 6 7\]\]
+
+                solution:
+
+                01: mov 1 RR 02: sto RR \[~tmp2~\] 03: mov 2 RR 04: ld
+                \[~tmp2~\] OR 05: sub RR OR 06: mov OR RR 07: sto RR
+                \[~tmp1~\] 08: mov 3 RR 09: sto RR \[~tmp2~\] 10: mov 4
+                RR 11: ld \[~tmp2~\] OR 12: mul OR RR 13: ld \[~tmp1~\]
+                OR 14: mul OR RR 15: sto RR \[~tmp0~\] 16: mov 5 RR 17:
+                sto RR \[~tmp1~\] 18: mov 6 RR 19: sto RR \[~tmp2~\] 20:
+                mov 7 RR 21: ld \[~tmp2~\] OR 22: add OR RR 23: ld
+                \[~tmp1~\] OR 24: sub RR OR 25: mov OR RR 26: ld
+                \[~tmp0~\] OR 27: add OR RR
+
+        2.  relational / logical
+
+            now that we\'ve handled arithmetic expressions, the
+            relational expressions are easy. the main thing we need to
+            do is decide how to represent the results of a relational
+            expression (i.e., how do we represent a boolean). we\'ll use
+            the same method as c/c++: a 0 is interpreted as false, a
+            non-0 is interpreted as true.
+
+            often assembly instructions that compare values store the
+            results as a flag rather than in a register, so we need to
+            compensate for that. let\'s look at an example:
+
+            (1 \< 2) && ((3 \<= 4) \|\| (5 = 6))
+
+            as a tree this is:
+
+            \[&& \[\< 1 2\] \[\|\| \[\<= 3 4\] \[= 5 6\]\]\]
+
+            so the process we want the code generator to go through is:
+
+            call generate~rexp~(&& node, tmp~num~ = 0): insert ~tmp0~
+            into symbol table call generate~rexp~(\< node, tmp~num~ =
+            1): insert ~tmp1~ into symbol table call generate~aexp~(1
+            node, tmp~num~ = 2) emit \"sto RESULT~REG~ \[~tmp1~\]\" call
+            generate~aexp~(2 node, tmp~num~ = 2) emit \"ld \[~tmp1~\]
+            OTHER~REG~\" \"cmp RESULT~REG~ OTHER~REG~\" \"setlt
+            RESULT~REG~\" emit \"sto RESULT~REG~ \[~tmp0~\]\" call
+            generate~rexp~(\|\| node, tmp~num~ = 1): insert ~tmp1~ into
+            symbol table // does nothing call generate~rexp~(\<= node,
+            tmp~num~ = 2): insert ~tmp2~ into symbol table call
+            generate~aexp~(3, tmp~num~ = 3) emit \"sto RESULT~REG~
+            \[~tmp2~\]\" call generate~aexp~(4, tmp~num~ = 3) emit \"ld
+            \[~tmp2~\] OTHER~REG~\" \"cmp RESULT~REG~ OTHER~REG~\"
+            \"setle RESULT~REG~\" emit \"sto RESULT~REG~ \[~tmp1~\]\"
+            call generate~rexp~(= node, tmp~num~ = 2): insert ~tmp2~
+            into symbol table // does nothing call generate~aexp~(5,
+            tmp~num~ = 3) emit \"sto RESULT~REG~ \[~tmp2~\]\" call
+            generate~aexp~(6, tmp~num~ = 3) emit \"ld \[~tmp2~\]
+            OTHER~REG~\" \"cmp RESULT~REG~ OTHER~REG~\" \"sete
+            RESULT~REG~\" emit \"ld \[~tmp1~\] OTHER~REG~\" \"or
+            OTHER~REG~ RESULT~REG~\" emit \"ld \[~tmp0~\] OTHER~REG~\"
+            \"and OTHER~REG~ RESULT~REG~\"
+
+            and the final generated code is:
+
+            01: \[code from generate~aexp~\] 02: sto RESULT~REG~
+            \[~tmp1~\] 03: \[code from generate~aexp~\] 04: ld
+            \[~tmp1~\] OTHER~REG~ 05: cmp RESULT~REG~ OTHER~REG~ 06:
+            setlt RESULT~REG~ 07: sto RESULT~REG~ \[~tmp0~\] 08: \[code
+            from generate~aexp~\] 09: sto RESULT~REG~ \[~tmp2~\] 10:
+            \[code from generate~aexp~\] 11: ld \[~tmp2~\] OTHER~REG~
+            12: cmp RESULT~REG~ OTHER~REG~ 13: setle RESULT~REG~ 14: sto
+            RESULT~REG~ \[~tmp1~\] 15: \[code from generate~aexp~\] 16:
+            sto RESULT~REG~ \[~tmp2~\] 17: \[code from generate~aexp~\]
+            18: ld \[~tmp2~\] OTHER~REG~ 19: cmp RESULT~REG~ OTHER~REG~
+            20: sete RESULT~REG~ 21: ld \[~tmp1~\] OTHER~REG~ 22: or
+            OTHER~REG~ RESULT~REG~ 23: ld \[~tmp0~\] OTHER~REG~ 24: and
+            OTHER~REG~ RESULT~REG~
+
+            it\'s basically like the arithmetic expressions except that
+            the comparison instructions set a condition flag, which we
+            then need to read in order to set a register. so the
+            generate~rexp~ code is:
+
+            generate~rexp~(AST\* node, int tmp~num~ = 0) { insert
+            ~tmp~\<tmp~num~\> into symbol table; if (node is a
+            comparison) { generate~aexp~(node-\>left, tmp~num~+1); emit
+            \"sto RESULT~REG~ \[~tmp~\<tmp~num~\>\]\";
+            generate~aexp~(node-\>right, tmp~num~+1); emit \"ld
+            \[~tmp~\<tmp~num~\>\] OTHER~REG~\"; emit \"cmp RESULT~REG~
+            OTHER~REG~\"; emit \"set\<op\> RESULT~REG~\" // \<op\> is
+            {e,lt,le} depending on the comparison being made } else {
+            generate~rexp~(node-\>left, tmp~num~+1); emit \"sto
+            RESULT~REG~ \[~tmp~\<tmp~num~\>\]\";
+            generate~rexp~(node-\>right, tmp~num~+1); emit \"ld
+            \[~tmp~\<tmp~num~\>\] OTHER~REG~\"; emit \"\<op\> OTHER~REG~
+            RESULT~REG~\" // \<op\> is {and,or} depending on the node }
+            }
+
+            1.  exercise
+
+                generate code for the following expression:
+
+                ((1 = 2) \|\| ((3 \< 4) && (5 \<= 6))) && ((7 \< 8) \|\|
+                (9 = 9))
+
+                tree:
+
+                \[&& \[\|\| \[= 1 2\] \[&& \[\< 3 4\] \[\<= 5 6\]\]\]
+                \[\|\| \[\< 7 8\] \[= 9 9\]\]
+
+                solution:
+
+                01: mov 1 RR 02: sto RR \[~tmp2~\] 03: mov 2 RR 04: ld
+                \[~tmp2~\] OR 05: cmp RR OR 06: sete RR 07: sto RR
+                \[~tmp1~\] 08: mov 3 RR 09: sto RR \[~tmp3~\] 10: mov 4
+                RR 11: ld \[~tmp3~\] OR 12: cmp RR OR 13: setlt RR 14:
+                sto RR \[~tmp2~\] 15: mov 5 RR 16: sto RR \[~tmp3~\] 17:
+                mov 6 RR 18: ld \[~tmp3~\] OR 19: cmp RR OR 20: setle RR
+                21: ld \[~tmp2~\] OR 22: and OR RR 23: ld \[~tmp1~\] OR
+                24: or OR RR 25: sto RR \[~tmp0~\] 26: mov 7 RR 27: sto
+                RR \[~tmp2~\] 28: mov 8 RR 29: ld \[~tmp2~\] OR 30: cmp
+                RR OR 31: setlt RR 32: sto RR \[~tmp1~\] 33: mov 9 RR
+                34: sto RR \[~tmp2~\] 35: mov 9 RR 36: ld \[~tmp2~\] OR
+                37: cmp RR OR 38: sete RR 39: ld OR \[~tmp1~\] 40: or OR
+                RR 41: ld \[~tmp0~\] OR 42: and OR RR
+
+        3.  short-circuiting evaluation
+
+            it can be wasteful to evaluate an entire logical expression
+            if we already know the answer part-way through (and even
+            harmful if the remainder of the expression has
+            side-effects). consider the following C expression:
+
+            if (ptr != NULL && \*ptr == 42) { ... }
+
+            clearly if ptr [is]{.underline} NULL we don\'t want to
+            dereference it. this is called \"short-circuited\"
+            evaluation: -- given \"\<lhs\> && \<rhs\>\", if \<lhs\> is
+            false then we don\'t need to evaluate \<rhs\>. -- given
+            \"\<lhs\> \|\| \<rhs\>\", if \<lhs\> is true then we don\'t
+            need to evaluate \<rhs\>.
+
+            our L1 language doesn\'t allow these kinds of expressions
+            currently, but we should understand how to implement it. the
+            basic idea is simple: we have to insert a conditional into
+            the middle of the expression evaluation. when evaluating a
+            && (or \|\|) node, after evaluating the left-hand side we
+            emit instructions to check whether the result is false (or
+            true) and if so then jump past the evaluation of the
+            right-hand side. we\'ll save the details for when we discuss
+            generating code for conditionals.
+
+    3.  assignments
+
+        assignment is trivial: we evaluate the right-hand side using
+        generate~aexp~, which puts the result in RESULT~REG~, then store
+        the result to the memory location for the left-hand side
+        variable.
+
+        generate~assign~(lhs, rhs) { generate~aexp~(rhs); emit \"sto RR
+        \[lhs\]\"; }
+
+    4.  conditionals
+
+        1.  no nested scope
+
+            let\'s look at an example:
+
+            if (x \< 2) { x := 1; } else { x := 2; }
+
+            depending on the outcome of the comparison, we want to
+            execute either the true branch or the false branch. we
+            don\'t necessarily know the outcome of the comparison at
+            compile time, so we need to emit code for both branches and
+            choose between them at runtime.
+
+            for the above example we would get:
+
+            01: ld \[x\] RR 02: sto RR \[~tmp0~\] 03: mov 2 RR 04: ld
+            \[~tmp0~\] OR 05: cmp RR OR 06: setlt RR 07: cmp 0 RR 08:
+            jmpe IF~FALSE0~ 09: mov 1 RR 10: sto RR \[x\] 11: jmp
+            IF~END0~ 12: IF~FALSE0~: 13: mov 2 RR 14: sto RR \[x\] 15:
+            IF~END0~:
+
+            \[note again the inefficiency of the codegen. we could be a
+            bit more clever and do things like check whether our left
+            and/or right operands are leafs and if so avoid some stores
+            and loads, which would be better code. but we\'re keeping
+            things simple so that the code generator only has to look at
+            the current AST node and nothing else.\]
+
+            generalizing:
+
+            generate~if~(node) { \<n\> = fresh index;
+            generate~rexp~(node-\>guard); emit \"cmp 0 RESULT~REG~\";
+            emit \"jmpe IF~FALSE~\_\<n\>\";
+            generate~block~(node-\>true~branch~); emit \"jmp
+            IF~END~\_\<n\>\"; emit \"IF~FALSE~\_\<n\>:\";
+            generate~block~(node-\>false~branch~); emit
+            \"IF~END~\_\<n\>:\"; }
+
+        2.  nested scope
+
+            remember that each branch of a conditional introduces a new
+            scope which can declare its own variables. that means that
+            we need to emit the preamble code again when the code
+            generator enters that new scope:
+
+            1.  see how many declared variables there are
+            2.  adjust the stack pointer accordingly
+            3.  initialize the new memory locations to 0
+            4.  update symbol table to map the newly declared variables
+                to their offsets
+
+            and when we leave the new scope we need to adjust things
+            back the way they were:
+
+            1.  reset the stack pointer to its old position
+            2.  restore the symbol table to its old value
+
+            so the code generator for the blocks of code inside the
+            true/false branches would look something like:
+
+            generate~block~(node) { old~symboltable~ = symbol~table~;
+            stack~size~ = node-\>num~declaredvariables~ \* 4; // because
+            4-byte integers emit \"sub \<stack~size~\> STACK~REG~\";
+            insert~insymboltable~(symbol~table~,
+            node-\>declared~variables~); for each var in
+            node-\>declared~variables~ { emit \"sto 0 \[var\]\"; } . . .
+            emit \"add \<stack~size~\> STACK~REG~\"; symbol~table~ =
+            old~symboltable~; }
+
+            remember that you can\'t just take the existing symbol table
+            and add the declared variables to it and then remove them
+            when the block is over, because some of them could shadow
+            existing variables in the enclosing scope. you can get
+            around that problem in various ways (e.g., making the symbol
+            table a stack instead of a map, where lookup scans the stack
+            top-down looking for the nearest declared variable with the
+            given name). for the purposes of this pseudocode i just
+            always pass a copy of the symbol table to each branch.
+
+            another consideration is that an expression inside a nested
+            scope may require more temporary variables than any
+            expression in an enclosing block. if so, then we need to
+            backpatch the preamble code for the nested scope to allocate
+            more space for those temporary variables.
+
+            EXAMPLE:
+
+            if (y \< 2) { int x; x := x + (1 + 2); y := x; }
+
+            assume this \'if\' is the only statement. then the generated
+            code would be:
+
+            01: ld \[y\] RR 02: sto RR \[~tmp0~\] // note that this
+            ~tmp0~ is outside the nested scope 03: mov 2 RR 04: ld
+            \[~tmp0~\] OR 05: cmp RR OR 06: setlt RR 07: cmp 0 RR 08:
+            jmpe IF~FALSE0~ 09: sub 8 SR // space for \'x\' and
+            \'~tmp1~\' ??: sto 0 \[x\] // I FORGOT THIS ORIGINALLY 10:
+            ld \[x\] RR 11: sto RR \[~tmp0~\] // reuse ~tmp0~ from
+            enclosing scope 12: mov 1 RR 13: sto RR \[~tmp1~\] 14: mov 2
+            RR 15: ld \[~tmp1~\] OR 16: add OR RR 17: ld \[~tmp0~\] OR
+            18: add OR RR 19: sto RR \[x\] 20: ld \[x\] RR 21: sto RR
+            \[y\] 22: add 8 SR // remove space for nested declarations
+            23: jmp IF~END0~ 24: IF~FALSE0~: 25: IF~END0~:
+
+        3.  exercise 1
+
+            generate code for the following program (fully, including
+            preamble code and all expressions and statements):
+
+            if (1 \< 2) { int y; x := y; } else { x := 2; }
+
+            solution:
+
+            01: mov 1 RR 02: sto RR \[~tmp0~\] 03: mov 2 RR 04: ld
+            \[~tmp0~\] OR 05: cmp RR OR 06: setlt RR 07: cmp 0 RR 08:
+            jmpe IF~FALSE0~ 09: sub 4 SR 10: sto 0 \[y\] 11: ld \[y\] RR
+            12: sto RR \[x\] 13: add 4 SR 14: jmp IF~END0~ 15:
+            IF~FALSE0~: 16: mov 2 RR 17: sto RR \[x\] 18: IF~END0~:
+
+        4.  exercise 2 (short-circuited evaluation)
+
+            generate code for the following relational expression using
+            short-circuiting:
+
+            (1 \< 1) && (2 \< 3)
+
+            tree:
+
+            \[&& \[\< 1 1\] \[\< 2 3\]\]
+
+            solution:
+
+            01: mov 1 RR 02: sto RR \[~tmp1~\] 03: mov 1 RR 04: ld
+            \[~tmp1~\] OR 05: cmp RR OR 06: setlt RR 07: cmp 0 RR 08:
+            jmpe REXP~END0~ 09: sto RR \[~tmp0~\] 10: mov 2 RR 11: sto
+            RR \[~tmp1~\] 12: mov 3 RR 13: ld \[~tmp1~\] OR 14: cmp RR
+            OR 15: setlt RR 16: ld \[~tmp0~\] OR 17: and OR RR 18:
+            REXP~END0~:
+
+    5.  loops
+
+        loops are a lot like conditionals except the \"true branch\" is
+        the body of the loop and the \"false branch\" is the end of the
+        loop. let\'s see an example:
+
+        while (x \< 3) { x := x + 1; }
+
+        so for the above example we would get:
+
+        01: WHILE~START0~: 02: ld \[x\] RR 03: sto RR \[~tmp0~\] 04: mov
+        3 RR 05: ld \[x\] OR 06: cmp RR OR 07: setlt RR 08: cmp 0 RR 09:
+        jmpe WHILE~END0~ 10: ld \[x\] RR 11: sto RR \[~tmp0~\] 12: mov 1
+        RR 13: ld \[~tmp0~\] OR 14: add OR RR 15: sto RR \[x\] 16: jmp
+        WHILE~START0~ 17: WHILE~END0~:
+
+        generalizing:
+
+        generate~while~(node) { \<n\> = fresh index; emit
+        \"WHILE~START~\_\<n\>:\"; generate~rexp~(node-\>guard); emit
+        \"cmp 0 RESULT~REG~\"; emit \"jmpe WHILE~END~\_\<n\>\";
+        generate~block~(node-\>body); emit \"jmp WHILE~START~\_\<n\>\";
+        emit \"WHILE~END~\_\<n\>:\"; }
+
+        1.  nested scope
+
+            we have the same issue here with nested scope as for
+            conditionals, though there\'s only one new scope: the body
+            of the loop. we handle it exactly the same way. note that
+            for loops the body can be entered many times; the preamble
+            and cleanup code for the new scope will be executed each
+            time.
+
+        2.  exercise
+
+            generate code for the following program (fully, including
+            all preamble code, expressions, and statements):
+
+            while (x \<= 10) { int y; y := 2; x := x + y; }
+
+            solution:
+
+            01: WHILE~START0~: 02: ld \[x\] RR 03: sto RR \[~tmp0~\] 04:
+            mov 10 RR 05: ld \[~tmp0~\] OR 06: cmp RR OR 07: setle RR
+            08: cmp 0 RR 09: jmpe WHILE~END0~ 10: sub 4 SR 11: sto 0
+            \[y\] 11: mov 2 RR 12: sto RR \[y\] 13: ld \[x\] RR 14: sto
+            RR \[~tmp0~\] 15: ld \[y\] RR 16: ld \[~tmp0~\] OR 17: add
+            OR RR 18: sto RR \[x\] 19: add 4 SR 20: jmp WHILE~START0~
+            21: WHILE~END0~:
+
+2.  with functions and calls
+
+    1.  what are functions and what are they for?
+
+        functions are an illusion: they exist as a programming language
+        abstraction, but the actual machine has no notion of a function.
+        they are an extremely valuable illusion for programmers:
+
+        1.  they allow code to be abstracted over the data the code is
+            run on. for example:
+
+            // imagine that these are complicated expressions (1 + 2) \*
+            2 (3 + 4) \* 4
+
+            // procedural abstraction: int proc(int a, int b) { return
+            (a + b) \* b; }
+
+        2.  if the language has higher-order functions, they also allow
+            code to be abstracted over control-flow. for example:
+
+            list = \[4, 2, 6, 1, 5, 3\]; sort(list, (a, b) =\> { return
+            a \< b; }) : \[1, 2, 3, 4, 5, 6\] sort(list, (a, b) =\> {
+            return a \> b; }) : \[6, 5, 4, 3, 2, 1\]
+
+        3.  they provide modularity: code can be written and compiled
+            independently but still linked together and run correctly.
+            procedure bodies are isolated from each other by different
+            scopes.
+
+        the compiler\'s job is to take this abstraction and turn it into
+        assembly code that preserves the intended meaning of the
+        procedure abstraction. what is that intended meaning? in a PL,
+        what happens when a function is called?
+
+        1.  the callee gets fresh instances of its parameters and local
+            variables (local scope, even in the presence of recursion).
+
+        2.  the argument values are copied to the parameters.
+
+        3.  control jumps to the beginning of the callee.
+
+        4.  the callee is executed.
+
+        5.  control jumps back to the caller site.
+
+        6.  if the function returns something, the return value is
+            provided as the result of the function call expression.
+
+        the basic tools we use to achieve this are:
+
+        1.  the stack frame (or activation record)
+        2.  calling conventions
+
+    2.  stack frame (activation record)
+
+        we\'ve talked about the process stack before. as a reminder:
+
+        1.  part of the process memory is set aside for the stack.
+        2.  stack register: holds a pointer to the current top of the
+            stack.
+
+        \[this means that SR holds the location of the top valid word on
+        the stack, rather than the next available word---if we read the
+        memory location contained in SR, we get the value of the word
+        that\'s currently on top of the stack\]
+
+        to make space on the stack, decrement the stack pointer; to
+        reclaim that space increment the stack pointer.
+
+        low high \[ xx\] \^ sp
+
+        we\'ll use the stack to implement a function\'s functionality.
+        the key data structure is called a [stack frame]{.underline} (or
+        sometimes, [activation record]{.underline}). a stack frame will
+        hold all the information a function needs to operate correctly:
+        -- memory for the local variables -- where to return to when its
+        done executing -- saved values for registers the function may
+        overwrite
+
+        how will the function know where to access this information,
+        since it can appear anywhere on the stack? we\'ll use the [frame
+        pointer]{.underline} (which lives in a register just like the
+        stack pointer). the frame pointer points to the bottom of the
+        current stack frame; the currently executing function can access
+        all of its info in terms of offsets from the frame pointer.
+
+        the basic idea is that when a function is called:
+
+        1.  the old frame pointer is saved
+        2.  the frame pointer is set to the current stack pointer
+        3.  the stack pointer is incremented to allocate space for the
+            activation record
+        4.  the activation record is filled in appropriately
+        5.  control jumps to the function
+        6.  when the function is done, the stack pointer is set to the
+            frame pointer and the frame pointer is restored to its old
+            value
+
+        \[go through high-level example of how the stack and frame
+        pointers change for a function call.\]
+
+        note that this is kind of like nested scope, except that we
+        adjust the frame pointer to preserve scope (in contrast the
+        nested scope which still has access to variables from the
+        enclosing scope).
+
+    3.  calling conventions
+
+        in order to make all of this work even when functions have been
+        compiled separately (perhaps even by different compilers) there
+        must be a convention that says exactly how a call will work and
+        who is responsible for what between the caller and the callee.
+
+        every function has a prologue and epilogue every function call
+        has a pre-call sequence and a post-return sequence
+
+        \[show quick diagram to make this clear\]
+
+        there is an agreed-upon protocol for the language to enforce who
+        (caller, callee) does what to make function calls work; this is
+        the [calling convention]{.underline}.
+
+        anatomy of a function call (this is a \"typical\" example
+        similar to that used by C on the x86; the details can vary from
+        language to language and machine to machine):
+
+        PRE-CALL:
+
+        -   save any caller-save registers by pushing them onto the
+            stack
+        -   push the call arguments onto the stack (in reverse)
+        -   push the return address onto the stack
+        -   jump to address of callee\'s prologue code
+
+        PROLOGUE CODE:
+
+        -   push the frame pointer onto the stack
+        -   copy the stack pointer into the frame pointer register
+            (frame reg always points to old frame reg)
+        -   make space on the stack for local variables (decrement stack
+            pointer)
+        -   save any callee-save registers by pushing them onto the
+            stack
+
+        EPILOGUE CODE:
+
+        -   put return value in known register
+        -   restore callee-save registers by popping from stack
+        -   deallocate local variables by moving frame pointer to stack
+            pointer
+        -   restore caller\'s frame pointer by popping it from the stack
+        -   pop call site\'s return address from stack and jump to it
+
+        POST-RETURN CODE:
+
+        -   discard call arguments from stack
+        -   restore caller-save registers by popping from stack
+        -   write return value to left-hand side of call
+        -   continue execution
+
+        note that the caller-save registers only need to be pushed if
+        they are holding values needed after the function call, and
+        callee-save registers only need to be pushed if they may be
+        overwritten by the callee function.
+
+    4.  example
+
+        the program:
+
+        def foo(int a, int b) : int { int c; c := a+b; return c+1; } int
+        x; x := foo(2, 3); output x;
+
+        offsets, scope 0: x : -4
+
+        offsets, scope foo: a : 8 b : 12 c : -4 ~tmp0~ : -8
+
+        we\'ll assume the existence of a few handy instructions: --
+        \'push\' decrements the stack pointer and stores its argument to
+        the newly allocated space on the stack. -- \'pop\' increments
+        the stack pointer and loads the contents of the newly
+        deallocated space into its argument -- \'call\' pushes the
+        current instruction address onto the stack and jumps to the
+        given label -- \'ret\' pops an instruction address off the stack
+        and jumps to it
+
+        we haven\'t targeted a specific architecture yet, so we\'ll also
+        assume the existence of CALLER~SAVEREG1~, CALLER~SAVEREG2~,
+        CALLEE~SAVEREG1~, and CALLEE~SAVEREG2~, with the obvious
+        meanings.
+
+        ENTRY: // entry point for entire program // ENTRY PROLOGUE push
+        FR // save current frame pointer mov SR FR // replace old frame
+        pointer with current stack pointer sub 4 SR // allocate space
+        for \'x\' sto 0 \[FR-4\] // initialize \'x\' to 0 push
+        CALLEE~SAVEREG1~ // save callee-save registers push
+        CALLEE~SAVEREG2~
+
+        // PRE-CALL for x := foo(2, 3) push CALLER~SAVEREG1~ // save
+        caller-save registers push CALLER~SAVEREG2~ push 3 // push
+        arguments onto stack in reverse push 2 call FOO
+
+        // POST-RETURN for x := foo(2, 3) add 8 SR // discard arguments
+        from stack pop CALLER~SAVEREG2~ // restore caller-save registers
+        pop CALLER~SAVEREG1~ sto RR \[FR-4\] // store return value to
+        memory location of \'x\'
+
+        // output x ld \[FR-4\] RR
+
+        // ENTRY EPILOGUE pop CALLEE~SAVEREG2~ // restore callee-save
+        registers pop CALLEE~SAVEREG1~ mov FR SR // restore old stack
+        pointer, deallocating stack frame pop FR // restore old frame
+        pointer ret // pop return address and jump to it, exiting
+        program
+
+        FOO: // FOO PROLOGUE push FR // save current frame pointer mov
+        SR FR // replace old frame pointer with current stack pointer
+        sub 8 SR // allocate space for local variables (c and ~tmp0~)
+        sto 0 \[FR-4\] // initialize \'c\' to 0 push CALLEE~SAVEREG1~ //
+        save callee-save registers push CALLEE~SAVEREG2~
+
+        // c := a+b ld \[FR+8\] RR sto RR \[FR-8\] ld \[FR+12\] RR ld
+        \[FR-8\] OR add OR RR sto RR \[FR-4\]
+
+        // return c+1 ld \[FR-4\] RR sto RR \[FR-8\] mov 1 RR ld
+        \[FR-8\] OR add OR RR
+
+        // FOO EPILOGUE pop CALLEE~SAVEREG2~ // restore callee-save
+        registers pop CALLEE~SAVEREG1~ mov FR SR // restore old stack
+        pointer, deallocating stack frame pop FR // restore old frame
+        pointer ret // pop return address and jump to it
+
+        \[show the stack as we walk through the code\]
+
+        how did the code generator know the offsets of the arguments to
+        the callee function when they were pushed onto the stack by the
+        caller function? because of the calling convention, the callee
+        always knows that the first argument is at a positive 8 offset
+        from the current frame pointer (to pass over the saved frame
+        pointer and return address) and subsequent arguments are at
+        4-byte offsets from that.
+
+    5.  exercise
+
+        translate the following program into assembly under the same
+        assumptions as the above exercise:
+
+        def bar(int a) : int { return a+42; } def foo(int a) : int { int
+        x; int y; x := bar(a); y := bar(a+1); return x\*y; } int x; x :=
+        2; x := foo(x); output x+3;
+
+        SOLUTION
+
+        offsets, scope 0: x : -4 ~tmp0~ : -8
+
+        offsets, scope foo: a : 8 x : -4 y : -8 ~tmp0~ : -12
+
+        offsets, scope bar: a : 8 ~tmp0~ : -4
+
+        ENTRY: // ENTRY PROLOGUE push FR mov SR FR sub 8 SR sto 0
+        \[FR-4\] push CALLEE~SAVEREG1~ push CALLEE~SAVEREG2~
+
+        // x := 2 mov 2 RR sto RR \[FR-4\]
+
+        // PRE-CALL for x := foo(x) push CALLER~SAVEREG1~ push
+        CALLER~SAVEREG2~ ld \[FR-4\] RR push RR call FOO
+
+        // POST-RETURN for x := foo(x) add 4 SR pop CALLER~SAVEREG2~ pop
+        CALLER~SAVEREG1~ sto RR \[FR-4\]
+
+        // output x+3 ld \[FR-4\] RR sto RR \[FR-8\] mov 3 RR ld
+        \[FR-8\] OR add OR RR
+
+        // ENTRY EPILOGUE pop CALLEE~SAVEREG2~ pop CALLEE~SAVEREG1~ mov
+        FR SR pop FR ret
+
+        FOO: // FOO PROLOGUE push FR mov SR FR sub 12 SR sto 0 \[FR-4\]
+        sto 0 \[FR-8\] push CALLEE~SAVEREG1~ push CALLEE~SAVEREG2~
+
+        // PRE-CALL for x := bar(a) push CALLER~SAVEREG1~ push
+        CALLER~SAVEREG2~ ld \[FR+8\] RR push RR call BAR
+
+        // POST-RETURN for x := bar(a) add 4 SR pop CALLER~SAVEREG2~ pop
+        CALLER~SAVEREG1~ sto RR \[FR-4\]
+
+        // PRE-CALL for y := bar(a+1) push CALLER~SAVEREG1~ push
+        CALLER~SAVEREG2~ ld \[FR+8\] RR sto RR \[FR-12\] mov 1 RR ld
+        \[FR-12\] OR add OR RR push RR call BAR
+
+        // POST-RETURN for y := bar(a+1) add 4 SR pop CALLER~SAVEREG2~
+        pop CALLER~SAVEREG1~ sto RR \[FR-8\]
+
+        // return x\*y ld \[FR-4\] RR sto RR \[FR-12\] ld \[FR-8\] RR ld
+        \[FR-12\] OR mul OR RR
+
+        // FOO EPILOGUE pop CALLEE~SAVEREG2~ pop CALLEE~SAVEREG1~ mov FR
+        SR pop FR ret
+
+        BAR: // BAR PROLOGUE push FR mov SR FR sub 4 SR push
+        CALLEE~SAVEREG1~ push CALLEE~SAVEREG2~
+
+        // return a+42 ld \[FR+8\] RR sto RR \[FR-4\] mov 42 RR ld
+        \[FR-4\] OR add OR RR
+
+        // BAR EPILOGUE pop CALLEE~SAVEREG2~ pop CALLEE~SAVEREG1~ mov FR
+        SR pop FR ret
+
+### notes on x86 assembly
+
+1.  some basic x86
+
+    we\'re not going to teach x86, but we\'ll give some pointers. an
+    excellent resource for you to look at is
+    <https://en.wikibooks.org/wiki/X86_Assembly>. when looking here,
+    keep in mind:
+
+    -   we\'re using 32-bit x86
+    -   we\'re using the gnu assembler, which uses AT&T syntax
+
+    \[there are lots of other places to look, but remember we\'re using
+    GAS/AT&T syntax!\]
+
+    wiki page \'x86 Register and Architecture Description\':
+
+    -   we\'re using the 32-bit registers, so \$eax, %ebx, %ecx, %edx,
+        %esp, %ebp, etc
+    -   %esp is the stack pointer, %ebp is the frame pointer, %eax is
+        the return value register
+
+    wiki page \'GAS Syntax\':
+
+    -   use the \'l\' suffix to indicate we\'re operating on 32-bit
+        integers
+    -   we\'re using the gnu assembler, which uses AT&T syntax. when
+        looking at x86 resources be sure you\'re looking at the right
+        ones.
+
+    operands:
+
+    -   \$k for constant k
+    -   %reg for register value
+    -   (%reg) for memory location whose address is in reg
+    -   k(%reg) for memory location at address (%reg + k)
+
+    can only use indirection in at most one operand to the same
+    instruction.
+
+    examples:
+
+    -   \"mov 2 RR\" == \"movl \$2, %eax\"
+    -   \"sub 8 SR\" == \"subl \$8, %esp\"
+    -   \"ld \[FR-4\] RR\" == \"movl -4(%ebp), %eax\"
+    -   \"sto RR \[FR-12\]\" == \"movl %eax, -12(%ebp)\"
+
+    when looking at disassembled code, don\'t worry about the header
+    information contained in sections like \".file\", \".text\", etc.
+    we\'ll add the necessary scaffolding in the infrastructure we give
+    you for your assignments.
+
+    wiki pages have lots of x86 instructions; here is a small cheat
+    sheet i\'ll post to the class slack \[show x86-cheat-sheet.pdf\]
+
+    some other useful instructions:
+
+    -   pushl \<reg\>
+    -   popl \<reg\>
+
+    x86 has some instructions that abbreviate the instructions for
+    pre-calls and epilogues:
+
+    -   call \<label\>: push current code location onto stack then jump
+        to label (the last part of the pre-call instruction sequence).
+    -   leave: copies %ebp to %esp then restores %ebp by popping from
+        the stack (the middle part of the epilogue instruction
+        sequence).
+    -   ret: pop a code location from the stack and jump to it (the last
+        part of the epilogue instruction sequence)
+
+    \[we used analogues of \'call\' and \'ret\' in our examples and
+    exercises\]
+
+    x86 has a specific set of caller-save and callee-save registers.
+    however, we only need to save them if we\'re actually using them and
+    because of our naive codegen we don\'t actually need to worry about
+    them.
+
+    -   use %eax for RR and %edx for OR
+    -   use %esp and %ebp for the stack and frame pointers
+    -   leave all other registers alone
+    -   don\'t need to do any caller or callee saves (except for %esp
+        and %ebp which we\'ve already covered)
+
+    \[this works because no callee function will write on the
+    callee-save registers (and so they don\'t need to save them) and no
+    caller function needs a register to be preserved over function calls
+    (and so they don\'t need to save them).\]
+
+2.  getting 32-bit x86 assembly for C code
+
+    commands: gcc -O0 -m32 -c \<file\>.c objdump -d \<file\>.o
+
+    -O0 says to turn off optimizations, -m32 forces 32-bit mode, -c says
+    to compile but don\'t link (without -c you will get an error message
+    unless \<file\>.c contains a main() function).
+
+    == OR ==
+
+    use Compiler Explorer: gcc.godbolt.org
+
+    -   in the left panel, put c++ code
+    -   in the right panel:
+        -   choose compiler and version (gcc or clang for x86-64)
+        -   set compiler options to \"-O0 -m32\"
+        -   under the Output menu, make sure \"Intel asm syntax\" is
+            deselected
+
+    1.  example
+
+        code.c: int foo(int x, int y) { int a = x \* y; int b = a + 2;
+        return b; }
+
+        \[instead of the below which is using objdump, show them
+        Compiler Explorer in action\]
+
+        output: 00000000 \<foo\>: 0: 55 push %ebp 1: 89 e5 mov %esp,%ebp
+        3: 83 ec 10 sub \$0x10,%esp 6: 8b 45 08 mov 0x8(%ebp),%eax 9: 0f
+        af 45 0c imul 0xc(%ebp),%eax d: 89 45 fc mov %eax,-0x4(%ebp) 10:
+        8b 45 fc mov -0x4(%ebp),%eax 13: 83 c0 02 add \$0x2,%eax 16: 89
+        45 f8 mov %eax,-0x8(%ebp) 19: 8b 45 f8 mov -0x8(%ebp),%eax 1c:
+        c9 leave 1d: c3 ret
+
+        0: put old frame pointer in stack frame 1: set current frame
+        pointer to current stack pointer 3: add space to stack for
+        locals 6: load x from memory 9: multiply by y d: store to a 10:
+        load a 13: add 2 16: store to b 19: load b 1c: tear down current
+        stack frame 1d: pop return address from stack and jump to it
+
+        note that the memory offsets to x and y are positive (meaning
+        below the current stack pointer) while those for a and b are
+        negative (meaning above the stack pointer).
+
+language L2: structs and dynamic memory allocation
+==================================================
+
+new syntax
+----------
+
+\[see handouts/L2-concrete-syntax.pdf\]
+
+new frontend
+------------
+
+nothing novel for lexing and parsing, a small extension of what we\'ve
+already done.
+
+AST validation is more interesting, specifically typechecking now that
+we have more than one type. we won\'t talk about it in detail for now
+(we\'ll just assume correct programs), but essentially we need to
+verify:
+
+-   struct field access is to struct that contains that field
+-   no pointer arithmetic in arithmetic expressions
+
+new codegen
+-----------
+
+for codegen we need to handle the following:
+
+-   struct allocation on the heap
+-   struct field access in an expression
+-   struct field access on the left-hand side of an assignment
+
+we also need to ensure that codegen makes runtime memory management
+possible.
+
+### managing memory: heap vs stack
+
+for L1 we didn\'t worry about memory management because the stack took
+care of it for us. when we enter a new scope the declared variables are
+allocated space by pushing them on the stack; when we leave that scope
+the space is deallocated by popping them off the stack. however, this
+means that the lifetimes of the variables are dictated by the scope they
+are declared in; once we leave that scope the variables disappear.
+
+if we want objects that will live beyond the scope they are created in,
+we need the heap. that\'s the main difference between the stack and the
+heap: heap lifetimes are not bound by scope. but if we don\'t deallocate
+heap objects when we leave the scope, when do we do it? that is the
+subject of memory management, and there are a number of different
+possible answers with their own tradeoffs. we will discuss the subject
+thoroughly in a later lecture.
+
+for L2 specifically we\'ll rely on garbage collection to automatically
+deallocate structs when it\'s safe, but to do that we\'ll need to change
+the codegen in our compiler to make it feasible to perform GC at
+runtime. i\'ll discuss the requirements as they become relevant during
+codegen.
+
+### symbol table
+
+we need to extend the symbol table in two ways:
+
+-   map typename to struct info (field names, types, and offsets)
+-   variable info needs to include type info
+
+other than adding the struct info first thing, we can handle the symbol
+table the same way we did before (just remembering to add the type info
+from the variable declarations alongside the memory locations).
+
+### struct allocation
+
+let\'s examine a concrete example from the handout:
+
+x := new %tree;
+
+where %tree is defined as:
+
+struct %tree { int value; %tree left; %tree right; };
+
+the runtime memory manager is going to handle the heap, so we\'ll
+delegate memory allocation to it by making a call to a predefined
+function \"allocate\" using the calling convention we discussed for L1.
+the allocate function will need to know how many words to allocate,
+which we can determine by looking up \<typename\> in the symbol table to
+get the corresponding struct info. our contract is that when we call
+allocate with a number of words (one per field), it will allocate
+sufficient space on the heap to hold those words and return the
+beginning address of the newly allocated space (which address we will
+store into the left-hand side of the assignment).
+
+for our example, we would call \'allocate(3)\' and get back an address
+(say 0x100) at the beginning of 3 words of heap memory:
+
+  -- -- ----- ----- ----- -- --
+        xxx   xxx   xxx      
+  -- -- ----- ----- ----- -- --
+
+0x100\^
+
+and we would write the value 0x100 into \'x\'. we then need to generate
+code to initialize the values of the fields, which as in L1 are always
+initialized to 0 (which is also the value of nil for references):
+
+  -- -- --- --- --- -- --
+        0   0   0      
+  -- -- --- --- --- -- --
+
+0x100\^
+
+however, the runtime memory manager will need more information about the
+struct than its size in order to handle it correctly, namely it needs to
+know which of its fields are pointers to other structs. this is
+information that we have at compile-time but we need it at runtime (the
+reason we need it will become clear when we cover memory management
+schemes). to communicate this information, allocate will actually create
+space for \<num~words~\>+1 words of memory, with the extra word being
+[before]{.underline} the returned address:
+
+  -- ----- ----- ----- ----- -- --
+     xxx   xxx   xxx   xxx      
+  -- ----- ----- ----- ----- -- --
+
+0x100\^
+
+this \'header word\' is going to contain the following information:
+
+1.  the first byte, bits 0--7, holds the number of fields in the struct
+2.  bits 8--30 are a bit vector s.t. a bit is set iff the corresponding
+    field in the struct is a reference.
+3.  the last bit, bit 31, is set to 1 (for reasons that, again, will
+    become apparent when we discuss memory management).
+
+the compiler must generate code to fill in that information. for our
+example, the result of the generated code should be:
+
+  -- ---------------------------------- --- --- --- -- --
+     00000011011000000000000000000001   0   0   0      
+  -- ---------------------------------- --- --- --- -- --
+
+0x100\^
+
+that is, there are three fields and the second two are pointers. this
+scheme means that, given a pointer to a struct containing an address,
+the runtime can always read the word at address-4 to get the size of the
+struct and which fields are pointers.
+
+notice that this scheme limits the number of fields a struct can have:
+at most 23, the size of the bitvector. we\'re using this scheme because
+it\'s relatively simple, but constraining the number of fields is a
+tradeoff. we could use a more elaborate scheme to remove this
+restriction. for example, we could map each typename to an index, copy
+the symbol table to the static memory segment indexed by typename, and
+have the header word contain the appropriate typename index instead of
+struct size and a bitvector. then the runtime can read the header word
+and use that index to lookup the information in the static memory\'s
+symbol table. that scheme is more flexible, but more complex and
+expensive. which one to use is a matter of language design.
+
+to recap, when we generate code for \"\<access\> := new \<typename\>\",
+we:
+
+1.  generate a call to function \'allocate\' passing an argument that is
+    the number of fields in \<typename\>.
+2.  write the return value to the left-hand side of the assignment.
+3.  for each field of the struct being allocated, store a 0 to the
+    corresponding offset from the returned address.
+4.  compute the header word and write it to a -4 offset from the
+    returned address.
+
+### field access in expression
+
+example 1:
+
+struct %foo { int a; int b; };
+
+%foo x; x := new %foo; output x.b;
+
+let\'s focus on the output expression. x contains the address of a foo
+struct object in memory, which has two integer fields.
+
+in order to retrieve the correct value, we need to dereference x to get
+the address of the struct object in the heap, compute the offset into
+that struct object of field \'b\', then read the value at that address
+from memory.
+
+AST: \[access x b\]
+
+\[note: for convenience i\'m going to be more efficient about the
+generated code rather than strictly following our naive codegen
+algorithm.\]
+
+ld \[FR-4\] RR ; get the address stored in \'x\' ld \[RR+4\] RR ; get
+the value at that address + 4, because b is at a 4-byte offset from the
+beginning of the struct
+
+how did we know to use offset 4? because we look up \'x\' in the symbol
+table to get its type \'foo\', then look up \'foo\' to get the
+information about the field offsets. remember that the extra header word
+is immediately [before]{.underline} the returned address, so offset 0
+would be the first field of the struct.
+
+example 2:
+
+struct %foo { int a; %bar b; };
+
+struct %bar { int c; int d; %baz e; };
+
+struct %baz { int f; int g; };
+
+%foo x; x := new %foo; x.b := new %bar; x.b.e := new %baz; output
+x.b.e.f;
+
+let\'s focus again on the output expression. x, x.b, and x.b.e will all
+contain pointers into the heap; we\'re going to do the same thing as
+before except chained in a row.
+
+AST: \[access \[access \[access x b\] e\] f\]
+
+when we recursive through the AST for codegen, we\'ll end up generating
+code for \[access x b\] first, then \[access \<result\> e\], then
+\[access \<result\> f\]:
+
+ld \[FR-4\] RR ; get the address stored in \'x\' ld \[RR+4\] RR ; get
+the address stored in \'x.b\' at offset 4 ld \[RR+8\] RR ; get the
+address stored in \'x.b.e\' at offset 8 ld \[RR\] RR ; get the int
+stored in \'x.b.e.f\' at offset 0
+
+again, we look in the symbol table to compute the offsets. note that
+everything starts with looking up the type of \'x\' to see that it\'s a
+\'foo\', then looking at \'foo\' to see that the \'b\' field is at
+offset 4 and type \'bar\', then looking at \'bar\' to see the \'e\'
+field is at offset 8 and type \'baz\', then looking at \'baz\' to see
+the \'f\' field is at offset 0.
+
+### field access on lhs of assignment
+
+when the access path is on the left-hand side of an assignment we need
+to treat it differently. this is actually the same as when it\'s just a
+variable as in L1, but we didn\'t highlight the difference. let\'s look
+at it now, then generalize to arbitrary access paths.
+
+example:
+
+x := x + 1;
+
+when we evaluate the \'x\' in \'x + 1\' we want to find the address of
+\'x\' in memory and retrieve the value stored there:
+
+ld \[FR-4\] RR add 1 RR
+
+but when we look at \'x\' in the left-hand side we want just the address
+of \'x\', which is where we\'ll put the final value:
+
+sto RR \[FR-4\]
+
+we say that \'x\' in the right-hand side expression is an
+[rvalue]{.underline} and that \'x\' on the left-hand side is an
+[lvalue]{.underline}. basically, for an lvalue we want to stop at the
+address to store the value, while for an rvalue we want to go ahead and
+dereference that address to get the value currently stored there.
+
+now let\'s look at some non-trivial access paths:
+
+struct %foo { int a; int b; int c; };
+
+%foo x; x := new %foo; x.b := x.c;
+
+as usual, we want to evaluate the right-hand side to a value, then store
+it into the location specified by the left-hand side:
+
+ld \[FR-4\] RR ; get the address stored in \'x\' ld \[RR+8\] RR ; get
+the int stored at offset 8 ld \[FR-4\] OR ; get the address stored in
+\'x\' sto RR \[OR+4\] ; store the right-hand side value into \'x.b\' at
+offset 4
+
+what if we have an lvalue access path with multiple fields?
+
+struct %foo { int a; %bar b; int c; };
+
+struct %bar { int d; int e; };
+
+%foo x; x := new %foo; x.b := new %bar; x.b.d := x.c;
+
+then we follow the access paths as normal, except that we stop right
+before we dereference the last one:
+
+ld \[FR-4\] RR ; get the address stored in \'x\' ld \[RR+8\] RR ; get
+the int stored at offset 8 ld \[FR-4\] OR ; get the address stored in
+\'x\' ld \[OR+4\] OR ; get the address stored at offset 4 sto RR \[OR\]
+; store the right-hand value into \'x.b.d\' at offset 0
+
+### enable collecting the root set for GC
+
+the last piece we need to worry about is how codegen will interact with
+our runtime memory management. we already handled one aspect: when we
+allocate a struct, the codegen will be sure to write the necessary
+information about the struct fields into the header word. but there\'s
+one more thing to do.
+
+for our L2 memory management we\'re going to use a scheme called a
+\'tracing garbage collector\'. we\'ll explain what that actually means
+in a different lecture, but for now just accept the following: for that
+scheme to work, the GC needs to be able to look at the function stack at
+any point during execution and identify which memory locations in the
+stack represent pointers to structs in the heap.
+
+this is more difficult than it might sound. remember that the stack is
+constantly growing and shrinking, and the same memory location may
+represent a pointer or not depending on when exactly during program
+execution we look at it. how can we implement codegen in order to enable
+the runtime GC to collect this information?
+
+there are many possible strategies with different tradeoffs between
+complexity, flexibility, and efficiency. i\'m going to describe one
+strategy that, going along with our usual mantra of \"make it as simple
+as possible as long as it works\", focuses on being easy to implement at
+the expense of some flexibility.
+
+key to this strategy is that the only heap pointers on the stack will be
+either function parameters or function local variables. here\'s the
+idea:
+
+1.  move all nested variable declarations up to the top of the function
+    they\'re in, renaming them as necessary to avoid name clashes. this
+    transformation expands the amount of stack memory the function will
+    consume, but otherwise doesn\'t change the program behavior (as long
+    as we remember to initialize the values to 0 at the same points as
+    before).
+
+2.  modify the prologue instruction sequence for function codegen,
+    specifically immediately after we push the old frame pointer value
+    onto the stack: push two additional words onto the stack after that
+    but before allocating stack space for local variables. remember that
+    we need to adjust the offsets of the local variables accordingly in
+    the symbol table. call these two words the \"argument info word\"
+    and the \"local info word\".
+
+3.  in the argument info word, set it as a bit vector s.t. a bit is set
+    iff the corresponding function parameter is a struct pointer.
+    remember that the function arguments are pushed onto the stack by
+    the pre-call instruction sequence, so by looking at the argument
+    info word we can tell which positive offsets from the frame pointer
+    correspond to a pointer argument.
+
+4.  in the local info word, set it as a bit vector s.t. a bit is set iff
+    the corresponding local variable is a struct pointer. remember that
+    the function locals are pushed onto the stack by the prologue
+    instruction sequence immediately after the local info word, so by
+    looking at the local info word we can tell which negative offsets
+    from the frame pointer correspond to a pointer local.
+
+so, how would this work at runtime to identify all heap pointers on the
+stack? recall that the current frame pointer is always holding the
+address of the old frame pointer for the caller function (this is
+enforced by our calling convention). at the point when we need to
+compute this information:
+
+1.  get the current frame pointer.
+
+2.  read the argument info word (at frame pointer - 4); for each set bit
+    representing offset X, return the memory address \'frame pointer +
+    X\'.
+
+3.  read the local info word (at frame pointer - 8); for each set bit
+    representing offset X, return the memory address \'frame pointer -
+    X\'.
+
+4.  get the value pointed to by the current frame pointer, which is the
+    value of the old frame pointer.
+
+5.  set the current frame pointer value to that old value, then go to 2.
+
+repeat these steps until we\'ve walked the entire stack and looked at
+all of the stack frames. then we\'ve returned all possible pointers into
+the heap.
+
+1.  example
+
+    PROGRAM: struct %foo { int a; };
+
+    def bar(%foo c) : int { %foo d; int e;
+
+    d := new %foo; if (0 \< c.a) { d.a = c.a - 1; e = bar(d); }
+
+    return e; }
+
+    %foo x; int y;
+
+    x := new %foo; x.a := 10; y := bar(x);
+
+    output y;
+
+    suppose we execute this program, and after a few function calls
+    decide to find all pointers on the stack. assume there are no
+    caller- or callee-save registers for convenience.
+
+    STACK:
+
+    ADDRESS CONTENTS
+
+    ------------------------------------------------------------------------
+
+    0x900: 0x1000 ; old frame pointer 0x0 ; argument info word: there
+    are no pointer arguments 0x1 ; local info word: \'x\' is a pointer
+    0xab0 ; the value of \'x\', a pointer into the heap 0x0 ; the value
+    of \'y\', an int 0xab0 ; the call argument, i.e., \'x\' 0xd0f ; the
+    return address 0x800: 0x900 ; old frame pointer 0x1 ; argument info
+    word: there is 1 pointer argument 0x01 ; local info word: there is 1
+    pointer local 0xac0 ; the value of \'d\' 0x0 ; the value of \'e\'
+    0xac0 ; the call argument, i.e., \'d\' 0xdef ; the return address
+    0x700: 0x800 ; old frame pointer 0x1 ; argument info word: there is
+    1 pointer argument 0x01 ; local info word: there is 1 pointer local
+    0xad0 ; the value of \'d\' 0x0 ; the value of \'e\'
+
+    this is the stack after the first recursive call to \'bar\'. the
+    current frame pointer is 0x700, which points to the most recent
+    \'old frame pointer\' on the stack.
+
+    1.  go to 0x700-4 to get the argument info word
+    2.  there is 1 set bit: return 0x700+8 as the memory location of a
+        pointer
+    3.  go to 0x700-8 to get the local info word
+    4.  there is 1 set bit: return 0x700-12 as the memory location of a
+        pointer
+    5.  set the current frame pointer as 0x800 (the address of the next
+        most recent frame pointer)
+    6.  go to 0x800-4 to get the argument info word
+    7.  there is 1 set bit: return 0x800+8 as the memory location of a
+        pointer
+    8.  go to 0x800-8 to get the local info word
+    9.  there is 1 set bit: return 0x800-12 as the memory location of a
+        pointer
+    10. set the current frame pointer as 0x900 (the address of the next
+        next most recent frame pointer)
+    11. go to 0x900-4 to get the argument info word
+    12. there are no pointer arguments
+    13. go to 0x900-8 to get the local info word
+    14. there is 1 set bit: return 0x900-12 as the memory location of a
+        pointer
+    15. set the current frame pointer as 0x1000 (the address of the next
+        next next most recent frame pointer)
+    16. say that 1000 is the base of the stack, so we\'re done.
+
+### exercise {#exercise-15}
+
+generate code for the following program (again assuming no caller- or
+callee-save registers):
+
+struct %foo { int a; %bar b; };
+
+struct %bar { int c; int d; };
+
+def fun(%foo p, int q, %bar r) : int { %foo s; s := p; return s.a; }
+
+%foo x; int y;
+
+x := new %foo; x.b := new %bar; y := fun(x, 2, x.b); output y;
+
+SOLUTION
+
+; entry prologue push FR mov SR FR push 0b0 ; argument info: no pointer
+arguments push 0b1 ; local info: x is a pointer sub 8 SR ; allocate
+stack space for x and y sto 0 \[FR-4\] ; initialize x to nil sto 0
+\[FR-8\] ; initialize y to 0
+
+; x := new foo push 2 ; argument to \'allocate\': 2 words call allocate
+add 4 SR ; deallocate stack space for argument sto RR \[FR-4\] ; write
+return value to \'x\' sto 0 \[RR\] ; initialize x.a to 0 sto 0 \[RR+4\]
+; initialize x.b to nil sto 0b00000010010...01 \[RR-4\] ; initialize
+header word
+
+; x.b := new bar push 2 ; argument to \'allocate\': 2 words call
+allocate add 4 SR ; deallocate stack space for argument ld \[FR-4\] OR ;
+get address of struct in heap from \'x\' sto RR \[OR+4\] ; write return
+value to \'x.b\' sto 0 \[RR\] ; initialize x.b.c to 0 sto 0 \[RR+4\] ;
+initialize x.b.d to 0 sto 0b00000010000...01 \[RR-4\] ; initialize
+header word
+
+; y := fun(x, 2, x.b) ld \[FR-4\] RR ; address stored in \'x\' ld
+\[RR+4\] RR ; address stored in \'x.b\' push RR ; push \'x.b\' argument
+to \'fun\' push 2 ; push \'2\' argument to \'fun\' ld \[FR-4\] RR ;
+address stored in \'x\' push RR ; push \'x\' argument to \'fun\' call
+FUN add 12 SR ; deallocate stack space for arguments sto RR \[FR-8\] ;
+write return value to \'y\'
+
+; output y ld \[FR-8\] RR
+
+; entry epilogue mov FR SR pop FR ret
+
+; FOO prologue FOO: push FR mov SR FR push 0b101 ; argument info: first
+and third arguments are pointers push 0b1 ; local info: one local
+pointer add 4 SR ; allocate stack space for \'s\' sto 0 \[FR-4\] ;
+initialize \'s\' to nil
+
+; s := p ld \[FR+16\] RR ; get value of \'p\' param sto RR \[FR-4\] ;
+put it in \'s\'
+
+; return s.a ld \[FR-4\] RR ; get value of \'s\' ld \[RR\] RR ; get
+value of \'s.a\'
+
+; FOO epilogue mov FR SR pop FR ret
+
+memory management schemes
+-------------------------
+
+\[see memory management slides\]
+
+middle-end: optimization (back to L1)
+=====================================
+
+intro to analysis and optimization
+----------------------------------
+
+so far we\'ve examined the frontend (lexing, parsing), the backend
+(codegen), and the runtime (memory management). let\'s spend some time
+looking at the middle-end and optimizations.
+
+what do we mean by \"optimization\"?
+
+-- usually we mean performance: making the generated code execute
+faster. sometimes we want to optimize for other things, like code size,
+memory consumption, or power consumption (all of which are important for
+embedded systems). for our purposes we\'ll focus on performance
+optimization.
+
+-- \"optimization\" is a somewhat misleading term, because it implies
+we\'re going to find some optimal (i.e., best) solution. in reality
+finding the best solution is np-hard or undecidable and we\'re just
+looking for a better solution (e.g., that the optimized code runs faster
+than the unoptimized code). there is a such thing as a
+\"super-optimizer\" which does look for the best possible solution, but
+this is an active area of research and current solutions can\'t scale
+beyond tens of lines of code.
+
+how do we optimize for performance? the general idea is to reduce the
+amount of computation the generated executable needs to do: to somehow
+eliminate instructions or to replace slower instructions with faster
+instructions, while still guaranteeing that the resulting program \"does
+the same thing\".
+
+EXAMPLES
+
+// arithmetic identities x := y \* 0; --\> x := 0;
+
+// constant folding x := 1 + 2; --\> x := 3;
+
+// constant propagation and folding x := 1 + 2; --\> x := 3; y := x + 3;
+--\> y := 6;
+
+// redundancy elimination x := a + b; --\> x := a + b; y := a + b; y :=
+x;
+
+// strength reduction x := y / 2; --\> x := y \>\> 1;
+
+optimization = analysis + transformation. we need to use program
+analysis (aka static analysis) to determine what is true about the
+program\'s behavior (e.g., what things are constant values, what
+expressions are guaranteed to evaluate to the same value, etc), then we
+select code transformations that, based on the information provided by
+the analysis, are safe (preserve behavior) and effective (improve
+performance).
+
+we can perform optimizations in the backend on the generated assembly
+code, but then we would have to reimplement them for each backend we add
+to the compiler. there are some optimizations that are inherently target
+specific, and we reserve those for the backend, but mostly we try to
+optimize in a target-agnostic way so that we can reuse the same
+optimizations for all targets. thus, the \"middle-end\".
+
+the middle-end optimizations [can]{.underline} operate directly on the
+AST, but it\'s nicer if the code is simpler and more regular; it makes
+the optimizations easier to specify and implement. usually, the
+middle-end translates the AST into a simpler \"intermediate
+representation\" (IR). it performs the optimizations on the IR, then the
+backend codegen translates the IR into assembly.
+
+the optimizer can also operate at a number of different scopes, ranging
+from small fragments of code (local optimization) to entire functions
+(global optimization) to set of functions (inter-procedural
+optimization) to entire programs (whole-program optimizations). the
+larger the scope that the optimizer operates at, the more effective it
+is but the more complex and expensive it is.
+
+-- we\'ll focus on local optizations and global optimizations. the term
+\"global\" may seem odd since we\'re focusing in on one single function;
+the term comes from a time when local optimization was the norm and
+operating at an entire function scope was seen as extremely
+aggressive---operating on even larger scopes than that was out of the
+question.
+
+safety and profitability
+------------------------
+
+we stated two important properties of optimization: -- it should be safe
+(preserve program behavior) -- it should be profitable (improve program
+performance)
+
+let\'s dig a little into each, because they aren\'t as straightforward
+as they seem.
+
+### safety
+
+we said that optimizations should preserve behavior, but what does that
+mean? if you think about it, the whole point is to change program
+behavior by making it run faster using different instructions. what are
+we preserving? what does \"behavior\" even mean?
+
+roughly, we can think of the behavior we\'re preserving as
+user-observable events independent of time. in other words, if we run
+the original program P and record the user-observable events (e.g.,
+outputs) without timestamps, then do the same with the optimized program
+P\', we should get the same thing.
+
+-- for L1, this would be just the final output result.
+
+this definition will work fine for L1, but it isn\'t adequate for
+language like C and C++. these languages have the concept of \"undefined
+behavior\". literally, this means that for certain code expressions and
+statements the language standard doesn\'t say what should happen, thus
+the compiler implementor is free to do whatever they want. in fact, it
+goes even further than that: a program that executes a statement with
+undefined behavior isn\'t defined at all; the entire program execution
+is undefined, not just that statement. this is important to understand:
+the effects of undefined behavior are not confined to the statement that
+is undefined, or even the execution after that statement, but the
+[entire]{.underline} execution, even before that statement is executed.
+
+let\'s look at some examples (taken from the blog of John Regehr, a CS
+professor whose research deals a lot with undefined behavior in C).
+
+\#include \<limits.h\> \#include \<stdio.h\>
+
+int main (void) { printf (\"%d`\n`{=latex}\", (INT~MAX~+1) \< 0); return
+0; }
+
+this program asks the question: if we take the maximum integer value and
+add 1, do we get a negative number? in other words, do integers wrap
+around? so what happens when we run this program?
+
+\$ gcc test.c -o test \$ ./test 1
+
+or:
+
+\$ gcc test.c -o test \$ ./test 0
+
+or:
+
+\$ gcc test.c -o test \$ ./test 42
+
+or:
+
+\$ gcc test.c -o test \$ ./test Formatting root partition
+
+any of these could happen, or anything else. the program has undefined
+behavior because it exhibits signed integer overflow, that is, we took a
+signed integer and added a value to it that caused the result to be out
+of the range that a signed integer can express. the C standard says this
+this is undefined (note that unsigned integer overflow is defined).
+
+now, you might think \"on an x86 the C integer add instruction is
+implemented using the x86 ADD assembly instruction, which operates using
+two\'s complement arithmetic, which does wrap around. thus, if i\'m
+running the program on an x86 i can expect to get 1.\" this is bad, for
+the following reasons:
+
+1.  you don\'t know what architectures your program will be compiled on,
+    even if you are compiling for x86 right now.
+2.  not all compilers will work this way, even on an x86, even if the
+    one you\'re using right now does.
+3.  at certain optimization levels, a compiler that may work this way
+    previously will stop working this way because it takes advantage of
+    the undefined behavior to optimize the program.
+
+let\'s take a closer look at that third reason with an example:
+
+int stupid(int a) { return (a+1) \> a; }
+
+note that if we pass in INT~MAX~ for a, then we get undefined behavior.
+the compiler optimizer can reason this way:
+
+case 1: \'a\' is not INT~MAX~. then the answer is guaranteed to be 1.
+case 2: \'a\' is INT~MAX~. then the behavior is undefined and we can do
+whatever we want. let\'s make the answer 1.
+
+it then outputs the following optimized code:
+
+int stupid(int a) { return 1; }
+
+this is completely valid, even if we\'re running the program on an x86
+and using the x86 ADD instruction which exhibits two\'s complement
+behavior, so that INT~MAX~ + 1 \< INT~MAX~.
+
+we\'ve only looked at signed integer overflow, but the C99 language
+standard lists 191 kinds of undefined behavior. this is why it\'s always
+a good idea to use -Wall for C/C++ compilation and pay attention to the
+warnings.
+
+### profitability
+
+another consideration is that the transformation we apply to the code to
+optimize it should actually result in faster code. this can be trickier
+than you might think.
+
+EXAMPLE: FUNCTION INLINING
+
+consider the following example:
+
+def foo(int a) { return a + 1; } int x; x := foo(2); output x;
+
+at runtime, the execution will look something like:
+
+precall sequence function prologue compute a+1 function epilogue
+post-return sequence output x
+
+notice that the precall, prologue, epilogue, and post-return are all
+overhead that comes because we\'re making a function call. we can
+optimize this code by [inlining]{.underline} the function call, that is,
+by copying the body of the function directly into the caller:
+
+int x; x := 2 + 1; output x;
+
+this has exposed another optimization opportunity for constant folding
+and propagation, yielding the following optimized program:
+
+output 3;
+
+function inlining both eliminates the overhead of function calls and
+also exposes many opportunities for optimization that wouldn\'t be
+obvious if we looked at functions in isolation. we can perform function
+inlining whenever we know exactly which function is being called (always
+in L1; usually in C except for function pointers; sometimes in C++
+because of virtual methods).
+
+you might think: inlining one function call was good, so obviously we
+should inline as many as possible! but this actually is not a good idea.
+for one, we can\'t fully inline recursive calls (we would get into a
+cycle of infinitely repeated inlinings); but let\'s ignore that issue.
+the real problem is that inlining comes with a cost: the code becomes
+larger.
+
+def foo(int a) { \<instruction 1\>; ... \<instruction N\>; return
+\<aexp\>; } int x; int y; x := foo(2); y := foo(3); output x + y;
+
+becomes:
+
+int x; int y; \<instruction 1\>; . . . \<instruction N\>; \<instruction
+1\>; . . . \<instruction N\>; output x + y;
+
+there were two calls to foo, so we doubled the amount of code inside
+foo\'s body. consider the following:
+
+def foo(int a) { \<instruction 1\>; ...; bar(); ...; bar();
+\<instruction N\>; return \<aexp\>; } def bar() { \<instruction 1\'\>;
+...; \<instruction M\'\>; return \<aexp\>; } int x; int y; x := foo(2);
+y := foo(3); output x + y;
+
+becomes:
+
+int x; int y; \<instruction 1\>; . . . \<instruction 1\'\>; . . .
+\<instruction M\'\>; . . . \<instruction N\>; \<instruction 1\>; . . .
+\<instruction 1\'\>; . . . \<instruction M\'\>; . . . \<instruction N\>;
+output x + y;
+
+we doubled the amount of code in foo, which, because we inlined the
+calls to bar, quadruples the amount of code in bar. in general, inlining
+can increase code size exponentially. this impacts not just memory
+consumption, but also performance because the large code size can blow
+the instruction cache and cause large slowdowns.
+
+in practice, compilers use a set of complicated heuristics to determine
+whether a function call should be inlined or not.
+
+many optimizations have similar considerations: just because we
+[can]{.underline} apply the optimization doesn\'t mean it\'s a good
+idea. we need to figure out in each case whether applying the
+optimization results in a net performance benefit or loss and act
+accordingly.
+
+IR: 3-address code
+------------------
+
+let\'s discuss the IR we\'ll use for the middle-end. it will be a
+classic example of \"three address code\", something similar to that
+used by many real compilers. the name \"three address code\" is a
+reference to the fact that no instruction will involve more than three
+\"addresses\" (think: variables). here is the syntactic definition of
+the IR:
+
+\[in1\] binop ::= + \| - \| \* \| \< \| \<= \| = \| AND \| OR operand
+::= variable \| constant instruction ::= variable \<- operand binop
+operand
+
+  ----------------------------
+  variable \<- NOT operand
+  variable \<- CALL function
+  variable \<- operand
+  arg operand
+  return operand
+  output operand
+  jump label
+  jump~if0~ operand label
+  ----------------------------
+
+### example {#example-8}
+
+let\'s look at an example. here is the original program:
+
+\[in2\] def bar(int a) : int { return a + (a - 12) \* 42; }
+
+def foo(int a) : int { int x; int y; x := bar(a); y := bar(a+1); return
+x\*y; }
+
+int x; while (x \< 2) { x := x + 1; } x := foo(x); output x+3;
+
+here is the IR version:
+
+\[in3\] def bar(int a) { ~tmp0~ \<- a - 12 ~tmp1~ \<- ~tmp0~ \* 42
+~tmp2~ \<- a + ~tmp1~ return ~tmp2~ }
+
+def foo(int a) { arg a x \<- CALL bar ~tmp0~ \<- a + 1 arg ~tmp0~ y \<-
+CALL bar ~tmp1~ \<- x \* y return ~tmp1~ }
+
+WHILE~START0~: ~tmp0~ \<- x \< 2 jump~if0~ ~tmp0~ WHILE~END0~
+
+x \<- x + 1 jump WHILE~START0~
+
+WHILE~END0~: arg x x \<- CALL foo ~tmp1~ \<- x + 3 output ~tmp1~
+
+\[note that i\'m writing the labels on separate lines like instructions
+for convenience, but they aren\'t actually instructions and don\'t take
+up a line of code.\]
+
+we see that the IR is a lot like assembly, except that it\'s
+higher-level (target agnostic, keeps the abstraction of functions and
+function calls, arbitrary number of variables). it does strip away the
+variable definitions, type annotations, etc because we assume that these
+are already in the symbol table.
+
+this IR is nicer to work with for optimizations because we don\'t have
+to deal with complex nested expressions and we can assume that every
+instruction is in one of a few kinds of formats and never has more than
+two operands.
+
+how do we generate the IR from the AST? it works exactly like the
+codegen we\'ve already examined, except emitting the IR instructions
+instead of assembly. other than that, we can use the same strategy and
+implementation. for clarity in this example i always created a new
+temporary, but we could also reuse them between instructions using the
+same strategy as we did for assembly codegen.
+
+### exercise {#exercise-16}
+
+\[in4\] translate the following program:
+
+def foo(int a, int b) : int { int x; int y;
+
+x := a + b \* (a - b);
+
+while (y \<= x + 3) { y := y + 10; }
+
+return y \* 2; }
+
+int t1; int t2;
+
+t1 := 42; t2 := foo(t1 + 2, t1 \* 2); if (t1 \< t2) { t1 := t2; } else {
+t1 := t1 + 2; }
+
+output t1 + 42;
+
+SOLUTION
+
+\[in5\] def foo(int a, int b) { ~tmp0~ \<- a - b ~tmp1~ \<- b \* ~tmp0~
+x \<- a + ~tmp1~
+
+WHILE~START0~: ~tmp2~ \<- x + 3 ~tmp3~ \<- y \<= ~tmp2~ jump~if0~ ~tmp3~
+WHILE~END0~
+
+y \<- y + 10 jump WHILE~START0~
+
+WHILE~END0~: ~tmp4~ \<- y \* 2 return ~tmp4~ }
+
+t1 \<- 42 ~tmp0~ \<- t1 + 2 ~tmp1~ \<- t1 \* 2 arg ~tmp0~ arg ~tmp1~ t2
+\<- CALL foo
+
+~tmp2~ \<- t1 \< t2 jump~if0~ ~tmp2~ IF~FALSE1~ t1 \<- t2 jump IF~END1~
+
+IF~FALSE1~: t1 \<- t1 + 2
+
+IF~END1~: ~tmp3~ \<- t1 + 42 output ~tmp3~
+
+control-flow graph
+------------------
+
+### definition
+
+unlike codegen, we don\'t output the IR as a linear list of
+instructions. instead, we use a data structure called the [control flow
+graph]{.underline}. confusingly, we abbreviate this as CFG, just like
+context-free grammars. so in the frontend CFG will mean context-free
+grammar and in the middle-end it will mean control flow graph; you just
+have to use the surrounding context to figure out which one is meant.
+
+a CFG models the control-flow of the program, i.e., which instructions
+can execute after which other instructions. it is a directed graph whose
+nodes are [basic blocks]{.underline} (a sequence of instructions, to be
+defined more precisely soon). an edge from basic block A to basic block
+B means that immediately after A executes, B may execute (not
+necessarily [must]{.underline} execute, just [may]{.underline} execute).
+
+a [basic~block~]{.underline} is a sequence of instructions with the
+following property: control must enter at the first instruction of the
+block and can only exit after the last instruction in the block, i.e.,
+the block has a single entry point and a single exit point. in other
+words, if program execution enters the basic block then every
+instruction in the basic block must be executed.
+
+-- note: when i was talking about optimization scope and said that local
+optimizations operate on \"small fragments of code\", what i really
+meant was basic blocks.
+
+### examples
+
+the CFG is perhaps more easily understood by example.
+
+EXAMPLE 1
+
+\[cfg1\] program:
+
+x := foo(); if (x \< 10) { x := 3; y := 2; } else { x := 2; y := 3; } z
+:= x + y \* 2; output z;
+
+IR:
+
+\[A\] x \<- CALL foo ~tmp0~ \<- x \< 10 jump~if0~ ~tmp0~ IF~FALSE0~
+
+\[B\] x \<- 3 y \<- 2 jump IF~END0~
+
+\[C\] x \<- 2 y \<- 3
+
+\[D\] IF~END0~: ~tmp1~ \<- y \* 2 z \<- x + ~tmp1~ output z
+
+each separate block of instructions is a basic block. note that: -- a
+jump, return, or output always ends a basic block. -- a basic block
+doesn\'t have to end in a jump, return, or output (see false branch).
+
+-   the block has to end there because the next instruction is the
+    target of a jump and we cannot allow basic blocks to be entered in
+    the middle. since the way we\'re generating the IR every jump target
+    has to be a label, it\'s fair to say that any labeled instruction
+    will automatically start a new basic block.
+
+-- a call does not end a basic block. while it does transfer control
+somewhere else, eventually that control will always return to
+immediately after the call. that means we preserve the invariant that
+every instruction in the basic block must be executed.
+
+CFG:
+
+\[show CFG\]
+
+EXAMPLE 2:
+
+\[cfg2\] program:
+
+x := foo(); while (x \< 10) { x := x + 1; y := y + 1; z := x \* y; }
+output z;
+
+IR:
+
+\[A\] x \<- CALL foo
+
+\[B\] WHILE~START0~: ~tmp0~ \<- x \< 10 jump~if0~ ~tmp0~ WHILE~END0~
+
+\[C\] x \<- x + 1 y \<- y + 1 z \<- x \* y jump WHILE~START0~
+
+\[D\] WHILE~END0~: output z
+
+CFG:
+
+\[show CFG\]
+
+EXAMPLE 3:
+
+\[cfg3\] program:
+
+x := foo(); while (x \< 10) { x := x + 1; if (x \<= y) { while (x \< y)
+{ y := y - 2; } } } output y;
+
+IR:
+
+\[A\] x \<- CALL foo
+
+\[B\] WHILE~START0~: ~tmp0~ \<- x \< 10 jump~if0~ ~tmp0~ WHILE~END0~
+
+\[C\] x \<- x + 1 ~tmp1~ \<- x \<= y jump~if0~ ~tmp1~ IF~FALSE1~
+
+\[D\] WHILE~START2~: ~tmp2~ \<- x \< y jump~if0~ ~tmp2~ WHILE~END2~
+
+\[E\] y \<- y - 2 jump WHILE~START2~
+
+\[F\] WHILE~END2~: IF~FALSE1~: jump WHILE~START0~
+
+\[G\] WHILE~END0~: output y
+
+CFG:
+
+\[show CFG\]
+
+### algorithm
+
+the basic algorithm for building a CFG is simple, though various
+language features can complicate it a bit. let\'s assume that we start
+with a linear sequence of IR instructions (something like what we would
+get from our codegen algorithm, a vector of instructions, but IR
+instructions rather than assembly instructions). also, this is per
+function (including treating the \"global\" block of code ending in
+\'output\' as a function itself).
+
+\[cfg4\] we\'ll use the following example to illustrate the algorithm:
+
+1.  x \<- CALL foo
+2.  WHILE~START0~: ~tmp0~ \<- x \< 10
+3.  jump~if0~ ~tmp0~ WHILE~END0~
+4.  x \<- x + 1
+5.  ~tmp1~ \<- x \<= y
+6.  jump~if0~ ~tmp1~ IF~FALSE1~
+7.  WHILE~START2~: ~tmp2~ \<- x \< y
+8.  jump~if0~ ~tmp2~ WHILE~END2~
+9.  y \<- y - 2
+10. jump WHILE~START2~
+11. WHILE~END2~: IF~FALSE1~: jump WHILE~START0~
+12. WHILE~END0~: output y
+
+```{=html}
+<!-- -->
+```
+1.  identify all \"leader\" instructions (the instructions that start a
+    basic block). a leader is the first instruction in the function, any
+    labeled instruction (because it can be the target of a jump), and
+    any instruction immediately following a conditional jump (because it
+    is the fall-through instruction if the conditional jump is not
+    taken). remember to treat multiple consecutive labels as a single
+    label for these purposes. save the indices of these leader
+    instructions in a vector, in the order they appear in the
+    instruction sequence.
+
+==\> the leaders for the example are indices { 00, 01, 03, 06, 08, 10,
+11 }.
+
+1.  record the basic blocks as the sequences of instructions from each
+    leader up to, but not including, the next leader in sequence.
+
+    the basic blocks for the example are:
+
+    \[A\]
+
+    1.  x \<- CALL foo
+
+    \[B\]
+
+    1.  WHILE~START0~: ~tmp0~ \<- x \< 10
+    2.  jump~if0~ ~tmp0~ WHILE~END0~
+
+    \[C\]
+
+    1.  x \<- x + 1
+    2.  ~tmp1~ \<- x \<= y
+    3.  jump~if0~ ~tmp1~ IF~FALSE1~
+
+    \[D\]
+
+    1.  WHILE~START2~: ~tmp2~ \<- x \< y
+    2.  jump~if0~ ~tmp2~ WHILE~END2~
+
+    \[E\]
+
+    1.  y \<- y - 2
+    2.  jump WHILE~START2~
+
+    \[F\]
+
+    1.  WHILE~END2~: IF~FALSE1~: jump WHILE~START0~
+
+    \[G\]
+
+    1.  WHILE~END0~: output y
+
+2.  for each basic block, look at the last instruction:
+
+    A. if it is not a jump, add an edge from this basic block to the
+    basic block whose leader is immediately next in sequence.
+
+==\> basic block A has an edge to B; basic block G would have an edge
+but it ends the function so it doesn\'t.
+
+B. if it is an unconditional jump to label L, add an edge from this
+basic block to the basic block whose leader is labeled L.
+
+==\> for the example, basic block E has an edge to D; basic block F has
+an edge to B.
+
+C. if it is a conditional jump to label L:
+
+1.  add an edge from this basic block to the basic block whose leader is
+    immediately next in sequence.
+2.  add an edge from this basic block to the basic block whose leader is
+    labeled L.
+
+==\> for the example, basic block B has edges to C and G; basic block C
+has edges to D and F; basic block D has edges to E and F.
+
+### exercise {#exercise-17}
+
+\[cfg5\] create the CFG for the following program:
+
+def foo(int a, int b) { ~tmp0~ \<- a - b ~tmp1~ \<- b \* ~tmp0~ x \<- a
++ ~tmp1~ WHILE~START0~: ~tmp2~ \<- x + 3 ~tmp3~ \<- y \<= ~tmp2~
+jump~if0~ ~tmp3~ WHILE~END0~ y \<- y + 10 jump WHILE~START0~
+WHILE~END0~: ~tmp4~ \<- y \* 2 return ~tmp4~ }
+
+t1 \<- 42 ~tmp0~ \<- t1 + 2 ~tmp1~ \<- t1 \* 2 arg ~tmp0~ arg ~tmp1~ t2
+\<- CALL foo ~tmp2~ \<- t1 \< t2 jump~if0~ ~tmp2~ IF~FALSE1~ t1 \<- t2
+jump IF~END1~ IF~FALSE1~: t1 \<- t1 + 2 IF~END1~: ~tmp3~ \<- t1 + 42
+output ~tmp3~
+
+SOLUTION
+
+\[cfg6\] basic blocks:
+
+def foo(int a, int b) { \[A\] ~tmp0~ \<- a - b ~tmp1~ \<- b \* ~tmp0~ x
+\<- a + ~tmp1~
+
+\[B\] WHILE~START0~: ~tmp2~ \<- x + 3 ~tmp3~ \<- y \<= ~tmp2~ jump~if0~
+~tmp3~ WHILE~END0~
+
+\[C\] y \<- y + 10 jump WHILE~START0~
+
+\[D\] WHILE~END0~: ~tmp4~ \<- y \* 2 return ~tmp4~ }
+
+\[E\] t1 \<- 42 ~tmp0~ \<- t1 + 2 ~tmp1~ \<- t1 \* 2 arg ~tmp0~ arg
+~tmp1~ t2 \<- CALL foo ~tmp2~ \<- t1 \< t2 jump~if0~ ~tmp2~ IF~FALSE1~
+
+\[F\] t1 \<- t2 jump IF~END1~
+
+\[G\] IF~FALSE1~: t1 \<- t1 + 2
+
+\[H\] IF~END1~: ~tmp3~ \<- t1 + 42 output ~tmp3~
+
+cfg:
+
+\[show CFG\]
+
+local optimizations
+-------------------
+
+local optimizations operate on basic blocks; we iterate through each
+block (in arbitrary order) and apply the local optimizations to optimize
+each block in isolation from each other.
+
+### constant folding and arithmetic identities
+
+we\'ve already mentioned these; they\'re simple optimizations that
+operate on single instructions. the idea is that sometimes we don\'t
+need to wait for the program to execute in order to evaluate
+expressions, we can do it right in the compiler.
+
+for each instruction: -- if all the operands are constants, evaluate the
+operation -- if some of the operands are constant, attempt to apply an
+arithmetic identity:
+
+x \* 1 = x 1 \* x = x x \* 0 = 0 0 \* x = 0 x + 0 = x 0 + x = x x - 0 =
+0 0 - x = -x x - x = 0
+
+we can also apply logical identities under our assumption that 0 is
+false and non-0 is true:
+
+0 AND x = 0 x AND 0 = 0 non-0 AND x = x x AND non-0 = x 0 OR x = x x OR
+0 = x non-0 OR x = 1 x OR non-0 = 1
+
+we can also handle some identities for the relational operators that
+probably wouldn\'t happen but are easy enough to check for that we might
+as well:
+
+x \< x = 0 x \<= x = 1 x = x = 1
+
+### local value numbering
+
+this is a slightly more complicated optimization that operates on the
+entire basic block. our goal is to identify redundant expressions
+computed by the basic block so that we don\'t compute the same thing
+more than once.
+
+example 1:
+
+a \<- 4 b \<- 5 c \<- a + b d \<- 5 e \<- a + b
+
+clearly the second \'a + b\' is redundant and we could optimize this as:
+
+a \<- 4 b \<- 5 c \<- a + b d \<- 5 e \<- c
+
+a naive approach would be to simply scan down the list of instructions
+in the basic block and record which ones we see; if we see it again,
+replace it with the left-hand side of the first instruction to compute
+that expression. this approach would work for the example above, but
+suppose we have instead:
+
+example 2:
+
+a \<- 4 b \<- 5 c \<- a + b a \<- 5 e \<- a + b
+
+then the optimization would be incorrect, because the value of the
+second \'a + b\' is different than the value of the first \'a + b\'.
+here\'s another problem:
+
+example 3:
+
+a \<- 4 b \<- 5 c \<- a + b d \<- 5 e \<- b + a
+
+the second expression \'b + a\' is syntactically different than the
+first \'a + b\' but is semantically identical; we need to be able to
+recognize that fact (while still distinguishing expressions like \'a -
+b\' and \'b - a\').
+
+we need a scheme that can solve both problems. our strategy will be to
+tag expressions with numbers s.t. semantically identical expressions
+(like \'a + b\' and \'b + a\' in example 3) are given the same number
+and hence are recognized as equivalent while semantically different
+expressions (like the first \'a + b\' and the second \'a + b\' in
+example 2) are given different numbers.
+
+-- the idea is that we want to distinguish between the variables (which
+are just arbitrary names for values) and the values of those variables.
+we are going to label variables
+
+-- note that our goal is not to guarantee that we find all equivalent
+expressions; this is uncomputable. we want to find as many as we can
+while still being fast and while guaranteeing that we never incorrectly
+find non-equivalent expressions to be equivalent.
+
+the algorithm:
+
+1.  initialize a table mapping expressions to value numbers (starting
+    empty). we often use a hash table, and thus this optimization is
+    sometimes called \"hash-based value numbering\".
+
+2.  for each copy, unary, and binary operator instruction in order: A.
+    look up each variable operand to get its value number; assign a
+    fresh number if it doesn\'t have one already and record it in the
+    table. B. if the operator is commutative, order the operand value
+    numbers from least to greatest. C. look up the entire expression
+    (using the operand numbers instead of variables) in the table to get
+    its number; assign a fresh number if it doesn\'t have one already
+    and record it in the table. D. update the table to map the left-hand
+    side variable to the number for the right-hand side expression.
+
+3.  for any two instructions \'\<var1\> \<- \<exp1\>\' and \'\<var2\>
+    \<- \<exp2\>\' in order s.t. \<var1\> and \<var2\> have the same
+    value number at the \'\<var2\> \<- \<exp2\>\' instruction, we can
+    replace \<exp2\> with \<var1\>.
+
+EXAMPLE 1 REDUX
+
+a \<- 4 ; 4 = \#1, a = \#1 b \<- 5 ; 5 = \#2, b = \#2 c \<- a + b ; (\#1
++ \#2) = \#3, c = \#3 d \<- 5 ; 5 = \#2, d = \#2 e \<- a + b ; (\#1 +
+\#2) = \#3, e = \#3
+
+we see that c = \#3 and e = \#3, thus we can replace the last
+instruction with \'e \<- c\'.
+
+EXAMPLE 2 REDUX
+
+a \<- 4 ; 4 = \#1, a = \#1 b \<- 5 ; 5 = \#2, b = \#2 c \<- a + b ; (\#1
++ \#2) = \#3, c = \#3 a \<- 5 ; 5 = \#2, a = \#2 e \<- a + b ; (\#2 +
+\#2) = \#4, e = \#4
+
+here we see that c and e have different tags, thus they are not
+guaranteed to be equivalent and we cannot apply the transformation.
+
+EXAMPLE 3 REDUX
+
+a \<- 4 ; 4 = \#1, a = \#1 b \<- 5 ; 5 = \#2, b = \#2 c \<- a + b ; (\#1
++ \#2) = \#3, c = \#3 d \<- 5 ; 5 = \#2, d = \#2 e \<- b + a ; (\#1 +
+\#2) = \#3, e = \#3
+
+because we reordered the value numbers for + expressions, we still
+recognize that c and e are equivalent in this case.
+
+EXAMPLE 4
+
+x \<- a + d ; a = \#1, d = \#2, (\#1 + \#2) = \#3 y \<- a ; y = \#1 z
+\<- y + d ; (\#1 + \#2) = \#3, z = \#3
+
+we can see from this example that local value numbering can discover
+equivalent expressions even if they use different variables altogether.
+
+EXAMPLE 5
+
+a \<- x + y ; x = \#1, y = \#2, (\#1 + \#2) = \#3, a = \#3 b \<- x + y ;
+(\#1 + \#2) = \#3, b = \#3 a \<- 1 ; a = \#4 c \<- x + y ; (\#1 + \#2) =
+\#3, c = \#3 b \<- 2 ; b = \#5 d \<- x + y ; (\#1 + \#2) = \#3, d = \#3
+
+how can we transform this code to optimize it based on the value
+numbering? we know that \'x + y\' in all four expressions will have the
+same value, but \'a\' and \'b\' are redefined at various points. in
+particular, it would be incorrect to replace \'c \<- x + y\' with \'c
+\<- a\' (though \'c \<- b\' is fine) and incorrect to replace \'d \<- x
++ y\' with either \'d \<- a\' or \'d \<- b\'.
+
+this is why we have the caveat in the algorithm that we can only replace
+\<exp2\> with \<var1\> [if]{.underline} \<var1\> and \<var2\> have the
+same value number [at that instruction]{.underline}. for the instruction
+\'c \<- x + y\' we see that while \'a\' originally also had value number
+\#3, now it has value number \#4 and so cannot be used. similarly, for
+the instruction \'d \<- x + y\' we see that neither \'a\' nor \'b\'
+still have value number \#3 and so neither can be used.
+
+it\'s annoying that we have to recompute \'x + y\' in the last
+instruction just because we\'ve overwritten \'a\' and \'b\' already. we
+could get around this problem by renaming variables whenever they are
+assigned to keep them unique:
+
+a0 \<- x0 + y0 ; x0 = \#1, y0 = \#2, (\#1 + \#2) = \#3, a0 = \#3 b0 \<-
+x0 + y0 ; (\#1 + \#2) = \#3, b0 = \#3 a1 \<- 1 ; a1 = \#4 c0 \<- x0 + y0
+; (\#1 + \#2) = \#3, c0 = \#3 b1 \<- 2 ; b1 = \#5 d0 \<- x0 + y0 ; (\#1
++ \#2) = \#3, d0 = \#3
+
+now we can replace \'d0 \<- x0 + y0\' with either \'d0 \<- a0\' or \'d0
+\<- b0\' with no problem. there is an issue though: renaming in this way
+becomes much more complicated with we look at the entire function,
+particularly when we have multiple branches that each redefine the same
+variables. this leads to something called \"static single assignment
+form\" (SSA), which is a popular variant of IR in modern compilers (both
+gcc and llvm use it). we may talk about SSA later, but for now we\'ll
+stick to the original IR we\'ve already defined.
+
+### exercise {#exercise-18}
+
+optimize the following code using local value numbering:
+
+a \<- b - c d \<- c - b e \<- c f \<- a AND d g \<- b - e h \<- d AND a
+d \<- 42 i \<- e - d
+
+SOLUTION
+
+value-numbered code:
+
+a \<- b - c ; b = \#1, c = \#2, (\#1 - \#2) = \#3, a = \#3 d \<- c - b ;
+(\#2 - \#1) = \#4, d = \#4 e \<- c ; e = \#2 f \<- a AND d ; (\#3 AND
+\#4) = \#5, f = \#5 g \<- b - e ; (\#1 - \#2) = \#3, g = \#3 h \<- d AND
+a ; (\#3 AND \#4) = \#5, h = \#5 d \<- 42 ; 42 = \#6, d = \#6 i \<- e -
+b ; (\#2 - \#1) = \#4, i = \#4
+
+transformed code:
+
+a \<- b - c d \<- c - b e \<- c f \<- a AND d g \<- a h \<- f d \<- 42 i
+\<- e - b
+
+dataflow analysis
+-----------------
+
+### intro {#intro-3}
+
+we have looked at analysis and optimization at the basic block level
+(local optimization), but the limited scope means that we can miss many
+optimization opportunities. let\'s widen our scope to entire functions,
+i.e., global optimization.
+
+the analyses required for global optimization tend to be more
+complicated than for local optimization, and we have developed a
+specific theoretical framework for it called \"dataflow analysis\".
+compiler developers tried a lot of ad-hoc global analyses at first, but
+found that they were very difficult to get correct; dataflow analysis
+provides a handy set of tools such that, if you use them correctly, you
+will get a correct analysis.
+
+we will first introduce some fundamental ideas that will be important
+for understanding how DFA works at a high level. then we\'ll look at
+some specific examples of analyses and the optimizations they enable.
+finally, we\'ll generalize to the DFA framework and discuss its
+properties.
+
+### DFA motivation
+
+when we\'re analyzing a function, what we\'re trying to do is to compute
+invariants about its behavior when it executes: what facts are always
+true no matter what arguments we give the function?
+
+here is a simple example:
+
+EXAMPLE 1
+
+def foo(int a, int b) { int c; if (a \< b) { c := b - a; } else { c := a
+- b; } return c; }
+
+given this function, we don\'t know what the values of the arguments
+will be, nor whether we will take the true or false branch of the
+conditional. but we can infer the invariant that the value returned by
+this function will always be non-negative. here\'s our reasoning:
+
+either a \< b or b \< a or a = b. if a \< b then we take the true
+branch, c is positive if b \< a then we take the false branch, c is
+positive if a = b then we take the false branch, c is zero therefore c
+cannot be negative at the return statement
+
+in this example we are reasoning about the sign of \'c\' (positive,
+negative, or zero), so the facts that we care about pertain to that. in
+other analyses we care about other properties (as we\'ll see examples of
+soon). dataflow analysis provides a general framework that is
+independent of the particular facts we want to reason about; basically,
+it\'s a template into which we plug in different kinds of things
+depending on the specific analysis we\'re trying to perform.
+
+how do we perform our reasoning over the facts that we care about? in
+the example we reasoned about each possible path that execution could
+take through the function (i.e., it could take the true branch or the
+false branch, then either way it will reach the return statement). this
+is easy if there\'s only one or a few possible paths, but in general
+this won\'t work.
+
+EXAMPLE 2 A if (...) { B } { C } if (...) { D } { E }
+
+possible paths: A -\> B -\> D A -\> B -\> E A -\> C -\> D A -\> C -\> E
+2^2^ paths
+
+EXAMPLE 3 A if (...) { B } { C } if (...) { D } { E } if (...) { F } { G
+}
+
+possible paths: A -\> B -\> D -\> F A -\> B -\> D -\> G A -\> B -\> E
+-\> F A -\> B -\> E -\> G A -\> C -\> D -\> F A -\> C -\> D -\> G A -\>
+C -\> E -\> F A -\> C -\> E -\> G 2^3^ paths
+
+in general, for n conditionals there are 2^n^ paths: an exponential
+blowup. things are worse for loops:
+
+EXAMPLE 4 A while (...) { B } C
+
+possible paths: A -\> C A -\> B -\> C A -\> B -\> B -\> C A -\> B -\> B
+-\> B -\> C ...
+
+there are an arbitrary, possibly infinite number of paths.
+
+somehow we need to reason about the function\'s behavior without
+reasoning about each path it could take. however, remember that in order
+to use the analysis results to optimize the function, we need to be
+safe: if we say that something is true about the function, it must
+really be true or the optimization could break the program. so the
+analysis must never return a false invariant (i.e., a fact that isn\'t
+true for some path in the function), but it can\'t reason about each
+path independently.
+
+DFA handles this conundrum by computing a conservative
+over-approximation of program behavior. what this means is that we
+don\'t promise to compute all true facts, but we do promise that any
+facts we compute are true.
+
+EXAMPLE 5
+
+def foo(int a, int b) { int c; if (a \< b) { c := b - a; } if (b \< a) {
+c := a - b; } if (a = b) { c := 1; } return c; }
+
+for this example we can reason about signedness again and determine that
+\'c\' must always be positive at the return statement. however, our
+analysis may only return that \'c\' will be non-negative. this is a true
+invariant, but it isn\'t as precise as it could be (being positive
+implies being non-negative). we will allow our analyses to be less
+precise in order to make them tractable. being less precise means that
+the information may not be as useful for optimization (i.e., we may miss
+optimization opportunities), but because the information is always true
+we are guaranteed that the optimizations will not break the program.
+
+### DFA fundamentals
+
+let\'s look at the general DFA framework. we\'ll examine it at a high
+level here with a simple example, then look at some more examples of
+common compiler analyses and optimizations, then look at the details of
+the DFA framework after you have that context. when we go over the high
+level below it will be very abstract and probably hard to understand. i
+recommend going through it, then going through the examples, then
+returning to the high level explanation again once you have the examples
+as context.
+
+we\'ll let L be a set of dataflow facts, whatever they are (for example,
+variable signedness). these will be the possible answers that we compute
+for the analysis.
+
+for each basic block k in the CFG, we\'ll define IN~k~ and OUT~k~ to be
+the dataflow facts that hold immediately before the basic block is
+executed and immediately afterwards, respectively. so IN~k~ and OUT~k~ ∈
+L. \[show picture\]
+
+for each basic block, we\'ll compute OUT (the output set of dataflow
+facts) from IN (the input set of dataflow facts) based on the IR
+instructions in the basic block. however, the IR instructions operate on
+values (e.g., integers) while the analysis operates on dataflow facts.
+so we need to redefine the IR instructions in terms of how they operate
+on the dataflow facts. since this depends on what dataflow facts we\'re
+tracking for a given analysis, these \"abstract transfer functions\" are
+another thing we plug into the DFA framework along with L.
+
+-- let F~k~ be the abstract transfer function for basic block k -- then
+OUT~k~ = F~k~(IN~k~)
+
+of course, we need to know IN~k~ for each basic block. if the basic
+block only has one predecessor, then that\'s easy: if the predecessor is
+block p (for predecessor), then IN~k~ = OUT~p~. \[show picture\]
+
+but what if block k has two predecessors, say p1 and p2? \[show
+picture\] then IN~k~ has to be a safe approximation of both of their
+outputs. in other words, IN~k~ can only contain facts that are true of
+both OUT~p1~ and OUT~p2~. how do we compute this approximation? we use
+an operator called the \"meet\" operator ⊓.
+
+-- IN~k~ = OUT~p~ if p is the only predecessor of k = OUT~p1~ ⊓ OUT~p2~
+if p1 and p2 are the predecessors of k
+
+for simplicity, we\'ll say this as: IN~k~ = ⊓ OUT~p~ s.t. p is a
+predecessor of k
+
+-- the ⊓ is also specific to L, and so it is another thing that we plug
+into the DFA framework along with L and the abstract transfer functions.
+
+now we have a set of simultaneous equations, i.e., for each basic block
+k:
+
+IN~k~ = ⊓ OUT~p~ s.t. p is a predecessor of k OUT~k~ = F~k~(IN~k~)
+
+note that because of loops, these equations may be recursive, that is,
+IN~k~ may transitively depend on OUT~k~ (we\'ll see an example shortly).
+
+the actual analysis consists of solving these equations to compute
+values for IN~k~ and OUT~k~ for every basic block k; these will be the
+solutions of the analysis. how do we solve them? the idea is that we
+want the [least fixpoint]{.underline} of these equations, and that will
+be our analysis answer.
+
+a fixpoint of a function is an input x s.t. f(x) = x; i.e., an input
+s.t. applying the function to the input yields itself. a function in
+general may have any number of fixpoints, from 0 to infinity. let\'s see
+some examples:
+
+f(x) = x + 2 \[0 fixpoints\] f(x) = x² - x \[2 fixpoints\] f(x) = x² ÷ x
+\[∞ fixpoints\]
+
+if there are multiple fixpoints then we want the most precise one (the
+[least]{.underline} fixpoint). for example, in the case above where
+there are two fixpoints (0 and 1), the least fixpoint is 0. even if
+there are multiple fixpoints, there may not be a least fixpoint. for
+example, in the case above where there are infinite fixpoints there is
+no least fixpoint (assuming we\'re operating over integers rather than
+natural numbers).
+
+fortunately the details of the DFA framework (to be discussed later)
+will guarantee that a least fixpoint always exists and is computable. so
+how do we compute it?
+
+the traditional algorithm is a worklist algorithm. we initialize IN~k~
+and OUT~k~ for every basic block to an initial value, then initialize a
+worklist to contain all of the basic blocks. then:
+
+while the worklist is not empty: remove a basic block from the worklist,
+call it k compute a new IN~k~ and OUT~k~ if OUT~k~ changed: put any
+basic block m s.t. IN~m~ directly depends on OUT~k~ into the worklist
+
+the details of the DFA framework (again, to be discussed later)
+guarantee that this algorithm will eventually terminate and that IN~k~
+and OUT~k~ will be the least fixpoint solution for every basic block.
+
+1.  signedness DFA example
+
+    a signedness DFA analysis (we could make this more precise in
+    various ways, e.g., being able to distinguish non-negative and
+    non-positive, but we\'ll keep it very simple for the purposes of
+    this example):
+
+    Sign = { +, 0, -, Uninit, Any } L = Var -\> Sign
+
+    ⊓ = (x ∈ Sign) . Any ⊓ x = x ⊓ Any = Any (x ∈ Sign) . Uninit ⊓ x = x
+    ⊓ Uninit = x (x ∈ {~~, 0, -}) . x ⊓ y where x != y = Any (x ∈ {~~,
+    0, -}) . x ⊓ x = x
+
+    abstract transfer functions:
+
+    var1 \<- constant : update var1 to the signedness of the constant
+    (i.e., +, 0, or -) var1 \<- var2 : update var1 to the signedness of
+    var2 var1 \<- var2 + var3 : update var1 to var2 \#ADD var3, where
+    \#ADD is defined below var1 \<- var2 - var3 : update var1 to var2
+    \#SUB var3, where \#SUB is defined below var1 \<- var2 \< var3 :
+    update var1 to var2 \#LT var3, where \#LT is defined below var1 \<-
+    CALL function : update var1 to Any
+
+    \#ADD \| + \| 0 \| - \| Uninit \| Any
+    -------~~--------~~--------~~--------~~--------+----
+
+    -   \| + \| + \| Any \| Uninit \| Any
+
+    0 \| + \| 0 \| - \| Uninit \| Any
+
+    -   \| Any \| - \| - \| Uninit \| Any
+
+    Uninit \| Uninit \| Uninit \| Uninit \| Uninit \| Uninit Any \| Any
+    \| Any \| Any \| Uninit \| Any
+
+    \#SUB \| + \| 0 \| - \| Uninit \| Any
+    -------~~--------~~--------~~--------~~--------+----
+
+    -   \| Any \| + \| + \| Uninit \| Any
+
+    0 \| - \| 0 \| + \| Uninit \| Any
+
+    -   \| - \| - \| Any \| Uninit \| Any
+
+    Uninit \| Uninit \| Uninit \| Uninit \| Uninit \| Uninit Any \| Any
+    \| Any \| Any \| Uninit \| Any
+
+    \#LT \| + \| 0 \| - \| Uninit \| Any
+    -------~~--------~~--------~~--------~~--------+----
+
+    -   \| Any \| 0 \| 0 \| Uninit \| Any
+
+    0 \| + \| 0 \| 0 \| Uninit \| Any
+
+    -   \| + \| + \| Any \| Uninit \| Any
+
+    Uninit \| Uninit \| Uninit \| Uninit \| Uninit \| Uninit Any \| Any
+    \| Any \| Any \| Uninit \| Any
+
+    SOURCE CODE:
+
+    def foo(int a) : int { int x; int y;
+
+    x := 1; y := -1;
+
+    if (y \< a) { while (a \< x) { x := x - 1; y := y - 1; } } else { x
+    := x + 1; y := -1; }
+
+    return y; }
+
+    IR:
+
+    def foo(int a) { \[B0\] x \<- 1 y \<- -1 ~tmp0~ \<- y \< a jump~if0~
+    ~tmp0~ IF~FALSE0~
+
+    \[B1\] WHILE~START1~: ~tmp1~ \<- a \< x jump~if0~ ~tmp1~ WHILE~END1~
+
+    \[B2\] x \<- x - 1 y \<- y - 1 jump WHILE~START1~
+
+    \[B3\] WHILE~END1~: jump IF~END0~
+
+    \[B4\] IF~FALSE0~: x \<- x + 1 y \<- -1
+
+    \[B5\] IF~END0~: return y }
+
+    ANALYSIS:
+
+    \[show CFG\]
+
+    initialization:
+
+    IN~0~: \[a = Any, x = 0, y = 0, ~tmp0~ = Uninit, ~tmp1~ = Uninit\]
+    OUT~0~: \[a = Uninit, x = Uninit, y = Uninit, ~tmp0~ = Uninit,
+    ~tmp1~ = Uninit\]
+
+    IN~1~: \[a = Uninit, x = Uninit, y = Uninit, ~tmp0~ = Uninit, ~tmp1~
+    = Uninit\] OUT~1~: \[a = Uninit, x = Uninit, y = Uninit, ~tmp0~ =
+    Uninit, ~tmp1~ = Uninit\]
+
+    IN~2~: \[a = Uninit, x = Uninit, y = Uninit, ~tmp0~ = Uninit, ~tmp1~
+    = Uninit\] OUT~2~: \[a = Uninit, x = Uninit, y = Uninit, ~tmp0~ =
+    Uninit, ~tmp1~ = Uninit\]
+
+    IN~3~: \[a = Uninit, x = Uninit, y = Uninit, ~tmp0~ = Uninit, ~tmp1~
+    = Uninit\] OUT~3~: \[a = Uninit, x = Uninit, y = Uninit, ~tmp0~ =
+    Uninit, ~tmp1~ = Uninit\]
+
+    IN~4~: \[a = Uninit, x = Uninit, y = Uninit, ~tmp0~ = Uninit, ~tmp1~
+    = Uninit\] OUT~4~: \[a = Uninit, x = Uninit, y = Uninit, ~tmp0~ =
+    Uninit, ~tmp1~ = Uninit\]
+
+    IN~5~: \[a = Uninit, x = Uninit, y = Uninit, ~tmp0~ = Uninit, ~tmp1~
+    = Uninit\] OUT~5~: \[a = Uninit, x = Uninit, y = Uninit, ~tmp0~ =
+    Uninit, ~tmp1~ = Uninit\]
+
+    \[worklist order: 0, 4, 5, 1, 3, 2, 1, 2, 3, 5\]
+
+    \[!! in lecture i think i just initialized the worklist with the
+    first basic block. this works for this analysis and language, but in
+    general you need to initialize the worklist with all basic blocks.\]
+
+    final answer:
+
+    IN~0~: \[a = Any, x = 0, y = 0, ~tmp0~ = Uninit, ~tmp1~ = Uninit\]
+    OUT~0~: \[a = Any, x = +, y = -, ~tmp0~ = Any, ~tmp1~ = Uninit\]
+
+    IN~1~: \[a = Any, x = Any, y = -, ~tmp0~ = Any, ~tmp1~ = Any\]
+    OUT~1~: \[a = Any, x = Any, y = -, ~tmp0~ = Any, ~tmp1~ = Any\]
+
+    IN~2~: \[a = Any, x = Any, y = -, ~tmp0~ = Any, ~tmp1~ = Any\]
+    OUT~2~: \[a = Any, x = Any, y = -, ~tmp0~ = Any, ~tmp1~ = Any\]
+
+    IN~3~: \[a = Any, x = Any, y = -, ~tmp0~ = Any, ~tmp1~ = Any\]
+    OUT~3~: \[a = Any, x = Any, y = -, ~tmp0~ = Any, ~tmp1~ = Any\]
+
+    IN~4~: \[a = Any, x = +, y = -, ~tmp0~ = Any, ~tmp1~ = Uninit\]
+    OUT~4~: \[a = Any, x = +, y = -, ~tmp0~ = Any, ~tmp1~ = Uninit\]
+
+    IN~5~: \[a = Any, x = Any, y = -, ~tmp0~ = Any, ~tmp1~ = Any\]
+    OUT~5~: \[a = Any, x = Any, y = -, ~tmp0~ = Any, ~tmp1~ = Any\]
+
+2.  exercise
+
+    perform signedness DFA on the following program:
+
+    def foo(int a) : int { int x; int y;
+
+    x := 1; y := -1;
+
+    while (x \< a) { if (y \< a) { x := x + 1; y := y - 1; } else { x :=
+    1; y := -1; } }
+
+    return y; }
+
+    IR:
+
+    def foo(int a) { \[B0\] x \<- 1 y \<- -1
+
+    \[B1\] WHILE~START0~: ~tmp0~ \<- x \< a jump~if0~ ~tmp0~ WHILE~END0~
+
+    \[B2\] ~tmp1~ \<- y \< a jump~if0~ ~tmp1~ IF~FALSE1~
+
+    \[B3\] x \<- x + 1 y \<- y - 1 jump IF~END1~
+
+    \[B4\] IF~FALSE1~ x \<- 1 y \<- -1
+
+    \[B5\] IF~END1~: jump WHILE~START0~
+
+    \[B6\] WHILE~END0~: return y }
+
+    ANALYSIS:
+
+    \[show CFG\]
+
+    IN~0~: \[a = Any, x = 0, y = 0, ~tmp0~ = Uninit, ~tmp1~ = Uninit\]
+    OUT~0~: \[a = Any, x = +, y = -, ~tmp0~ = Uninit, ~tmp1~ = Uninit\]
+
+    IN~1~: \[a = Any, x = +, y = -, ~tmp0~ = Any, ~tmp1~ = Any\] OUT~1~:
+    \[a = Any, x = +, y = -, ~tmp0~ = Any, ~tmp1~ = Any\]
+
+    IN~2~: \[a = Any, x = +, y = -, ~tmp0~ = Any, ~tmp1~ = Any\] OUT~2~:
+    \[a = Any, x = +, y = -, ~tmp0~ = Any, ~tmp1~ = Any\]
+
+    IN~3~: \[a = Any, x = +, y = -, ~tmp0~ = Any, ~tmp1~ = Any\] OUT~3~:
+    \[a = Any, x = +, y = -, ~tmp0~ = Any, ~tmp1~ = Any\]
+
+    IN~4~: \[a = Any, x = +, y = -, ~tmp0~ = Any, ~tmp1~ = Any\] OUT~4~:
+    \[a = Any, x = +, y = -, ~tmp0~ = Any, ~tmp1~ = Any\]
+
+    IN~5~: \[a = Any, x = +, y = -, ~tmp0~ = Any, ~tmp1~ = Any\] OUT~5~:
+    \[a = Any, x = +, y = -, ~tmp0~ = Any, ~tmp1~ = Any\]
+
+    IN~6~: \[a = Any, x = +, y = -, ~tmp0~ = Any, ~tmp1~ = Any\] OUT~6~:
+    \[a = Any, x = +, y = -, ~tmp0~ = Any, ~tmp1~ = Any\]
+
+### example analyses and optimizations
+
+1.  available expressions -\> gcse
+
+    a common compiler optimization is [common subexpression
+    elimination]{.underline}, i.e., trying to avoid recomputing
+    expressions multiple times.
+
+    EXAMPLE
+
+    def foo(int a) { int x; int y; int z;
+
+    x := 4 \* a;
+
+    if (0 \< a) { a := a + 1; y := 4 \* a; }
+
+    z := 4 \* a; return z; }
+
+    note that the expression \"4 \* a\" has been computed before we get
+    to the assignment of \'z\' no matter whether we enter the true
+    branch of the conditional or not. also note that it has a different
+    value depending on whether we entered the true branch or not.
+
+    optimized program:
+
+    def foo(int a) { int x; int y; int z; int ~tmp0~;
+
+    x := 4 \* a; ~tmp0~ := x;
+
+    if (0 \< a) { a := a + 1; y := 4 \* a; ~tmp0~ := y; }
+
+    z := ~tmp0~; return z; }
+
+    we have replaced the expression computation with a set of copies. we
+    can break this process into two components: -- DFA: available
+    expressions analysis -- optimization: GCSE
+
+    1.  available expressions
+
+        DEFINITION: an expression exp is [available]{.underline} at some
+        program point pp if: -- exp is computed along every path from
+        the entry of the function to pp -- the variables used in exp are
+        not redefined after the last evaluation of exp along any path
+
+        in order to define a DFA to compute available expressions, we
+        need to define: -- L, the dataflow facts we\'re computing -- ⊓,
+        the meet operator for L -- the abstract transfer functions for L
+
+        the facts we\'re computing are which expressions are available,
+        so the elements of L will be sets of expressions. we interpret
+        an element of L as \"these are the expressions that are
+        currently available\".
+
+        the meet operator tells us how to conservatively approximate two
+        elements of L using a single element of L. given two sets of
+        expressions E1 and E2, we know that along one path the E1
+        expressions are available and along another path the E2
+        expressions are available. the only safe approximation of those
+        two sets is E1 `\intersect`{=latex} E2, i.e., those expressions
+        that are available along both paths.
+
+        what is the weakest thing we can say about what expressions are
+        available? i.e., the safest thing that is guaranteed not to give
+        incorrect information? the empty set: there are no available
+        expressions.
+
+        what is the strongest thing we can say about what expressions
+        are available? the set of all expressions contained in the
+        function.
+
+        we can define a single abstract transfer function and specialize
+        it per basic block:
+
+        OUT~k~ = GEN~k~ `\union`{=latex} (IN~k~ - KILL~k~)
+
+        GEN~k~ is defined as the set of expressions that are computed in
+        basic block k (whose variables are not defined afterwards in
+        that basic block).
+
+        KILL~k~ is defined as the set of expressions for which at least
+        one variable is defined in basic block k.
+
+        let\'s look at an example:
+
+        \[B0\] a \<- b + c b \<- a + c d \<- b + d
+
+        GEN~0~ = { a+c } KILL~0~ = any expression that uses \'a\',
+        \'b\', or \'d\'
+
+        note that B0 does [not]{.underline} generate b+c or b+d because
+        it defines b and d after those expressions are evaluated.
+
+        so the formula OUT~k~ = GEN~k~ `\union`{=latex} (IN~k~ -
+        KILL~k~) says: -- take all the expressions that are available
+        coming into this block (i.e., IN~k~) -- remove those expressions
+        that are killed by this block (i.e., subtract KILL~k~) -- add
+        back those expressions that are generated by this block (i.e.,
+        union GEN~k~)
+
+        \[note that the order is important: if we union GEN~k~ and then
+        subtract KILL~k~ we may lose precision. see the \'a+c\' example
+        above.\]
+
+        QUICK EXERCISE
+
+        a \<- b + c x \<- y - z b \<- x + y x \<- a \* b
+
+        what are the GEN and KILL sets?
+
+        SOLUTION
+
+        GEN = {y-z, a\*b} KILL = {b+c, x+y} plus any expressions that
+        contain a, x, b, x
+
+        now we have a complete available expressions DFA and we can use
+        the DFA framework:
+
+        1.  define the set of all expressions computed in the function;
+            call this set E.
+
+        2.  for each basic block k, define GEN~k~ and KILL~k~ by looking
+            at the instructions in the basic block.
+
+        3.  initialize IN~0~ to {}, i.e., there are no available
+            expressions at the beginning of the function.
+
+        4.  optimistically initialize all other IN and OUT sets to E
+            (this is safe, because the analysis will remove expressions
+            as necessary).
+
+        5.  put all basic blocks onto the worklist.
+
+        6.  apply the worklist algorithm until it is empty.
+
+        ```{=html}
+        <!-- -->
+        ```
+        1.  example
+
+            SOURCE CODE
+
+            def foo(int a, int b) : int { // returns a^b^ int x; int y;
+            int z;
+
+            x := 1; y := a;
+
+            while (x != b) { z := x \* 2; if (z \<= b) { y := y \* y; x
+            := x \* 2; } else { y := y \* a; x := x + 1; } }
+
+            return y; }
+
+            IR:
+
+            def foo(int a, int b) { \[B0\] x \<- 1 y \<- a
+
+            \[B1\] WHILE~START0~: ~tmp0~ \<- x != b jump~if0~ ~tmp0~
+            WHILE~END0~
+
+            \[B2\] z \<- x \* 2 ~tmp1~ \<- z \<= b jump~if0~ ~tmp1~
+            IF~FALSE1~
+
+            \[B3\] y \<- y \* y x \<- x \* 2 jump IF~END1~
+
+            \[B4\] IF~FALSE1~: y \<- y \* a x \<- x + 1
+
+            \[B5\] IF~END1~: jump WHILE~START0~
+
+            \[B6\] WHILE~END0~: return y }
+
+            \[show CFG\]
+
+            E = { x!=b, x\*2, z\<=b, y\*y, y\*a, x+1 }
+
+            GEN~0~ = {} KILL~0~ = { x!=b, x\*2, y\*y, y\*a, x+1 }
+
+            GEN~1~ = { x!=b } KILL~1~ = {}
+
+            GEN~2~ = { x\*2, z\<=b } KILL~2~ = { z\<=b }
+
+            GEN~3~ = {} KILL~3~ = { x!=b, x\*2, y\*y, y\*a, x+1 }
+
+            GEN~4~ = {} KILL~4~ = { x!=b, x\*2, y\*y, y\*a, x+1 }
+
+            GEN~5~ = {} KILL~5~ = {}
+
+            GEN~6~ = {} KILL~6~ = {}
+
+            now we can initialize the IN and OUT sets for each basic
+            block, insert all basic blocks into the worklist, and apply
+            the worklist algorithm. the final solution is:
+
+            IN~0~ = {} OUT~0~ = {}
+
+            IN~1~ = {} OUT~1~ = { x!=b }
+
+            IN~2~ = { x!=b } OUT~2~ = { x!=b, x\*2, z\<=b }
+
+            IN~3~ = { x!=b, x\*2, z\<=b } OUT~3~ = { z\<=b }
+
+            IN~4~ = { x!=b, x\*2, z\<=b } OUT~4~ = { z\<=b }
+
+            IN~5~ = { z\<=b } OUT~5~ = { z\<=b }
+
+            IN~6~ = { x!=b } OUT~6~ = { x!=b }
+
+        2.  exercise
+
+            perform the available expressions analysis on the following
+            program:
+
+            def foo(int a, int b) : int { int x; int y;
+
+            x := a + b; y := a \* b;
+
+            while (a + b \< y) { a := a + 1; x := a + b; }
+
+            return x; }
+
+            SOLUTION
+
+            IR:
+
+            def foo(int a, int b) { \[B0\] x \<- a + b y \<- a \* b
+
+            \[B1\] WHILE~START0~: ~tmp0~ \<- a + b ~tmp1~ \<- ~tmp0~ \<
+            y jump~if0~ ~tmp1~ WHILE~END0~
+
+            \[B2\] a \<- a + 1 x \<- a + b jump WHILE~START0~
+
+            \[B3\] WHILE~END0~: return x }
+
+            \[show CFG\]
+
+            E = { a+b, a\*b, ~tmp0~\<y, a+1 }
+
+            GEN~0~ = { a+b, a\*b } KILL~0~ = { ~tmp0~\<y }
+
+            GEN~1~ = { a+b, ~tmp0~\<y } KILL~1~ = { ~tmp0~\<y }
+
+            GEN~2~ = { a+b } KILL~2~ = { a+b, a\*b, a+1 }
+
+            GEN~3~ = {} KILL~3~ = {}
+
+            ---
+
+            IN~0~ = {} OUT~0~ = { a+b, a\*b }
+
+            IN~1~ = { a+b } OUT~1~ = { a+b, ~tmp0~\<y }
+
+            IN~2~ = { a+b, ~tmp0~\<y } OUT~2~ = { a+b, ~tmp0~\<y }
+
+            IN~3~ = { a+b, ~tmp0~\<y } OUT~3~ = { a+b, ~tmp0~\<y }
+
+    2.  GCSE
+
+        once we have the available expressions info, how do we use it to
+        eliminate common subexpressions? there are a variety of schemes
+        with various tradeoffs. we\'ll look at a simple scheme that
+        works, but requires other optimization passes to clean up after
+        it.
+
+        1.  for each expression in E, create a unique variable name
+            (~opt0~, ~opt1~, etc).
+
+        2.  for each definition \"var1 \<- op1 OP op2\", look up the
+            unique name for expression \"op1 OP op2\" (say ~optX~) and
+            insert an assignment immediately afterwards \"~optX~ \<-
+            var1\".
+
+        3.  for each use of expression \"op1 OP op2\", see if it is
+            available at that point (i.e., it is available at the
+            beginning of the basic block and is not killed before the
+            use). if so, replace it with ~optX~.
+
+        we end up with a bunch of extraneous copies, but they can be
+        cleaned up by another pass like copy propagation and dead code
+        elimination.
+
+        1.  example
+
+            def foo(int a, int b) { \[B0\] x \<- 1 y \<- a
+
+            \[B1\] WHILE~START0~: ~tmp0~ \<- x != b jump~if0~ ~tmp0~
+            WHILE~END0~
+
+            \[B2\] z \<- x \* 2 ~tmp1~ \<- z \<= b jump~if0~ ~tmp1~
+            IF~FALSE1~
+
+            \[B3\] y \<- y \* y x \<- x \* 2 jump IF~END1~
+
+            \[B4\] IF~FALSE1~: y \<- y \* a x \<- x + 1
+
+            \[B5\] IF~END1~: jump WHILE~START0~
+
+            \[B6\] WHILE~END0~: return y }
+
+            E = { x!=b, x\*2, z\<=b, y\*y, y\*a, x+1 }
+
+            IN~0~ = {} OUT~0~ = {}
+
+            IN~1~ = {} OUT~1~ = { x!=b }
+
+            IN~2~ = { x!=b } OUT~2~ = { x!=b, x\*2, z\<=b }
+
+            IN~3~ = { x!=b, x\*2, z\<=b } OUT~3~ = { z\<=b }
+
+            IN~4~ = { x!=b, x\*2, z\<=b } OUT~4~ = { z\<=b }
+
+            IN~5~ = { z\<=b } OUT~5~ = { z\<=b }
+
+            IN~6~ = { x!=b } OUT~6~ = { x!=b }
+
+            STEP 1
+
+            ~opt0~ = x != b ~opt1~ = x \* 2 ~opt2~ = z \<= b ~opt3~ =
+            y \* y ~opt4~ = y \* a ~opt5~ = x + 1
+
+            STEP 2
+
+            def foo(int a, int b) { \[B0\] x \<- 1 y \<- a
+
+            \[B1\] WHILE~START0~: ~tmp0~ \<- x != b ~opt0~ \<- ~tmp0~
+            jump~if0~ ~tmp0~ WHILE~END0~
+
+            \[B2\] z \<- x \* 2 ~opt1~ \<- z ~tmp1~ \<- z \<= b ~opt2~
+            \<- ~tmp1~ jump~if0~ ~tmp1~ IF~FALSE1~
+
+            \[B3\] y \<- y \* y ~opt3~ \<- y x \<- x \* 2 ~opt1~ \<- x
+            jump IF~END1~
+
+            \[B4\] IF~FALSE1~: y \<- y \* a ~opt4~ \<- y x \<- x + 1
+            ~opt5~ \<- x
+
+            \[B5\] IF~END1~: jump WHILE~START0~
+
+            \[B6\] WHILE~END0~: return y }
+
+            STEP 3
+
+            def foo(int a, int b) { \[B0\] x \<- 1 y \<- a
+
+            \[B1\] WHILE~START0~: ~tmp0~ \<- x != b ~opt0~ \<- ~tmp0~
+            jump~if0~ ~tmp0~ WHILE~END0~
+
+            \[B2\] z \<- x \* 2 ~opt1~ \<- z ~tmp1~ \<- z \<= b ~opt2~
+            \<- ~tmp1~ jump~if0~ ~tmp1~ IF~FALSE1~
+
+            \[B3\] y \<- y \* y ~opt3~ \<- y x \<- ~opt1~ ~opt1~ \<- x
+            jump IF~END1~
+
+            \[B4\] IF~FALSE1~: y \<- y \* a ~opt4~ \<- y x \<- x + 1
+            ~opt5~ \<- x
+
+            \[B5\] IF~END1~: jump WHILE~START0~
+
+            \[B6\] WHILE~END0~: return y }
+
+        2.  exercise
+
+            def foo(int a, int b) { \[B0\] x \<- a + b y \<- a \* b
+
+            \[B1\] WHILE~START0~: ~tmp0~ \<- a + b ~tmp1~ \<- ~tmp0~ \<
+            y jump~if0~ ~tmp1~ WHILE~END0~
+
+            \[B2\] a \<- a + 1 x \<- a + b jump WHILE~START0~
+
+            \[B3\] WHILE~END0~: return x }
+
+            E = { a+b, a\*b, ~tmp0~\<y, a+1 }
+
+            IN~0~ = {} OUT~0~ = { a+b, a\*b }
+
+            IN~1~ = { a+b } OUT~1~ = { a+b, ~tmp0~\<y }
+
+            IN~2~ = { a+b, ~tmp0~\<y } OUT~2~ = { a+b, ~tmp0~\<y }
+
+            IN~3~ = { a+b, ~tmp0~\<y } OUT~3~ = { a+b, ~tmp0~\<y }
+
+            given the above information, optimize the given program.
+
+            SOLUTION
+
+            STEP 1
+
+            ~opt0~ = a + b ~opt1~ = a \* b ~opt2~ = ~tmp0~ \< y ~opt3~ =
+            a + 1
+
+            STEP 2
+
+            def foo(int a, int b) { \[B0\] x \<- a + b ~opt0~ \<- x y
+            \<- a \* b ~opt1~ \<- y
+
+            \[B1\] WHILE~START0~: ~tmp0~ \<- a + b ~opt0~ \<- ~tmp0~
+            ~tmp1~ \<- ~tmp0~ \< y ~opt2~ \<- ~tmp1~ jump~if0~ ~tmp1~
+            WHILE~END0~
+
+            \[B2\] a \<- a + 1 ~opt3~ \<- a x \<- a + b ~opt0~ \<- x
+            jump WHILE~START0~
+
+            \[B3\] WHILE~END0~: return x }
+
+            STEP 2
+
+            def foo(int a, int b) { \[B0\] x \<- a + b ~opt0~ \<- x y
+            \<- a \* b ~opt1~ \<- y
+
+            \[B1\] WHILE~START0~: ~tmp0~ \<- ~opt0~ ~opt0~ \<- ~tmp0~
+            ~tmp1~ \<- ~tmp0~ \< y ~opt2~ \<- ~tmp1~ jump~if0~ ~tmp1~
+            WHILE~END0~
+
+            \[B2\] a \<- a + 1 ~opt3~ \<- a x \<- a + b ~opt0~ \<- x
+            jump WHILE~START0~
+
+            \[B3\] WHILE~END0~: return x }
+
+2.  reaching definitions -\> copy propagation
+
+    \[omitted for time\]
+
+3.  liveness / neededness -\> dead code elimination
+
+    \[omitted for time\]
+
+4.  global constant propagation and folding
+
+    another common compiler optimization is constant propagation (we
+    often just say constant propagation when we actually are including
+    constant folding).
+
+    def foo(int a) : int { int x; int y; int z;
+
+    y := 3; // a = Any, x = 0, y = 3, z = 0
+
+    if (a \< 0) { x := 2; // a = Any, x = 2, y = 3, z = 0 z := y + x; //
+    a = Any, x = 2, y = 3, z = 5 } else { x := 4; // a = Any, x = 4, y =
+    3, z = 0 z := y + x; // a = Any, x = 4, y = 3, z = 7 }
+
+    return z; // a = Any, x = ?, y = 3, z = ? }
+
+    becomes:
+
+    def foo(int a) : int { int z;
+
+    if (a \< 0) { z := 5; } else { z := 7; }
+
+    return z; }
+
+    you might think that this doesn\'t come up in real programs, but in
+    fact as code is lowered from AST to IR to assembly and as other
+    optimizations are applied, constants become increasingly common.
+
+    as before we can divide this process into an analysis and an
+    optimization, but here the optimization itself is trivial (just
+    replace variables with their constant values and evaluate the
+    operations involving constant operands). so the only interesting
+    part is the analysis itself.
+
+    as before, we need to define L (the set of possible solutions), ⊓
+    (the approximation operator), and the abstract transfer functions.
+    the thing that makes this analysis different from the ones we\'ve
+    seen before is that L contains an infinite number of possible
+    solutions, because there are an infinite number of integers.
+
+    -- you might think that since we\'re using 32-bit integers that
+    there are only a finite number (albeit a large number). this is
+    correct for L1 specifically, but let\'s look at the bigger picture:
+
+    -- for C/C++, the bitwidth of an integer is unspecified. that means
+    that the exact same program compiled on different machines can
+    behave differently: one on an int may be 16 bits, on another 32
+    bits, on another 64 bits, etc. if we\'re doing target-agnostic
+    optimization then we can\'t assume a given size of int, so we have
+    to treat them as if they are arbitrarily big.
+
+    -- for other languages, the int type is arbitrary-precision, that
+    is, they don\'t have a set bitwidth. a single integer can be as big
+    as the machine\'s memory can hold.
+
+    -- therefore, for this optimization we assume that there are an
+    infinite number of possible integers and thus an infinite number of
+    possible analysis solutions.
+
+    the fact that L is infinite is dangerous in terms of a decidable
+    analysis. if we aren\'t careful, we could easily get an analysis
+    that never terminates. consider:
+
+    def foo(int a) : int { int x; while (x \< a) { x := x + 1; } // x =
+    0, 1, 2, 3, ... return x; }
+
+    fortunately, the dataflow analysis framework gives us the tools we
+    need to make certain this never happens (to be discussed shortly).
+
+    Const = { ..., -1, 0, 1, ... } ∪ { Uninit, Any } L = Var -\> Const
+
+      ⊓        Uninit   c1    c2    Any
+      -------- -------- ----- ----- -----
+      Uninit   Uninit   c1    c2    Any
+      c1       c1       c1    Any   Any
+      c2       c2       Any   c2    Any
+      Any      Any      Any   Any   Any
+
+    (c ∈ Const) . c ⊓ Uninit = Uninit ⊓ c = c (c ∈ Const) . c ⊓ Any =
+    Any ⊓ c = Any (n ∈ Integer) . n ⊓ n = n (n1, n2 ∈ Integer) . n1 ⊓ n2
+    = Any (if n1 != n2)
+
+    notice that the meet operator is really over-approximating: the best
+    approximation of 2 different integers is Any, i.e., we jump from
+    \"it could be n1 or n2\" to \"it could be any integer at all\". you
+    might think that we could do better, e.g.:
+
+    n1 ⊓ n2 = \[n1..n2\] n1 ⊓ n2 = {n1, n2}
+
+    but the dataflow analysis framework disallows these definitions of ⊓
+    because they would lead to nonterminating analyses. there is a more
+    comprehensive analysis framework called [abstract
+    interpretation]{.underline} that would allow us to use these and
+    even more complicated and precise definitions of L and ⊓ (under
+    certain restrictions), but these are outside the scope of dataflow
+    analysis and usually not used inside compilers.
+
+    finally, the abstract transfer functions:
+
+      \#ADD    Uninit   n2        Any
+      -------- -------- --------- --------
+      Uninit   Uninit   Uninit    Uninit
+      n1       Uninit   n1 + n2   Any
+      Any      Uninit   Any       Any
+
+    \[similarly for the other operators\]
+
+    1.  example
+
+        def foo(int a) : int { int x; int y; int z;
+
+        // a = Any, x = 0, y = 0, z = 0
+
+        if (a \< 0) { x := 2; // a = Any, x = 2, y = 0, z = 0 y := 3; //
+        a = Any, x = 2, y = 3, z = 0 z := x + y; // a = Any, x = 2, y =
+        3, z = 5 } else { x := 3; // a = Any, x = 3, y = 0, z = 0 y :=
+        2; // a = Any, x = 3, y = 2, z = 0 z := x + y; // a = Any, x =
+        3, y = 2, z = 5 }
+
+        return z; // a = Any, x = Any, y = Any, z = 5 }
+
+### the DFA framework
+
+now that we\'ve seen some example, let\'s look a little into the DFA
+framework and why it works. the theory behind DFA uses a branch of
+discrete math called Order Theory. I teach a graduate-level course on
+Program Analysis that goes into this topic in detail, but we\'ll just
+skim the surface.
+
+there are two main questions:
+
+1.  how do we know that the analysis we\'ve defined is giving us a safe
+    answer?
+2.  how do we know that it is decidable, i.e., that it is guaranteed to
+    terminate?
+
+the first question is outside the scope of this class (see my graduate
+class for more). the second one we can at least get a conceptual idea of
+why it works. recall that we use a worklist algorithm to compute the
+DFA: we pull out a basic block, process it, and if its output changes we
+put its successors back onto the worklist. this algorithm proceeds until
+the worklist is empty. so how do we know that it will, eventually,
+become empty? the DFA framework gives us some requirements that, if they
+are satisfied, will guarantee termination:
+
+1.  L contains an element that over-approximates all other elements;
+    this is the safest (and least precise) analysis solution.
+
+-- for signedness and constant propagation, that element is Any -- for
+available expressions, that element is {}
+
+1.  the ⊓ operator is always defined for any two elements of L a and b,
+    and will give us the element of L that most closely approximates
+    both a and b.
+
+2.  from any given element of L, there are only a finite number of
+    elements that over-approximate it until we get to the \"maximal\",
+    safest element.
+
+-- this is where constant propagation [would]{.underline} break if we
+used elements of L like ranges or sets of numbers. since there are
+infinite integers, there are infinite ranges/sets that over-approximate
+any given solution.
+
+1.  the abstract transfer functions are monotone. a function is monotone
+    if, when x \<= y, f(x) \<= f(y). in other words, the function
+    preserves the order of the elements.
+
+    A. f(x) = x + 1 is monotone B. f(x) = -x is not monotone
+
+these, taken together, guarantee termination. why? recall that each time
+we process a basic block in the worklist algorithm, we (1) take the meet
+of the input solutions; then (2) apply the abstract transfer function;
+then (3) if the output solution changed, add the successor basic blocks
+to the worklist.
+
+the first three requirements mean that, for a given basic block, the
+meet of its input solutions can only get less precise (never more
+precise) and we can only take the meet of its input solutions a finite
+number of times before we get a stable input that never changes (the
+safest, least precise solution in the worst case, but something more
+precise than the safest solution if we\'re lucky).
+
+the last requirement means that, if we\'re getting an input that is less
+precise, then we cannot get an output solution that is more precise.
+that is, since the input solution can only get less precise, the output
+solution can only get less precise.
+
+but we know that there is a limit to how imprecise we can get (the
+\"maximal\" solution) and we\'ll reach it in a finite number of steps.
+therefore eventually we are guaranteed that at some point we will
+process a basic block and its output won\'t change. but that means that
+we won\'t put any successors on the worklist. this reasoning is true for
+all basic blocks, and therefore eventually we are guaranteed that no
+basic block will put any successors on the worklist. therefore the
+worklist will eventually become empty.
+
+the reasoning i\'ve given you here is rather vague and hand-wavy; the
+technical description and proof requires a lot more math that we won\'t
+get into. but hopefully this conveys the basic idea of why we want to
+define a DFA the way that we do.
+
+order of optimizations
+----------------------
+
+the last thing i want to mention is that the order of optimizations can
+make a big difference in how effective they are (and also how many times
+we apply them).
+
+we saw for GCSE that our optimization left a lot of copy assignments and
+dead variables, which we said could be cleaned up by other optimizations
+(like copy propagation and dead code elimination). it turns out that
+many optimizations modify the code in such a way that they enable other
+optimizations, and this can even be cyclic (A enables B which enables A
+again).
+
+so what\'s the best order? this isn\'t an easy question to answer, and
+heavily depends on the code being optimized. the optimization levels in
+a compiler such as gcc or clang (-O1, -O2, -O3, etc) are just convenient
+flags that specify a series of optimizations determined by the compiler
+developers to \"usually\" do a pretty good job. you (the compiler user)
+can actually specify the exact set of optimizations that you want to
+apply and what order you want to apply them in, and if you do it right
+you can often get even faster code than by using the default compiler
+flags. however, figuring out what optimizations to use in what order can
+take a lot of trial and error, and you\'ll never know whether you found
+the best possible ordering.
+
+SSA
+---
+
+\[omitted for time\]
+
+type systems
+============
+
+we have a fairly complete compiler at this point: lexer, parser,
+optimizer, codegen, and garbage collector. for language L1 we only
+skimmed an important piece of the front-end though: validating the AST
+after parsing. for L1 this is a simple process that only involves a few
+easy checks. when we move to language L2 things get more interesting.
+
+The most common method of validating the AST is by a process called
+[type checking]{.underline}. let\'s look at type systems and type
+checking in general, then apply those ideas to L2 to develop our own
+type system and type checker. you have all used languages with type
+systems and type checkers before (e.g., C++, Java), but do you know what
+a type actually is or what they are used for? now you will.
+
+\[handout3-typedLC.pdf section 1\]
+
+now that we understand what types are used for, how do we specify a type
+system for a language? it turns out that type systems are closely
+related to mathematical logic, and we can specify type systems in a
+similar way using a system called [natural deduction]{.underline}.
+
+simple type system
+------------------
+
+let\'s look at a simple example before we tackle the entire L2 language.
+
+\[simple-type-system.pdf\]
 
 ### example 1
 
-CODE
-```
-fn main() -> int {
-  let a:&&int, b:int, c:&int, d:&&int, e:&&int, f:&&int, g:&&int, h:&int, i:int
-  entry:
-    a = $alloc 1 [_alloc]
-    b = $copy 42
-    c = $addrof b
-    d = $gep a 42
-    $store d c
-    $branch b bb1 bb2
+\[type check the AST example given in simple-type-system.pdf\]
 
-  bb1:
-    e = $copy d
-    $jump bb3
+### example 2 {#example-2-1}
 
-  bb2:
-    f = $addrof c
-    $jump bb3
+def foo(bool a) : int { return if (a) {1} else {2}; } def bar(int a) :
+int { return a + 1; } if (foo(false) \<= bar(0)) { true } else { false }
 
-  bb3:
-    g = $copy e
-    g = $copy f
-    h = $load g
-    i = $load h
-    $ret i
-}
-```
+### exercise {#exercise-22}
 
-CONSTRAINTS (we'll use lower case for constants, upper case for set variables)
-```
-ref(alloc, ALLOC) ⊆ A
-ref(b, B) ⊆ C
-A ⊆ D
-C ⊆ ref⁻¹(D)
-D ⊆ E
-ref(c, C) ⊆ F
-E ⊆ G
-F ⊆ G
-ref⁻¹(G) ⊆ H
-```
+def foo(int a) : int { return a + (if (a \<= 0) { a+1 } else { 42 }); }
+if (((1 + 2) + -12) \<= foo(12)) { 3 \<= 4 } else { false }
 
-GRAPH
-```
-ref(alloc, ALLOC) --> A ==> D ==> E ====> G
-ref(c, C) ------------> F ==============//
-ref(b, B) --> C --> ref⁻¹(D)
-ref⁻¹(G) --> H
-```
+L2 type system
+--------------
 
-SOLUTION
-```
-A -> { ref(alloc, ALLOC) }
-C -> { ref(b, B) }
-D -> { ref(alloc, ALLOC) }
-E -> { ref(alloc, ALLOC) }
-F -> { ref(c, C) }
-G -> { ref(alloc, ALLOC), ref(c, C) }
-H -> { ref(b, B) }
-ALLOC -> { ref(b, B) }
-```
+now that we have a handle on the idea, let\'s look at L2.
 
-## adding structs [but no struct-typed variables]
-### intro
+\[L2-abstract-syntax.pdf\] \[L2-type-system.pdf\]
 
-- what if we have structs in the program? recall that the `$gfp` instruction is how we access the fields of a struct:
+### example {#example-12}
 
-    + `x = $gfp y <fieldname>`
-    + `y` is a pointer to the struct
-    + `<fieldname>` is the name of the field we want to access
-    + `x` is set to a pointer to the desired field
+\[L2-concrete-syntax.pdf section 2, the \'insert\' function\]
 
-- when a struct is allocated using `$alloc` it creates a heap object that has distinct fields and we need to decide how to represent that in the analysis
+### exercise {#exercise-23}
 
-- we have three choices: field-insensitive, field-based, field-sensitive; the most common choices are field-insensitive or field-sensitive, that's what we'll cover
-
-### field-insensitive
-
-- the simplest and easiest option: treat a struct object as if it doesn't have distinct fields, i.e., all fields are merged together into a single blob
-
-    + treat `$gfp` like a copy
-
-    + `x = $gfp y <field>` ==> `[y] ⊆ [x]`
-
-- example:
-
->  struct foo {
->    f1: &int
->    f2: &int
->  }
->
->  fn bar(i:int) -> &int {
->    let p:&int, a:&foo, b:&&int, c:&&int, d:&int
->    entry:
->      p = $addof i
->      a = $alloc 1 [_alloc]
->      b = $gfp a f1
->      c = $gfp a f2
->      $store b p
->      d = $load c
->      $ret d
->  }
-
-    + the pointer analysis will treat the `f1` and `f2` fields as the same thing, so `b` and `c` will have the same abstract value (i.e., the pointer analysis says that both pointers can point to both fields)
-
-    + the analysis result will say that `d` can point to `i` even though it really can't
-
-### field-sensitive
-
-- the most complex and most precise option: treat each struct field independently
-
-- we need to define a constructor for each struct type, whose name is the struct type, arity is the number of fields, and variance is all covariant
-
-- `$gfp` instructions that are accessing a field need to turn into projections of the correct field
-
-- this only works because we require the program to be strictly typed (and there's no inheritance); if we can have the same pointer point to structs with different numbers of fields things become more complicated
-
-## adding direct calls
-### constraint generation
-
-- our final version of the analysis will be _interprocedural_, that is, we'll track how information flows back and forth between functions; this means we need to add constraint generation for `$call_dir`
-
-    + we'll ignore `$call_idr` for now, but add it in next
-
-    + we'll also ignore `$call_ext`; there's no source code to analyze so we can't do anything---we'll assume that any relevant external calls have been transformed into stubs that are called using `$call_dir` instead
-
-- we'll use the notation `retval(func)` to mean the variable operand of the `$ret` instruction inside function `func`
-
-- `[x =] $call_dir <function>(args...) then bb`
-
-    + if `x` is pointer-typed: `[retval(<function>)] ⊆ [x]` (unless `<function>` returns the null pointer)
-
-    + `∀arg ∈ args`, if arg is pointer-typed: `[arg] ⊆ [prm]` s.t. `prm` is the corresponding parameter of `<function>` (unless `arg` is the null pointer)
-
-- these constraints account for pointer-related information being passed to the callee via the call arguments and back from the callee via the return instruction
-
-### example 2
-
-CODE
-```
-fn main() -> int {
-  let a:int, b:&int, c:int, d:&int, e:&&int, f:&int, g:int
-  entry:
-    a = $copy 42
-    b = $addrof a
-    c = $copy 12
-    d = $addrof c
-    e = $addrof d
-    f = $call foo(b, e) then exit
-
-  exit:
-    g = $load f
-    $ret g
-}
-
-fn foo(p1:&int, p2:&&int) -> &int {
-  let h:&int
-  entry:
-    h = $load p2
-    $store p2 p1
-    $ret h
-}
-```
-
-CONSTRAINTS
-```
-ref(a, A) ⊆ B
-ref(c, C) ⊆ D
-ref(d, D) ⊆ E
-B ⊆ P1
-E ⊆ P2
-H ⊆ F
-ref⁻¹(P2) ⊆ H
-P1 ⊆ ref⁻¹(P2)
-```
-
-GRAPH
-```
-ref(a,A) --> B ==> P1 --> ref⁻¹(P2) ==> H ==> F
-ref(c,C) --> D
-ref(d,D) --> E ==> P2
-```
-
-SOLUTION
-```
- A -> {}
- B -> { ref(a,A) }
- C -> {}
- D -> { ref(a,A), ref(c,C) }
- E -> { ref(d,D) }
- F -> { ref(a,A), ref(c,C) }
- H -> { ref(a,A), ref(c,C) }
-P1 -> { ref(a,A) }
-P2 -> { ref(d,D) }
-```
-
-## adding indirect calls
-### setup
-
-- unlike direct calls, we can't generate constraints that link a call with its callee and the callee return value with the lhs of the call because we don't know what the callee is; instead we need to generate constraints that can somehow figure out these links dynamically during constraint solving
-
-- we'll define a constructor `lamₓ` for each function type `X` (or really, just the ones that have a corresponding function pointer global)
-
-    + it will have arity 1 + |P| + |R| where |P| is the number of pointer-typed parameters and |R| is the number of pointer-typed return values (which will be 0 or 1)
-
-    + we'll call a lam constructor in two places:
-
-        - when creating a global function pointer: position 1 is the name, position 2 is the return variable (if the function returns a pointer), the remaining positions are parameters
-
-        - when generating a constraint for an indirect call: position 1 is a set variable, position 2 is the lhs of the call, the remaining positions are arguments
-
-    + the first argument position is covariant; if |R| = 1 then the second argument position is covariant; all other argument positions are contravariant (we'll see why momentarily)
-
-### example 3
-
-- we'll start with an example to see how this will work
-
-  CODE:
-  ```
-  foo: &(&int,int,&int)->&int
-
-  fn foo(p1:&int, p2:int, p3:&int) -> &int {
-    let r:&int
-    entry:
-      r = $copy p3
-      $ret r
-  }
-
-  fn main() -> int {
-    let a:&int, b:&int, c:&int, f:&(&int,int,&int)->&int
-    entry:
-      a = $alloc 1 [_alloc1]
-      b = $alloc 1 [_alloc2]
-      f = $copy foo
-      c = $call_idr f(a, 42, b) then exit
-
-    exit:
-      $ret 0
-  }
-  ```
-
-  CONSTRAINTS:
-  ```
-  define lam_{&(&int,int,&int)->&int}/4 where positions 0,1 are covariant and positions 2,3 are contravariant
-  - [for convenience, let's call this lamₓ]
-
-  lamₓ(foo, R, _P1_, _P3_) ⊆ FOO // using _X_ to mean contravariant
-  ref(alloc1, ALLOC1) ⊆ A
-  ref(alloc2, ALLOC2) ⊆ B
-  FOO ⊆ F
-  F ⊆ lamₓ(_DUMMY, C, _A_, _B_)
-  ```
-
-- notice that during solving, we eventually get `lamₓ(foo, R, _P1_, _P3_) ⊆ lamₓ(_DUMMY, C, _A_, _B_)`; then:
-
-    + `foo ⊆ _DUMMY`, i.e., `foo` is recorded in `_DUMMY` as the function being called (we use a dummy variable because this is redundant info)
-    + `R ⊆ C`, i.e., the return value of `foo` goes to the left-hand side of the indirect call
-    + `A ⊆ P1`, i.e., the first pointer argument to the indirect call goes to the first pointer parameter of `foo`
-    + `B ⊆ P3`, i.e., the second pointer argument to the indirect call goes to the second pointer parameter of `foo`
-
-- by making the return value position covariant and the parameter positions contravariant, we can have the call information passing in both directions at once to correctly model function call/return semantics
-
-### constraint generation
-
-- for each global function pointer `<func>:&X` (e.g., `foo: &(int,int)->&int`):
-
-    + let `N` = 1 + (number of pointer-typed parameters) + (number of pointer-typed return values); note that the latter will always be 0 or 1
-
-    + create a constructor `lamₓ/N` if it doesn't already exist
-    
-        - first position covariant; if there is a pointer-type return value then second position covariant; all other positions contravariant
-
-    + let `<func>` have pointer-typed parameters `param1`, `param2`, ... (i.e., ignore any non-pointer-typed parameters)
-
-    + if `<func>`'s return type is a pointer:
-
-        + if the operand of `$ret` is a variable, let `retval` be that variable
-        + otherwise if the operand of `$ret` is null (i.e., 0), let `retval` be `_nil`
-
-    + let `args` be:
-
-        - if `<func>` has a `retval` then `(const(<func>), [retval], [param1], [param2], ...)`
-        - otherwise `(const(<func>), [param1], [param2], ...)`
-
-    + generate constraint `lamₓ(args) ⊆ [<func>]`
-    
-        - this says that the global function pointer points to a function of the given type
-
-- for each indirect call instruction `[y =] $call_idr func_ptr(args...) then bb`:
-
-    + let the pointer-typed arguments be `arg1`, `arg2`, ...
-
-        - if any arguments are, according to the function pointer type, supposed to be pointers, but are instead `0` (representing the null pointer), then use a dummy variable `_nil` with set variable `[_nil]` instead; we'll use the same `[_nil]` set variable any time this happens
-
-        - we can't just ignore null pointers like before because we need to have an argument for each position in the `lamₓ` constructor call
-
-    + if the type of the function being called returns a pointer but there is no `y`, create a dummy `[y]` set variable called `_DUMMY` and act as if there is a pointer-typed `y`
-
-    + if `y` is pointer-typed let `args` = `(_DUMMY, [y], [arg1], [arg2], ...)`, otherwise let `args` = `(_DUMMY, [arg1], [arg2], ...)`
-
-        - we need a first argument to fill in all the constructor arguments, but we don't really need its value---we can get the same information just by looking at the points-to set of `func_ptr`
-
-    + generate constraint `[func_ptr] ⊆ lamₓ(args)`
-    
-        - this says that anything `func_ptr` points to should flow into the given constructor call
-
-- if we generate constraints this way, then eventually the `lamₓ` constructor calls containing the name, retval, and parameters of an address-taken function will flow into the `lamₓ` constructor call containing the DUMMY, lhs, and arguments of the indirect call
-
-    + since the first position is covariant, the name of the function being called will flow into `_DUMMY`
-    + since the retval position (if it exists) is covariant, `retval` will flow into `y`
-    + since the remaining positions are contravariant, the arguments will flow into the parameters
-
-# current summary and roadmap
-
-- covered basics of DFA: abstract domain + abstract semantics + abstract execution (MOP vs MFP; worklist algorithm)
-
-    + flow-sensitive
-    + intraprocedural
-    + no pointer info
-
-- saw several examples thereof:
-
-    + sign analysis
-    + constant propagation
-    + interval analysis
-    + reaching definitions
-    + control analysis
-
-- looked at the math behind DFA: neotherian lattices, monotone functions, fixpoint theorems
-
-    + make the abstract domain a noetherian lattice
-    + make the abstract semantics monotone
-    + then the worklist algorithm is guaranteed to terminate with the most precise answer
-
-- then covered basics of set constraint-based analysis:
-
-    + picking a constraint language (specifically, inclusion constraints)
-    + implementing a constraint solver
-    + analysis = constraint generation
-    + example: andersen-style pointer analysis (flow-insensitive, field-insensitive)
-
-- now what?
-
-    - going back to DFA, but using pointer analysis results to get better results
-
-        + revisit reaching defs, but using pointer info
-        + reaching defs + control analysis to do program slicing
-
-    - look at another application of reaching defs and control analysis: static single assignment form and sparse analysis
-
-    - extending DFA to interprocedural analysis
-
-        + taint analysis
-        + context sensitivity
-
-    - if time:
-
-        - a little abstract interpretation
-        - maybe more...
-
-# program slicing
-## intro
-
-- the point is to:
-
-    + show why pointer info is useful now that we have it
-    + introduce a different application for program analysis than optimization
-    + describe some generally useful things like the PDG
-
-- now that we have a way to compute pointer information for our analyses, let's use it on a practical application: program slicing
-
-    + problem statement: given a specific instruction I, return the set of instructions that influence the result of I (aka a _backwards slice_)
-
-    + could also ask for the set of instructions that I influences (aka a _forwards slice_)
-    
-    + the name is inspired by the idea that we're computing a "slice" of the program that only contains relevant instructions
-
-    + slicing is a well-known and heavily-used analysis and there are many variations; we're using one of the basic definitions here but there are many more possible versions
-
-    + slicing is usually used for things like program understanding and debugging, so we're now exploring a different use-case for program analysis
-
-- example:
-
-  ```
-  fn main() -> int {
-    let i:int, j:int, x:int = input(), y:int = 0, z:int = 1;
-
-    i = 0;
-    j = 1;
-
-    while i < x {
-        y = y + 2;
-        z = z * j;
-        i = i + 1;
-        j = j + 2;
-    }
-
-    return y;
-  }
-  ```
-
-  SLICE WRT RETURN STATEMENT:
-  ```
-  main() {
-    let i:int, x:int = input(), y:int = 0;
-
-    i = 0;
-
-    while i < x {
-        y = y + 2;
-        i = i + 1;
-    }
-
-    return y;
-  }
-  ```
-
-- slicing is built on top of several analyses that we've already studied:
-
-    + ((pointer analysis -> reaching defs with pointer info) + control analysis) -> PDG -> slicing
-
-    + remember that i said reaching definitions was more for follow-on analyses than for human consumption; this is the kind of thing i meant
-
-    + notice that if we treat pointers conservatively like in assignment 1 then slicing is pretty useless; the "slice" it computes will contain many irrelevant instructions and overwhelm the user with useless info
-
-    + also note that the PDG is a very useful data structure in its own right and can be used for things besides slicing; i'll talk more about that later
-
-- to keep things simpler and more focused we'll stay with intraprocedural analysis for this problem; we'll move to interprocedural analysis after we're done with slicing
-
-## reaching defs with pointer info
-### intro
-
-- we'll revisit our old friend reaching defs, but now with pointer information
-
-    + we'll keep it intraprocedural, but we'll use pointer information to improve precision for loads, stores, and calls
-
-- we'll assume that we have the solution of a flow-insensitive, field-insensitive pointer analysis available (i.e., it maps each program variable and heap object to its points-to set, which itself contains program variables and heap objects)
-
-- we'll also pre-process the program we're analyzing to compute "mod/ref" information: for each function, what set of inputs to the function can be defined by a `$store` ("mod") or used by a `$load` ("ref") either directly by that function or by some function that it transitively calls
-
-    + this mod/ref info will allow us to be less conservative when processing calls during our intraprocedural analysis
-
-### mod/ref info
-
-- note: we'll assume that any relevant externs have been stubbed as internal functions, so we can ignore `$call_ext` instructions
-
-- step 1: compute the call graph of the program
-
-    + a node for each function
-
-    + an edge from function `A` to function `B` if `A` contains a call to `B` via `$call_{dir, idr}`
-    
-        - use the points-to solution to resolve targets of `$call_idr`
-
-    + this is an very common and useful data structure that a lot of program analysis tools use
-
-- step 2: compute the transitive closure of the call graph
-
-    + augment the call graph so that there is an edge from `A` to `B` if `A` can directly or transitively reach `B` in the call graph
-
-    + you can use a worklist algorithm where the worklist contains all functions that have new incoming edges since they were last processed (initialized with all functions)
-
-- step 3: compute initial mod/ref info
-
-    + for each function `<func>`, compute (1) the set of globals and pointed-to objects that can be defined in `<func>` (`Mods(<func>)`) and (2) the set of globals and pointed-to objects that can be used in `<func>` (`Refs(<func>)`)
-
-- step 4: propagate the mod/ref info using the transitively closed call graph
-
-    + for `<func2>` s.t. `<func> --> <func2>` in the closed graph: `Refs(<func>) = Refs(<func>) ∪ Refs(<func2>)`; `Mods(<func>) = Mods(<func>) ∪ Mods(<func2>)`
-
-- what does this tell us? given a function `<func>`, `Refs(<func>)` is the set of objects that can be used in `<func>` or any function that `<func>` may call, and `Mods(<func>)` is the set of objects that can be defined in `<func>` or any function that `<func>` may call
-
-    + this info will help us be more precise when processing calls during the reaching defs analysis
-
-### the improved analysis
-
-- no more need for "fake variables"; that's handled by the pointer analysis (i.e., the static allocation sites) and we'll just use its results
-
-- all the instructions stay the same except for `$load`, `$store`, and `$call_{dir, idr}`
-
-    + again, we assume relevant extern functions have been stubbed so we can ignore `$call_ext`
-
-- `x = $load y`:
-
-    + USE = `{ y } ∪ points-to[y]`
-    + rest is the same
-
-- `$store x <op>`:
-
-    + DEF = `points-to[x]`
-    + rest is the same
-
-- `[x =] $call_{dir, idr} id/<fp>(<arg_op>...)`:
-
-    + CALLEES = `{ id }` (if `$call_dir`) OR `points-to[fp]` (if `$call_idr`)
-    + REACHABLE = globals + all objects reachable from the arguments or globals per the points-to solution
-
-    + WDEF = `(⋃_{callee ∈ CALLEES} Mods(callee)) ∩ REACHABLE`
-    + USE = `{ <fp> } ∪ { <arg_op> | <arg_op> is a variable } ∪ ((⋃_{callee \in CALLEES} Refs(callee)) ∩ REACHABLE)`
-    + rest is the same
-
-## control dependence reminder
-
-- remember that block `X` is control dependent on block `Y` iff `Y` is in the post-dominance frontier of `X`
-
-- given a CFG:
-
-    + reverse the edges
-    + now the exit block is the entry block
-    + compute dominance frontiers (just like assignment 2)
-    + `X` c.d. on `Y` iff `Y` ∈ dom_frontier(`X`)
-
-## pdg
-
-- the PDG is a data structure that embodies the reaching defs (aka _data dependencies_) and control dependence information
-
-- a node for for each instruction
-
-- a _data dependence_ edge from `A` to `B` if the definition at `A` reaches a use at `B`
-
-    + we get this directly from the reaching defs analysis
-
-- a _control dependence_ edge from `A` to `B` if `B` is control dependent on `A`
-
-    + we expand the basic block control dependence info to individual instructions: if basic block `X` is control dependent on block `Y`, then all instructions in `X` have a control dependence edge from the terminator instruction in `Y`
-
-- it will be useful to have bi-directional edges so that we can go forwards or backwards in the PDG
-
-- example
-
-  SOURCE:
-  ```
-  fn main() -> int {
-    let i:int, j:int, x:int = input(), y:int = 0, z:int = 1;
-
-    i = 0;
-    j = 1;
-
-    while i < x {
-        y = y + 2;
-        z = z * j;
-        i = i + 1;
-        j = j + 2;
-    }
-
-    return y;
-  }
-  ```
-
-  LIR:
-  ```
-  fn main() -> int {
-  let i:int, j:int, x:int, y:int, z:int, tmp:int
-
-  entry:
-    x = $call_ext input()
-    y = $copy 0
-    z = $copy 1
-    i = $copy 0
-    j = $copy 1
-    $jump loop_hdr
-
-  loop_hdr:
-    tmp = $cmp lt i x
-    $branch tmp loop_body exit
-
-  loop_body:
-    y = $arith add y 2
-    z = $arith mul z j
-    i = $arith add i 1
-    j = $arith add j 2
-    $jump loop_hdr
-
-  exit:
-    $ret y
-  }
-  ```
-
-  PDG:
-  ```
-  [show reaching defs and control dependencies graphically]
-  ```
-
-## slicing
-
-- recall: a _backwards slice_ of a function for instruction `X` consists of all instructions that affect the behavior of `X`
-
-- if `X` is data dependent on `Y` then clearly `Y` affects `X`'s behavior...and so do the instructions that `Y` is data dependent on, and so on
-
-    + this is the transitive closure of the data dependence edges in the PDG (going backwards from `X`)
-
-- if `Y` controls how many times `X` is executed then clearly `Y` affects `X`'s behavior...and so do all the instructions that control whether `Y` executes or not, and so on
-
-    + this is the transitive closure of the control dependence edges in the PDG (going backwards from `X`)
-
-- if you think about it, if `X` is data dependent on `Y` and `Y` is control dependent on `Z` then `Z` also affects `X`'s behavior; and if `X` is control dependent on `Y` and `Y` is data dependent on `Z` then same thing
-
-- so to compute a slice wrt `X`: compute the transitive closure of all data and control dependence edges from X going _backwards_ in the PDG
-
-    + we could also compute a _forwards slice_ by doing the same thing except going forwards in the PDG; this kind of slice tells us what instructions the execution of `X` can directly or indirectly affect
-
-- for human consumption, rather than a simple set of instructions it's useful to present the slice as a new function that only contains the relevant instructions
-
-- example: backwards slice from return instruction for the PDG example
-
-  SLICED:
-  ```
-  fn main() -> int {
-  let i:int, x:int, y:int, tmp:int
-
-  entry:
-    x = $call_ext input()
-    y = $copy 0
-    i = $copy 0
-
-  loop_hdr:
-    tmp = $cmp lt i x
-    $branch tmp loop_body exit
-
-  loop_body:
-    y = $arith add y 2
-    i = $arith add i 1
-
-  exit:
-    $ret y
-  }
-  ```
-
-- notice that we're missing some `$jump` instructions; that's because they are unconditional and so there is no control dependence on them
-
-# sparse analysis and SSA
-## efficiency problem with standard DFA
-
-- the DFA algorithm we've been using has an efficiency problem: information is propagated indiscriminately throughout the CFG, delaying convergence
-
-- example (constant propagation):
-
-  ```
-  fn foo(p:int) -> int {
-  let x:int, y:int, z:int
-  entry:
-    x = $copy 4
-    y = $copy 1
-    $branch p if_true if_false
-
-  if_true:
-    y = $copy 3
-    z = $copy x
-    $jump exit
-
-  if_false:
-    z = $copy 3
-    $jump exit
-
-  exit:
-    a = $arith add y z
-    $ret a
-  }
-  ```
-
-- notice that the `x` info is propagated to `if_false` and `exit` and the `y` info is propagated to `if_true` and `if_false`, none of which actually use this info
-
-- this problem doesn't affect precision but does impact performance; it would be better to propagate information only where it is actually needed and nowhere else
-
-    + for large programs this can mean the difference between taking seconds and taking hours, or between taking hours and taking days
-
-## def-use chains and sparse analysis
-
-- how do we know where information is needed? we already know how to figure this out: reaching definitions
-
-- the reaching definitions solution allows us to directly connect where information is _produced_ (defs) to where it is _needed_ (uses)
-
-    + this is basically the PDG with only data dependence edges, no control dependence edges
-
-- replace the CFG with a "def-use graph":
-
-    + nodes are statements (not basic blocks)
-
-    + there is an edge `A-->B` if a def at instruction `A` reaches a use at instruction `B`
-
-- run the standard DFA worklist algorithm, but on the def-use graph instead of the CFG
-
-    + there is no single 'entry' point; the easiest thing to do is just initialize the worklist with all statements
-
-- example: [reuse example from above]
-
-## factoring def-use chains: SSA form
-
-- there's still a problem with the def-use graph: the number of def-use edges can be quadratic in the number of statements
-
-- example (using shorthand to remove irrelevant details):
-
-  ```
-  if (_)      x = _
-  else if (_) x = _
-  else        x = _
-
-  if (_)      _ = x
-  else if (_) _ = x
-  else        _ = x
-  ```
-
-- [draw def-use graph]
-
-- the solution is to _factor_ the def-use edges, which will give us _SSA form_
-
-- a program is in _Static Single Assignment_ (SSA) form if every variable is defined with exactly one instruction and every use of a variable has exactly one reaching definition
-
-- example 1: renaming variables to transform into SSA
-
-  ```
-  x = 4
-  y = x
-  x = 6
-  y = x
-  ```
-
-  ```
-  x1 = 4
-  y1 = x1
-  x2 = 6
-  y2 = x2
-  ```
-
-- why _static_ single assignment? there is only a single textual assignment, but it can happen dynamically an arbitrary number of times
-
-  ```
-  while (_) x = x + 1
-  ```
-
-- there's still one complexity: what if multiple defs reach a single use?
-
-  ```
-  if (_)      x1 = _
-  else if (_) x2 = _
-  else        x3 = _
-
-  if (_)      _ = x?
-  else if (_) _ = x?
-  else        _ = x?
-  ```
-
-- this is where _phi functions_ come in: a phi function is a choice operator that multiplexes multiple defs together
-
-    + `x1 = phi(x2, x3, ...)` _means_ that `x1` is assigned the value of whichever reaching def (one of `x2, x3, ...`) is appropriate
-
-  ```
-  if (_)      x1 = _
-  else if (_) x2 = _
-  else        x3 = _
-  x4 = phi(x1, x2, x3)
-  if (_)      _ = x4
-  else if (_) _ = x4
-  else        _ = x4
-  ```
-
-- [draw the new def-use graph]
-
-    + note that the number of edges has gone from quadratic to linear
-
-- SSA form renders some analyses trivial (e.g., reaching defs) and others much easier and more efficient (e.g., sign analysis, constant propagation, slicing, taint analysis)
-
-- to compute SSA form, we need to (1) insert phi functions, and (2) rename variables
-
-## computing SSA form
-### intro
-
-- there are two parts to computing SSA:
-
-    + where should phi functions be placed?
-
-    + how to rename variables?
-
-### placing phi functions
-
-- where should we put these new phi functions?
-
-- naive answer: at every join point in the CFG, put a phi function for every variable
-
-    + this is way too many, most of them are unneeded
-
-- better answer: for each variable `x`, if blocks `A` and `B` both define `x` and there are non-intersecting paths from `A` and `B` to block `Z`, then put a phi function for `x` at the top of block `Z`
-
-    + this just says to find the earliest point in the CFG where multiple defs converge to one point, and put the phi function there
-
-    + there are refinements that yield even fewer phi functions (e.g., require that variable `x` must be used at some point after `Z`), but this answer is a pretty good one
-
-- fortunately, we already know how to compute this information: dominance frontiers
-
-    + the dominance frontier of block `X` is the set of all blocks `Y` s.t. `X` dominates a predecessor of `Y` but does not strictly dominate `Y`
-
-    + intuitively, the dominance frontier is the set of blocks that are _almost_ dominated by `X`, but just outside its control; or, it's the set of blocks that are the earliest point where some competing control-flow path may reach that block
-
-- the dominance frontier of a variable definition is the set of blocks where we need to add phi functions for that variable
-
-    + remember that we used _post-dominance_ for computing control dependence; now we're using _dominance_: same algorithm, just different direction of the CFG edges
-
-    + note that when we add a phi function that this is a new definition of the variable, which itself may require more phi functions to be added
-
-    + iterated dominance frontier: `DF⁺(S)` = the limit of the sequence:
-
-        - `DF₁(S)` = `DF(S)`
-        - `DFᵢ₊₁(S)` = `DF(S ∪ DFᵢ(S))`
-
-    + let `S` be the set of definitions for variable `x`; then `DF⁺(S)` is exactly the set of blocks that require phi functions for `x`
-
-### renaming variables
-
-- after phi functions have been placed, we need to rename all the variables
-
-- simple method:
-
-    + compute reaching defs using the original variables names (but with phi functions in place); because of how we placed phi functions only one def will ever reach any use
-
-    + for each definition, give the defined variable a unique name
-
-    + for each use, replace that use with the unique name of the single reaching def
-
-- this is easy but not as efficient as it could be; there's a more complicated but efficient version found in cytron et al, "efficiently computing static single assignment form and the control dependence graph"
-
-### example
-
-SOURCE
-```
-fn main() -> int {
-  let a:int = input(), b:int = 2, c:int;
-  if a > 0 {
-    while a < 100 {
-      a = a * 2;
-    }
-    c = a + b;
-  }
-  else {
-    c = a + b;
-  }
-  return c + a;
-}  
-```
-
-LIR
-```
-fn main() -> int {
-let a:int, b:int, c:int, t1:int, t2:int, t3:int
-entry:
-  a = $call_ext input()
-  b = $copy 2
-  t1 = $cmp gt a 0
-  $branch t1 else loop_hdr
-
-loop_hdr:
-  t2 = $cmp lt a 100
-  $branch t2 loop_body loop_exit
-
-loop_body:
-  a = $arith mul a 2
-  $jump loop_hdr
-
-loop_exit:
-  c = $arith add a b
-  $jump exit
-
-else:
-  c = $arith add a b
-  $jump exit
-
-exit:
-  t3 = $arith add c a
-  $ret t3
-}
-```
-
-DOM FRONTIERS
-```
-entry -> {}
-loop_hdr -> { exit }
-loop_body -> { loop_hdr }
-loop_exit -> { exit }
-else -> { exit }
-exit -> {}
-```
-
-ITERATED DOM FRONTIERS (a)
-```
-DF₁({entry, loop_body}) = { loop_hdr }
-DF₂({entry, loop_body, loop_hdr}) = { loop_hdr, exit }
-DF₃({entry, loop_body, loop_hdr, exit}) = { loop_hdr, exit }
-```
-
-ITERATED DOM FRONTIERS (c)
-```
-DF₁({else, loop_exit}) = { exit }
-DF₂({else, loop_exit, exit}) = { exit }
-```
-
-SSA
-```
-fn main() -> int {
-let a1:int, a2:int, a3:int, a4:int, b:int, c1:int, c2:int, c3:int, t1:int, t2:int, t3:int
-entry:
-  a1 = $call_ext input()
-  b = $copy 2
-  t1 = $cmp gt a1 0
-  $branch t1 else loop_hdr
-
-loop_hdr:
-  a2 = phi(a1, a3)
-  t2 = $cmp lt a2 100
-  $branch t2 loop_body loop_exit
-
-loop_body:
-  a3 = $arith mul a2 2
-  $jump loop_hdr
-
-loop_exit:
-  c1 = $arith add a2 b
-  $jump exit
-
-else:
-  c2 = $arith add a1 b
-  $jump exit
-
-exit:
-  a4 = phi(a1, a2)
-  c3 = phi(c1, c2)
-  t3 = $arith add c3 a4
-  $ret t3
-}
-```
-
-## revisiting sparse analysis
-
-- if the program is in SSA form and we're doing a first-order analysis (i.e., computing an abstraction of program variable values), then we can modify our worklist algorithm to operate on variables instead of basic blocks or statements
-
-    + since there is a single assignment for each variable, we don't need separate abstract stores for each block: just a single, global abstract store for the whole program
-
-    + there is no propagation of abstract stores or anything like that; in fact, we're doing effectively a flow-insensitive analysis, but because of being in SSA form we're getting a flow-sensitive solution
-
-- example: constant propagation
-
-  ```
-  initialize store and worklist to empty
-
-  for each variable x:
-    if x is assigned a constant k:
-      store[x] = k
-      add x to worklist
-
-  while worklist is not empty:
-    pop x from worklist
-    for each variable y defined using x:
-      compute value for y using value of x
-      store[y] = updated value
-      if y's value changed: add y to worklist
-  ```
-
-- [demonstrate using previous example for computing SSA]
-
-## dealing with pointers
-
-- all of the examples i've given have contained _no_ pointers; what if they did have pointers? 
-
-- there are basically two options
-
-- option 1 (the option compilers use, like gcc and llvm): don't allow address-taken variables; any source-level address-taken variable is converted into a pointer instead, and we do SSA only for the program variables, not for the address-taken objects
-
-    + example:
-
-BEFORE
-```
-      x = $copy 0
-      y = $addrof x
-      z = x
-```
-
-AFTER
-```
-      x = $alloc 1 [id] // on stack, not on heap
-      $store x 0
-      y = x
-      z = $load x
-```
-
-- people generally just call this SSA, but in terms of analysis i like to call it "partial SSA" because only top-level variables are really in SSA form; anything on the heap is not in SSA form
-
-- option 2 (can be useful, but not the common choice): do a pointer analysis and then treat every store as a def and every load as a use of the appropriate address-taken objects and compute SSA as normal
-
-    + the points-to sets can be large, and the pointer analysis is a "may point-to" analysis, so there can be many spurious def-use edges in this version
-
-    + still useful: this is one of the techniques that i used to scale flow-sensitive pointer analysis to make it 100x more scalable
-
-# taint analysis (interprocedural dfa; icfg; context sensitivity)
-## intro
-
-- we've seen applications of program analysis for optimization and debugging, and we've seen how to overcome the difficulty of pointers; now let's explore how to deal with function calls and interprocedural analysis at the same time as we expand our applications to include security
-
-- we'll look at _taint analysis_: the goal of taint analysis is to track "tainted" information (e.g., input from users) as it propagates through a program and to ensure that it doesn't influence sensitive operations
-
-    + example: sql injection
-
-    + we can also use taint analysis for the inverse: track sensitive information (e.g., from a user's private data) to ensure that it doesn't influence information output from the program (e.g., that a browser addon doesn't read a user's credit card info and send it out over the network)
-
-- to make this analysis useful, it really needs to be interprocedural---that is, it needs to track information across function call boundaries
-
-    + andersen-style pointer analysis was interprocedural, but not in a DFA setting
-
-- when dealing with the intraprocedural CFG we had two choices: flow-sensitive vs flow-insensitive
-
-    + flow-sensitive: respect the flow of control; a solution per program point; a variable can have a difference abstract value at different places in the program
-
-    + flow-insensitive: disregard the flow of control and assume any statement can execute at any time; one solution for the entire program; a variable must have one abstract value that over-approximates all possible concrete values it might have anywhere
-
-- when dealing with interprocedural analysis we have a similar choice: context-insensitive vs context-sensitive
-
-    + concretely during program execution, every function call results in a unique function instance (typically using stack frames); conceptually, this results in an infinite domain of possible function instances
-
-    + for program analysis to be decidable, we need to abstract this infinite domain into something tractable while still over-approximating the conrete domain
-
-    + context-insensitive: we'll abstract all function instances of the same function into a single abstract function instance that over-approximates all of them; that is, the information for every call to the same function is merged together
-
-    + context-sensitive: we'll partition the set of function instances for the same function into a set of different abstract function instances, treating each one as distinct; the different ways that we partition the set result in different context-sensitivity schemes
-
-        - unlike flow-sensitivity (for which there is just one definition), there are many different versions of context-sensitivity
-
-- we'll start with intraprocedural taint analysis ignoring the possibility of function calls, then we'll look at interprocedural context-insensitive taint analysis, and then explore a couple of different context-sensitivity strategies
-
-## intraprocedural taint analysis
-### intro
-
-- we'll suppose that there are a set of functions that create tainted information, called _sources_, and a set of functions that consume potentially tainted information, called _sinks_
-
-    + what these functions are will depend on the specific program we're analyzing; for our purposes we'll say any external function starting with `src` is a source and any external function starting with `snk` is a sink (e.g., `src123` is a source and `snk_blah` is a sink)
-
-    + we'll assume only external functions can be sources and sinks just to keep things simple; we can easily extend it to allow for internal sources and sinks if we wanted to but it adds complexity without any pedagogical benefit
-
-- a taint analysis solution is a map from each sink to the set of sources that _reach_ that sink; that is, there is some path along which information derived from or influenced by a source can be passed to the sink
-
-    + we'll only care about which sources and sinks are involved, not which specific _objects_ or _call instructions_ were involved; e.g., if there are two different calls to the same source `src` and only one of them reaches a call to the sink `snk` (perhaps transmitted through some intermediate variable `x`), the solution will just say `snk --> { src }`
-
-    + this is like reaching defs, where the analysis tracked for each variable what defs reached each program point but the final solution just mapped uses to the reaching defs for those uses; here our analysis will actually track for each variable what sources they are tainted by but the final solution will just record what sources reached what sinks
-
-    + a more elaborate analysis can also take into account _sanitizers_ that kill taint, but we won't worry about that possibility here
-
-- we'll take the result of an interprocedural, flow-insensitive pointer analysis as input (e.g., from an Andersen-style pointer analysis)
-
-- an object (variable or heap object) becomes _tainted_ if it is (1) assigned the result of a call to a source; (2) reachable from a pointer returned from a source; or (3) reachable from a pointer passed to a call to the source
-
-- a tainted object _reaches_ a a sink if (1) it is an argument to a call to the sink; or (2) it is reachable from a pointer passed as an argument to a call to the sink
-
-- example
-
-  ```
-  extern src1: () -> int
-  extern src2: (&int) -> _
-  extern snk1: (int) -> _
-  extern snk2: (&int) -> _
-  
-  fn main() -> int {
-    let x:int, y:int, z:&int
-
-    entry:
-      x = $call_ext src1()
-      z = $addrof y
-      $call_ext src2(z)
-      $branch x bb1 bb2
-
-    bb1:
-      y = $copy x
-      $call_ext snk1(y)
-      $jump exit
-
-    bb2:
-      $call_ext snk2(z)
-      $jump exit
-
-    exit:
-      $ret 0
-  }
-  ```
-
-  SOLUTION
-  ```
-  snk1 --> { src1 }
-  snk2 --> { src2 }
-  ```
-
-### abstract domain
-
-- an abstract value will be a set of sources, signifying which sources may have contributed to the concrete value
-
-    + this is a second-order analysis like reaching defs; we don't care what the value is just where it came from
-
-    + ⊤ = set of all sources
-
-    + ⊥ = empty set
-
-    + ⊔ = set union
-
-- this domain is finite, hence necessarily complete and noetherian
-
-- the abstract store will map variables to abstract values as usual
-
-### abstract semantics
-
-- helpers:
-
-    + let `taint(op)` = `store[op]` if `op` is a variable, else `{}`
-
-    + let `reachable(v...)` be the set of pointed-to objects reachable from the given arguments according to the points-to solution
-
-- `x = $call_ext <source>(args...)`
-
-    + `store[x] = {<source>}`
-    + ∀v ∈ reachable(args), `store[v] = store[v] ∪ {<source>}`
-
-    + notice that even if `x` is a pointer we don't taint the objects it points to; why not? because the things it points to can't have come from the external function (since the pointer analysis ignores external calls) therefore the source can't have tainted them; it's sufficient that anything accessed _through_ the pointer returned from the source will be tainted with that source
-
-    + also note that we're assuming the external call didn't change the pointer analysis solution---again, if it did we would have stubbed it as an internal function so the pointer analysis could analyze it
-
-- `x = $call_ext <non-source>(args...)`
-
-    + `store[x] = {}`
-    + we're replacing `x`'s value with something non-tainted (again, assuming that if the external function propagated taint we would have stubbed it as an internal function)
-
-- `x = $call <sink>(args...)`
-
-    + this is a subset of the instruction above, during the analysis treat it like that
-    + we only need to do this once, after the analysis is finished (just like the reaching defs solution)
-    + ∀v ∈ (args ∪ reachable(args)), `soln[<sink>] = soln[<sink>] ∪ store[v]`
-
-- `x = $copy op`
-
-    + `store[x] = taint(op)`
-
-- `x = $arith <aop> op1 op2`
-
-    + `store[x] = taint(op1) ⊔ taint(op2)`
-
-- `x = $cmp <rop> op1 op2`
-
-    + `store[x] = taint(op1) ⊔ taint(op2)`
-
-- `x = $addrof y`
-
-    + `store[x] = {}`
-
-- `x = $alloc op [id]`
-
-    + `store[x] = {}`
-    + notice that `op` could have been tainted, but that doesn't taint `x` because `op`'s value can't influence `x`'s value (just the number of allocated objects)
-
-- `x = $gep y op`
-
-    + `store[x] = taint(y) ⊔ taint(op)`
-    + in this case we take `op`'s taint into account because it can influence what `x` points to
-
-- `x = $gfp y <field>`
-
-    + `store[x] = taint(y)`
-
-- `x = $load y`
-
-    + `store[x] = (⨆_{v ∈ ptsto(y)} taint(v)) ⊔ taint(y)`
-
-- `$store x op`
-
-    + ∀v ∈ ptsto(x), `store[v] = store[v] ⊔ (taint(x) ⊔ taint(op))`
-
-- `$jump` and `$branch`: propagate abstract store as normal
-
-### example
-
-- [give students points-to solution, have them come up with final abstract store and solution]
-
-  ```
-  extern src1: (&int) -> &int
-  extern src2: () -> int
-  extern snk1: (&int, &int) -> _
-  extern snk2: (int) -> _
-  extern snk3: (&int, &int) -> _
-
-  fn main() -> int {
-    let a:&int, b:&int, c:int, d:&int, e:&int, f:&int, g:int
-    entry:
-      a = $alloc 1 [_a1]
-      b = $alloc 1 [_a2]
-      b = $call_ext src1(a)
-      c = $call_ext src2()
-      d = $addrof c
-      e = $gep a c
-      f = $alloc 1 [_a3]
-      $store f c
-      g = $load e
-      $call_ext snk1(a, d)
-      $call_ext snk2(g)
-      $call_ext snk3(b, f)
-      $ret 0
-  }
-  ```
-
-  POINTS-TO
-  ```
-  a --> { _a1 }
-  b --> { _a2 }
-  d --> { c }
-  e --> { _a1 }
-  f --> { _a3 }
-  ```
-
-  FINAL ABSTRACT STORE
-  ```
-  a --> {}
-  b --> { src1 }
-  c --> { src2 }
-  d --> {}
-  e --> { src2 }
-  f --> {}
-  g --> { src1, src2 }
-  _a1 --> { src1 }
-  _a2 --> {}
-  _a3 --> { src2 }
-  ```
-
-  SOLUTION
-  ```
-  snk1 --> { src1, src2 }
-  snk2 --> { src1, src2 }
-  snk3 --> { src1, src2 }
-  ```
-
-## interprocedural analysis: icfg
-
-- we need to revisit our old program representation of the CFG: now that we're propagating information to calls and back, we need something that shows the connections between functions
-
-- Interprocedural Control-Flow Graph (ICFG): take the individual function CFGs and add edges
-
-    + from a `$call_{dir, idr}` instruction to the entry nodes of all callee functions (note that we need pointer info to handle `$call_idr`)
-    + from a `$ret` instruction back to the callsites for that function
-
-- unlike intraprocedural analyses where we picked which function to analyze, for interprocedural analyses we always start at `main`...which functions we end up analyzing will depend on which ones are reachable from `main` via function calls
-
-- note that we've already set up our CFG definition to make this easy by requiring direct and indirect calls to be terminals for basic blocks, so all we need to do is add the interprocedural edges (at least conceptually---you don't have to have an explicit representation of these edges as long as you can easily look up the callees for call instructions and the callsites for return instructions)
-
-    - many definitions of CFGs allow calls in the middle of basic blocks, which is fine for intraprocedural analysis (the most common type of analysis done in compilers) but makes interprocedural analysis difficult
-
-    - note that `$call_ext` isn't included in the ICFG, since we don't have any source code for the callee functions
-
-- example:
-
-  ```
-  extern input: () -> int
-
-  fn main() -> int {
-    let x:int, y:int, z:int
-    entry:
-      x = $call_ext input()
-      $branch x call_f1 call_f2
-
-    call_f1:
-      y = $call_dir func1(x) then ret_f1
-
-    ret_f1:
-      z = $arith add z 2
-      $jump exit
-
-    call_f2:
-      y = $call_dir func2(x) then ret_f2
-
-    ret_f2:
-      z = $arith mul z 4
-      $jump exit
-
-    exit:
-      $ret z
-  }
-
-  def func1(p1:int) -> int {
-    let a:int
-    entry:
-      a = $call_dir func3(p1) then exit
-
-    exit:
-      a = $arith add a 1
-      $ret a
-  }
-
-  def func2(p2:int) -> int {
-    let b:int
-    entry:
-      b = $call_dir func3(p2) then exit
-
-    exit:
-      b = $arith mul b 2
-      $ret b
-  }
-
-  def func3(p3:int) -> int {
-    entry:
-      $ret p3
-  }
-  ```
-
-## context-insensitive interprocedural taint analysis
-### prep
-
-- we need to remember the connections between call instructions and callees (e.g., when we return from a callee what call instructions might we be returning to?) and also what information got returned from each callee (whose use we'll see soon)
-
-    + we'll have a map `call_edges` : `callee function -> { set of call instructions (i.e., function + basic block) }`
-
-    + we'll have a map `call_returned` : `function -> returned abstract store` that remembers for each function the abstract store it returns to its callers
-
-- since we're now analyzing multiple functions we need to change `bb_in` from `basic block -> abstract store` to `function -> basic block -> abstract store` (remember that basic block labels can be repeated across functions, and in fact at least `entry` definitely will be)
-
-    + again, we'll always start the analysis from the entry block of `main`
-
-- we also need to change the worklist from a list of `basic block`s to a list of `(function, basic block)` pairs (or else have each basic block have a reference to its parent function)
-
-- the worklist loop will still work the same (including propagating the abstract store to the target basic block for call terminals), with the addition of _also_ propagating abstract stores from calls to callees
-
-### helpers
-
-- intuition for handling calls:
-
-    + what are we actually passing to a callee? the value of the arguments PLUS anything reachable from the arguments via the points-to solution
-
-        - that is, we don't pass _everything_ in the caller's abstract store, just the things that the callee can actually access
-
-    + what are we returning? the return value PLUS anything reachable from the return value PLUS anything reachable from the parameters
-
-        - again we don't pass _everything_ in the callee's abstract store, just the things the caller can actually access
-
-- we'll use several helper functions
-
-    + `get_callee_store` : `(ptsto info, abstract store, callee function, args) -> abstract store` 
-    
-        - given the current abstract store at a call instruction, the callee function, and the call arguments, computes the abstract store that will be passed to the callee
-
-        - what is that callee store? it maps each callee parameter to the abstract value of its corresponding argument AND copies each element of the current abstract store reachable from an argument via pointer derefences
-
-        - example (sign analysis with pointer info):
-
->         // ptsto = [b -> {c}]
->         // store = [a -> Pos, c -> Neg]
->         x = $call_dir foo(a, 0, b) then bb
->
->         // callee store = [p1 -> Pos, p2 -> Zero, c -> Neg]
->         fn foo(p1:int, p2:int, p3:&int) -> int { ... }
-
-        - one tricky corner case: the reachable elements may include the callee parameters (e.g., a recursive call whose argument is a pointer that reaches a parameter); be sure to use _weak updates_ to create the callee store to avoid unsoundness
-
-    + `get_returned_store` : `(ptsto info, abstract store, current function, return operand(?)) -> abstract store`
-
-        - given the current abstract store at a return instruction, the current function containing that return instruction, and the returned operand (if one exists), computes the abstract store that will be passed back to the call instruction
-
-        - what is that returned store? this is a little tricky because we could be returning to multiple different call instructions and its slightly different depending on which call we're returning to based on the left-hand side of the call...we'll create a generic returned store and then specialize it later
-
-            + it contains all variables reachable from the current function parameters via pointer deferences AND all variables reachable from the return instruction's variable operand (if there was one) AND the value of the returned operand (if there was one)
-
-            + problem: what do we map to the value of the returned operand? it should be the left-hand side of the original call to this function, but there could be many such calls...for now use a placeholder fake variable (distinct from any variable in the program)
-
-        - example (sign analysis with pointer info):
-
->         // returned store = [c -> Top, _placeholder -> Zero]
->         x = $call_dir foo(a, 0, b) then bb
->
->         // ptsto = [p3 -> c]
->         // current store = [p1 -> Neg, p2 -> Top, c -> Top, y -> Zero]
->         fn foo(p1:int, p2:int, p3:&int) -> int { ... $ret y }
-
-    + `get_caller_store` : `(abstract store, optionally call lhs) -> abstract store`
-
-        - given the returned abstract store and a specific call instruction's left-hand side, returns the abstract store returned to that specific call (i.e., with the placeholder value, if present, replaced by the left-hand side of the call, if present)
-
-        - example 1 (sign analysis with pointer info):
-
->         // returned store = [c -> Top, _placeholder -> Zero]
->         // caller store = [c -> Top, x -> Zero]
->         x = $call_dir foo(a, 0, b) then bb
-
-        - example 2 (sign analysis with pointer info):
-
->         // returned store = [c -> Top, _placeholder -> Zero]
->         // caller store = [c -> Top]
->         $call_dir foo(a, 0, b) then bb
-
-### adding call and return instructions
-
-- `[x =] $call_dir <func>(args...) then bb`
-
-    + update `call_edges[<func>]` to include `(<current function>, <current bb>)`
-    + let `callee_store` = `get_callee_store(ptsto, store, <func>, args)`
-    + propagate `callee_store` to `(<func>, entry)`
-
-    + `store[x] = ⊥` (the actual value of `x` will be computed by the callee's `$ret`)
-    + propagate `store` to `bb` as normal
-    + notice that we're propagating the entire store to `bb` including the parts that we're also passing to the callee; that's because the callee can only make weak updates to those values (via a pointer) and so we don't lose any precision by also propagating them locally
-
-    + there's a tricky corner case: what if we propagate info to the callee _but_ (1) the callee has already been analyzed from another call and so has pre-existing abstract stores; and (2) the current info we're propagating isn't adding any new info to that pre-existing info? then the callee analysis may never reach the `$ret` instruction and thus it's returned store may never get propagated back to _this_ call
-
-    + to handle that tricky case we check if the callee already has a `returned store` and if so we preemptively propagate it here
-    + if `call_returned[<func>]` = `ret_store` then
-        - let `caller_store` = `get_caller_store(ret_store, x)`
-        - propagate `caller_store` to `bb`
-
-- `x = $call_idr fp(args...) then bb`
-
-    + mostly like `$call_dir`, but what if there are multiple callees (i.e., `fp` has a points-to set greater than 1)? we need the analysis to behave as if each callee is being called independently "in parallel"
-
-    + handle `ret_store` and `callee_store` for each callee separately
-
-    + note that `x` will be strongly updated in that its old value will be replaced, but its new value must be the _join_ of the return values from each callee; we'll handle that when we process a `$ret`
-
-- `$ret op?`
-
-    + if we're in `main` then there is no caller and we can skip this instruction
-
-    + let `ret_store` = `get_returned_store(ptsto, store, <current function>, op?)`
-
-    + set `call_returned[<current function>]` = `ret_store`
-
-    + `∀(func, bb) ∈ call_edges[<current function>]` where the terminal of `bb` is `[x =] $call_{dir, idr} ... then next_bb`:
-
-        - `caller_store` = `get_caller_store(ret_store, x)`
-        - propagate `caller_store` to `(func, next_bb)`
-
-    + notice that because propagation uses ⊔ and because we set `x` to ⊥ when handling the call instruction, the effect of this process is that the value of `x` for `next_bb` will be the join of the return values of each callee
-
-### example
-
-- [ask students to go over it in their head first, figuring out the solution without going through it step by step; then go over it together walking through it step by step]
-
-CFG
-```
-extern src1: () -> int
-extern src2: (&int) -> _
-extern src3: () -> int
-extern src4: () -> int
-extern snk: (int) -> _
-
-fn main() -> int {
-  let a:int, b:&int, c:&int, d:&int, e:int, f:int, g:&int, h:&int, i:int, j:int
-
-  entry:
-    a = $call src1()
-    b = $addrof a
-    $branch a bb2 bb4
-
-  bb2:
-    c = $alloc 1 [_a1]
-    $call_ext src2(c)
-    d = $call_dir foo(c) then bb3
-
-  bb3:
-    e = $load d
-    $jump exit
-
-  bb4:
-    f = $call src3()
-    g = $addrof f
-    h = $call_dir foo(g) then bb5
-
-  bb5:
-    j = $load h
-    $jump exit
-
-  exit:
-    $call snk(j)
-    $ret 42
-}
-
-fn foo(p:&int) -> &int {
-  let q:int, r:int, s:int, t:&int
-
-  entry:
-    q = $call src4()
-    r = $load p
-    s = $arith add q r
-    t = $addrof s
-    $ret t
-}
-```
-
-POINTS-TO
-```
-b --> { a }
-c --> { _a1 }
-d --> { s }
-g --> { f }
-h --> { s }
-p --> { _a1, f }
-t --> { s }
-```
-
-SOLUTION
-```
-snk --> { src2, src3, src4 }
-```
-
-## adding context-sensitivity
-### intro
-
-- the context-insensitive analysis does not follow the concrete semantics for how function calls concretely work---it essentially transforms calls and returns into gotos, so that values can flow into a callee from one callsite and return at another, losing precision
-
-    + the "context", in this case, is the execution context in which calls to the same function are made (e.g., callsite, function stack, arguments, etc)
-
-- example:
-
-  ```
-  fn main() -> int {
-    let taint1:int, taint2:int, a:int, b:int
-    entry:
-      taint1 = $call_ext src1()
-      a = $call_dir foo(taint1) then bb1
-
-    bb1:
-      $call_ext snk1(a)
-      taint2 = $call_ext src2()
-      b = $call_dir foo(taint2) then exit
-
-    exit:
-      $call_ext snk2(b)
-      $ret 0
-  }
-
-  fn foo(p:int) -> int {
-    let taint3:int, taint4:int, c:int
-    entry:
-      $branch p bb1 bb3
-
-    bb1:
-      taint3 = $call_ext src3()
-      c = $call_dir bar(p, taint3) then bb2
-
-    bb2:
-      $call_ext snk3(c)
-      $jump exit
-
-    bb3:
-      taint4 = $call src4()
-      c = $call_dir bar(p, taint4) then bb4
-
-    bb4:
-      $call_ext snk4(c)
-      $jump exit
-
-    exit:
-      $ret c
-  }
-
-  fn bar(q:int, r:int) -> int {
-    entry:
-      q = $arith add q r
-      $ret q
-  }
-  ```
-
-  SOLUTION (CI)
-  ```
-  snk1 --> { src1, src2, src3, src4 }
-  snk2 --> { src1, src2, src3, src4 }
-  snk3 --> { src1, src2, src3, src4 }
-  snk4 --> { src1, src2, src3, src4 }
-  ```
-
-- the arguments from one callsite propagate back to the other callsites, polluting the precision of the analysis
-
-- to make the analysis more precise we can make it _context sensitive_: it can try to distinguish different contexts for the same callee function
-
-    + the basic idea is to give each function context a unique id `cid`; then instead of `bb_in` : `function -> basic block -> abstract store` we have `bb_in` : `function + cid -> basic block -> abstract store`
-
-        - in other words, we compute an entirely separate solution for each context of each function, and make sure to only propagate information between matching caller/callee contexts
-
-    + we haven't said what a "context" is exactly; there are a number of different schemes and we'll go over two of the most common
-
-    + as always, there is a cost: more precision means a more expensive, less scalable analysis
-
-### call-string context-sensitivity
-
-- one way to distinguish different contexts for the same callee function is to abstract the runtime function stack; essentially, mimic the concrete semantics of function calls
-
-    + maintain a stack of callsites; this will be the context
-
-    + when making a call, push the callsite onto the stack
-
-    + when returning from a call, pop the top callsite off that stack and use that as the return point (rather than all possible callsites)
-
-- to change the analysis to take advantage of context sensitivity:
-
-    + the worklist now contains `(function + context, basic block)` pairs
-
-    + instead of `bb_in` mapping from `basic block -> abstract store` now it maps from `(function + context, basic block) -> abstract store`
-
-    + the context only changes when calling into or returning from some function, so analysis inside a single function works the same as before
-
-- example: [use the intro example]
-
-  SOLUTION (CALLSTRING, full callstack)
-  ```
-  snk1 --> { src1, src3, src4 }
-  snk2 --> { src2, src3, src4 }
-  snk3 --> { src1, src2, src3 }
-  snk4 --> { src1, src2, src4 }
-  ```
-
-- while conceptually simple, there is an issue we need to address: the domain of possible callstacks ranges from exponential to infinite (depending on if there are any recursive cycles in the call graph)
-
-    + we can see the exponential problem in the example we just gave; for the infinite problem, see the example below
-
-- recursive example:
-
-  ```
-  fn foo(p:int) -> int {
-    let a:int
-    entry:
-      $branch p bb1 exit
-
-    bb1:
-      p = $arith sub p 1
-      a = $call_dir bar(p) then exit
-
-    exit:
-      $call_ext snk(a)
-      $ret a
-  }
-
-  function bar(q:int) -> int {
-    let b:int, c:int, d:int
-    entry:
-      b = $call_ext src()
-      c = $arith add b q
-      d = $call_dir foo(c) then exit
-
-    exit:
-      $ret d
-  }
-  ```
-
-- to fix this, we need to modify our scheme to something called `k-limited call-string` context sensitivity
-
-    + for some fixed constant `k`, we only use the top `k` elements of the callstack to determine what context we're in
-
-    + the current context is a string of callsites `ctx` s.t. `|ctx| <= k` (it can be less than `k` if we haven't made `k` calls yet)
-
-    + when making a call at callsite `pp`, to get the callee context `callee_ctx` we take `ctx`, append `pp`, then if `|callee_ctx| = k+1` we remove the first element to get it back to `k`
-
-- this k-limiting raises an issue: what context are we returning to? previously we had the entire callstack, but now we only have the top `k` entries
-    
-    + consider the 3-limited context `abc` that makes a call at callsite `d`, yielding the callee context `bcd`; when the callee returns, how does it know that it should return to the context `abc`?
-
-    + we already have most of a solution in `call_edges`; extend it from `callee function -> { set of call instructions }` to `(callee function + context) -> { set of (context + call instruction) pairs }`
-
-    + update `call_edges` as before when processing a call instruction, just include the callee and caller contexts in the saved information
-
-- another issue: what if the callee was already analyzed under a given callee context, but a different caller context? 
-    
-    + consider again the 3-limited context `abc` that makes a call at callsite `d` yielding the callee context `bcd`, and suppose that previously there was a context `xbc` that makes a call at `d`, yielding the same callee context
-        
-    + again we already have most of a solution in `call_returned` : `function -> returned abstract store`; extend it to `(function + context) -> returned abstract store`
-
-    + update `call_returned` as before when processing a `$ret` instruction, just include the current context in the saved information
-
-    + consult `call_returned` as before when processing a call instruction, but using context information
-
-- [revisit intro example with k == 1, recursive example with k == 2]
-
-  INTRO SOLUTION (CALLSTRING, k == 1)
-  ```
-  sink1 --> { src1, src2, src3, src4 }
-  sink2 --> { src1, src2, src3, src4 }
-  sink3 --> { src1, src2, src3 }
-  sink4 --> { src1, src2, src4 }
-  ```
-
-  RECURSIVE EXAMPLE SOLUTION (k == 2)
-  ```
-  sink --> { src }
-  ```
-
-- an alternative, common way to handle recursive cycles is to treat all the functions within a cycle context-insensitively (i.e., transform recursive call/return edges into gotos)
-
-    + we would usually do k-limiting anyway to combat exponential callstrings, but this can still help performance (but hurt precision)
-    
-    + we won't be doing this for our own implementations
-
-- implementation tip: it will make your lives a bit easier if you implement the analysis s.t. each 'context' is represented with a unique integer id
-
-    + this will make your lives easier because you can easily change the context-sensitivity strategy for your analysis just by changing how you derive the integer id
-
-        - context-insensitive: id is the function name
-
-        - call-string context-sensitive: id is derived from the k-limited callstack
-
-        - other kinds of context-sensitivity (which we'll get to shortly): id is derived using the appropriate definition of context
-
-    + the key is that the only difference between all of these schemes is how the context is defined; otherwise they all work exactly the same way
-
-### functional context-sensitivity (aka partial transfer function)
-
-- another way to distinguish different contexts for the same callee function is by remembering that the abstract transfer functions are, in fact, functions---and hence if we give them the same input they will always yield the same output
-
-    + so we memoize: for each abstract input to a function, if we haven't seen it before then we analyze the function with that input and then remember the result; if we have seen it before then we just return the corresponding result without any further analysis
-
-    + thus, a 'context' is an abstract store describing the inputs to a given function
-
-- we'll use the exact same data structures as for the call-string strategy except using abstract stores as contexts instead of call-strings; all the things like `call_edges`, `call_returned`, the worklist, `bb_in`, etc stay the same
-
-    + when making a call, `callee_ctx == get_callee_store(...)`
-
-    + we already memoize using `call_returned`, no need to add anything extra: if there is an entry for `(callee, callee_ctx)` in `call_returned` then we use that, otherwise we analyze the callee in `callee_ctx` (which will then memoize the result in `call_returned`)
-
-- example:
-
-  ```
-  fn foo(i:int) -> int {
-    entry:
-      $branch i bb1 bb4
-
-    bb1:
-      taint1 = $call_ext src1()
-      a = $call_dir bar(taint1) then bb2
-
-    bb2:
-      $call_ext snk1(a)
-      taint2 = $call_ext src2()
-      b = $call_dir bar(taint2) then bb3
-
-    bb3:
-      $call_ext snk2(b)
-      $jump bb7
-
-    bb4:
-      taint1 = $call_ext src1()
-      a = $call_dir bar(taint1) then bb5
-
-    bb5:
-      $call_ext snk1(a)
-      taint2 = $call_ext src2()
-      b = $call_dir bar(taint2) then bb6
-
-    bb6:
-      $call_ext snk2(b)
-      $jump bb7
-
-    bb7:
-      c = $arith add a b
-      d = $call_dir bar(c) then exit
-
-    exit:
-      $call_ext snk3(d)
-      $ret 0
-  }
-
-  fn bar(p:int) -> int {
-    entry:
-      r = $call_dir baz(p) then exit
-
-    exit:
-      $ret r
-  }
-
-  fn baz(q:int) -> int {
-    entry:
-      $ret q
-  }
-  ```
-
-  SOLUTION:
-  ```
-  snk1 --> { src1 }
-  snk2 --> { src2 }
-  snk3 --> { src1, src2 }
-  ```
-
-- however, we still have an issue to address: just like with call-string, the number of possible contexts could be infinite (consider, e.g., constant propagation)
-
-    + this only happens if our abstract domain is infinite, but if it is then we have to have some ad-hoc threshold beyond which we just merge contexts together
-
-    + this won't happen for our assignment because our abstract domain for taint analysis is finite
-
-### which scheme is better?
-
-- call-string: what we're doing with this scheme is essentially statically expanding the ICFG to have a separate copy of each function for each possible callstack that reaches it
-
-    + [draw a simple diagram to illustrate]
-
-    + we don't have to actually create a separate copy for each context because we keep the different contexts separate for a given function by mapping `(function + context, basic block) --> abstract store`
-
-    + the drawback of this scheme is that because we're separating contexts statically, we always keep different contexts separate even if it doesn't gain any additional precision; that is, even if merging two contexts wouldn't make the analysis any less precise, we still track them separately
-
-- functional: what we're doing with this scheme is dynamically expanding the ICFG based on what abstract inputs we actually see during the analysis
-
-    + unlike call-string we don't separate out different contexts for the same function unless it will (probably) benefit us (it's possible we'll still get the same output for different inputs, but less likely)
-
-    + however, the number of possible contexts is a function of both the size of the abstract domain we're working with _and_ the details of the program we're analyzing; this means it's unpredictable and could potentially get extremely expensive
-
-- so which is better? it depends
-
-### other kinds of context-sensitivity
-#### summary-based (aka transfer function)
-
-- the partial transfer function approach (aka functional) memoized the callee context based on its abstract inputs, so if we saw the same abstract inputs we could just retrieve the previous result
-
-    + the partial version re-analyzes the function for each new input, and only for inputs that actually happen during the analysis
-
-- the full transfer function approach (aka summary-based) instead directly replaces a function with an abstract version that takes the function's input abtract values and returns the function's abstract result
-
-    + essentially we transform the function body into a function on abstract values
-
-    + whenever the function is called, the analysis applies this transfer function to the inputs to get the result; since this happens for every call to the same function, each call is treated independently
-
-    + the full version _replaces_ the function entirely with this new transfer function
-
-- example:
-
-  ```
-  fn main() -> int {
-    let a:int, b:int, c:int, d:int, e:int
-    entry:
-      a = $copy -42
-      b = $call abs(a)
-      c = $copy 0
-      d = $call abs(c)
-      e = $arith add b d
-      $ret e
-  }
-
-  fn abs(p:int) -> int {
-    let t:int
-    entry:
-      t = $cmp lt p 0
-      $branch t bb1 exit
-
-    bb1:
-      p = $arith sub 0 p
-      $jump exit
-
-    exit:
-      $ret p
-  }
-  ```
-
-- suppose we're doing sign analysis on the above program, which computes the sum of the absolute values of 0 and -42
-
-    + a context-insensitive analysis would say that both calls to foo would return ⊤ (because it would either be Zero or Pos, and Zero ⊔ Pos = ⊤), so `e` is ⊤
-
-    + we can replace all calls to `abs` with the transfer function: `abs(x) = (x == Neg) ? Pos : x`
-
-    + now `b` is Pos and `d` is Zero, so `e` is Pos
-
-- if we can compute a relatively simple summary for a function, this approach can work great
-
-- however, for complex analyses (e.g., flow-sensitive pointer analysis) the summary can be at least as complicated as the function itself, and often expensive to compute at all
-
-#### object sensitivity
-
-- so far we've talked about abstracting function instances based on the stack (call-string) or inputs (partial or full transfer functions); researchers noticed that specifically for object-oriented languages neither approach was a great fit
-
-- quick review of how methods work:
-
-  OOP:
-  ```
-  Object* obj = new Object();
-  obj->method(arg1, arg2);
-  ```
-
-  LOWERED VERSION (static dispatch, e.g., C++ non-virtual method):
-  ```
-  Object* obj = new Object();
-  name_mangled_Object_method(obj, arg1, arg2);
-  ```
-
-- `obj` is a pointer to the _receiver object_, i.e., a pointer to the allocated object in memory on which the method is being called
-
-- when doing a static analysis, the receiver object will be some abstract object (e.g., a static allocation site); object sensitivity uses this abstract object as the context for a context-sensitive analysis
-
-    + it doesn't track the actual callsite, like call-string context sensitivity
-
-    + it doesn't track the method arguments, like full or partial transfer functions
-
-- [can't show an example using our IR, since it isn't object-oriented]
-
-    + basically, for a method call `obj->method(...)` the context for analyzing `method` would be the abstract object pointed to by `obj`, as computed by some pointer analysis
-
-#### CFL reachability
-
-- this is a different approach to program analysis than either DFA or set constraint-based
-
-- suppose that we take a program and compute its ICFG, then label each call edge to a function `foo` at program point `p` as `(_p` and each return edge from `foo` to program point `p` as `)_p`
-
-- example: [use example from intro]
-
-- context sensitivity is trying to emulate the concrete behavior of function calls: at a callsite we go to the callee function, execute it, and return the results back to the _same_ callsite---we shouldn't mix results from different calls together
-
-    + that is, a _valid path_ for the analysis to take is one that respects the concrete flow of control for a function call
-
-- notice that in the labeled ICFG, valid paths correspond to properly nested parentheses
-
-    + [trace some valid paths in the ICFG and show the resulting strings from the labels]
-
-- properly nested parentheses is a context-free language, i.e., it can be described using a context-free grammar or a pushdown automaton
-
-    + notice the potential for confusion: we're talking about _context sensitivity_ using a _context free_ language; they're talking about different kinds of context
-
-- so the CFL reachability approach to context sensitivity is to only allow the analysis to follow ICFG paths that are part of the well-matched parentheses language
-
-    + CFL reachability == "context free language" reachability == from node X in the ICFG we can reach node Y using only valid paths according to some grammar
-
-- we can use CFL reachability for other things besides context sensitivity as well (e.g., field sensitivity)
-
-### context-sensitive heap models
-
-- when doing pointer analysis we used a common heap model: an abstract object per static allocation site
-
-    + we can make our pointer analysis context-sensitive using any of the methods outlined above (though it's not trivial and takes some thought and effort to make it work)
-
-    + we could still use the same heap model as before, but there is an opportunity to do better
-
-- example:
-
-  ```
-  fn main() -> int {
-    let tainted:int, untainted:int, x:&int, y:&int
-    entry:
-      tainted = $call src()
-      untainted = 42
-      x = $call_dir foo() then bb1
-
-    bb1:
-      y = $call_dir foo() then bb2
-
-    bb2:
-      $store x tainted
-      $store y untainted
-      $call snk1(x)
-      $call snk2(y)
-  }
-
-  fn foo() -> &int {
-    let p:&int
-    entry:
-      p = $alloc 1 [_a1]
-      $ret p
-  }
-  ```
-
-- note that both `x` and `y` point to the same abstract object; it doesn't matter if we treat `foo` context-sensitively, we'll still get an imprecise result
-
-- context-sensitive heap model: an abstract object per static allocation site _per context_
-
-- example revisited: now `x` points to `_a1_context1` and `y` points-to `_a1_context2`
-
-- as always, there's a cost: a context-sensitive heap model is more precise, but can be much more expensive
-
-# abstract interpretation
-## intro
-
-- DFA and set constraint-based analysis are intended to be sound, but don't provide any framework for _proving_ that an analysis is sound
-
-    + they provide ways to prove the analysis is _computable_, not _sound_
-
-    + essentially, the analysis designer is just supposed to "think about it real hard"
-
-    + this is OK for some applications (e.g., compilers) but not for others (e.g., critical systems such as medical devices, avionics, etc)
-
-- abstract interpretation is similar to DFA in many respects, but does provide a framework for proving soundness (and precision)
-
-- a sound analysis over-approximates program behavior---in order to prove anything about programs, we need a mathematical description of program behavior
-
-    + a formal _concrete semantics_ is a mathematical description of how a program behaves when it executes
-
-    + a formal _abstract semantics_ is a mathematical description of how the analysis behaves
-
-    + to prove an analysis is sound, we must prove that the abstract semantics over-approximates the concrete semantics
-
-    + abstract interpretation gives us the machinery required to do so (and a bit more as well: precision)
-
-- this is just a primer, we'll focus on:
-
-    + a simple language with no functions or pointers (IMP)
-
-    + first-order analyses (like integer analysis)
-
-    + we can easily extend to second-order analyses and more complicated languages, but the basic ideas remain the same
-
-## formal semantics
-### syntax vs semantics
-
-- how do we formally define a programming language?
-
-    - syntax (what a program looks like)
-    - semantics (how a program behaves)
-
-- for syntax there are standard, agreed-upon formalisms:
-
-    - regular expressions and context-free grammars
-    - parsing: translate concrete syntax (a text file) into an abstract syntax tree (AST, a data structure)
-
-- example abstract syntax for arithmetic expressions:
-
->   n ∈ 𝐙
->   e ∈ Exp ::= n | e1 PLUS e2 | e1 MUL e2
-
-- example AST: `(1 PLUS [6 MUL 3]) PLUS (3 MUL 2)` -- [draw as tree]
-
-- note that we would need something in the concrete syntax to establish precedence (e.g., parentheses), but this is handled automatically by the tree-shape of the AST once we translate to abstract syntax
-
-- for semantics there is no such concensus: there are many possible ways to formally define behavior, each with different tradeoffs
-
-### denotational semantics
-
-- like a dictionary, explain the "meaning" of a term by explaining it using already known, well-defined terms
-
-    + basically, a compiler from the AST to some known, well-defined formalism
-
-    + e.g., give a translation from the AST (the syntax) to a lambda calculus formula (describing the behavior of that syntax)
-
-    + our example language is too simple to need the lambda calculus, we can just translate using simple arithmetic:
-
->          ⟦n⟧ => n
-> ⟦e1 PLUS e2⟧ => ⟦e1⟧ + ⟦e2⟧
->  ⟦e1 MUL e2⟧ => ⟦e1⟧ * ⟦e2⟧
-
-> ⟦(1 PLUS [6 MUL 3]) PLUS (3 MUL 2)⟧ => 25
-
-### operational semantics
-
-- explain the "meaning" of a term by describing what it does (i.e., how it operates, hence the name)
-
-    + basically, a mathematically-defined interpreter for the syntax
-
-    + there are a variety of different types of operational semantics, we'll look at some of the most popular
-
-#### big-step operational semantics (aka natural semantics)
-
-- define as a set of recursive rules from the AST to the final answer
-
-    + this is similar to denotational at the surface level (especially for our simple language) but is actually different, which becomes more apparent for more complex languages
-
-    + it's called `big step` because the rules can be thought of as describing recursive functions that go from the AST to the final answer in one "big step"
-
->       ------- 
->       n ⇓ n
->
->       e1 ⇓ n1  e2 ⇓ n2
->       ----------------------
->       e1 PLUS e2 ⇓ n1 + n2
->
->       e1 ⇓ n1  e2 ⇓ n2
->       ----------------------
->       e1 MUL e2 ⇓ n1 * n2
-
-> (1 PLUS [6 MUL 3]) PLUS (3 MUL 2) ⇓ 25
-
-#### small-step structural operational semantics
-
-- define as a set of rewrite rules on the AST that end up with the final answer
-
-    + it's called `small step` because we see all the intermediate points between the AST and the final answer
-
-    + it's called `structural` because we define the rewrite rules in terms of the AST (which is a structure)
-
->       e1 ⟶ e1'
->       -------------------------
->       e1 PLUS e2 ⟶ e1' PLUS e2
->
->       e2 ⟶ e2'
->       -------------------------
->       n1 PLUS e2 ⟶ n1 PLUS e2'
->
->       ---------------------
->       n1 PLUS n2 ⟶ n1 + n2
->
->       e1 ⟶ e1'
->       -------------------------
->       e1 MUL e2 ⟶ e1' MUL e2
->
->       e2 ⟶ e2'
->       -------------------------
->       n1 MUL e2 ⟶ n1 MUL e2'
->
->       ---------------------
->       n1 MUL n2 ⟶ n1 * n2
-
-> (1 PLUS [6 MUL 3]) PLUS (3 MUL 2) ⟶
-> (1 PLUS 18) PLUS (3 MUL 2) ⟶
-> 19 PLUS (3 MUL 2) ⟶
-> 19 PLUS 6 ⟶
-> 25
-
-### small-step abstract machine-based operational semantics
-
-- this turns out to be a good choice for static analysis, so this is what we'll focus on from now on 
-        
-    - note that "abstract" is being used in the sense of "mathematical, not physical" and not the sense we've been using "abstract" as meaning "approximate, not concrete"
-
-    - we'll be defining an "abstract machine", i.e., a mathematical interpreter, that computes on ASTs
-
-    - we can easily translate this mathematical interpreter into a real interpreter (particularly using a functional language)---the result isn't efficient, but will clearly match the formalism and can be used as an oracle for correctness
-
-    - NOTE: you don't have to use this kind of semantics to do abstract interpretation, it's just the one that i've chosen
-
-- defining an abstract machine: first we define a "state" of the machine, then we define the rules of the machine that transition from one state to the next, aka `state transition rules`
-
-- first some intuition
-
-    + we can easily code up the big step semantics for arithmetic expressions as a recursive function
-
-    + how would we translate that into iterative (i.e., non-recursive) code? we would need to reify the function stack into an explicit data structure that keeps track of what still needs to be done
-
-    + we call that data structure a `continuation`, because it is the continuation of the execution
-
-        - languages with `first-class continuations` give the programmer a way to explicitly get a reference to the continuation and treat as a value, kind of like a closure (except it never returns)
-
-```
-fn bigstep(e:Exp) -> int {
-  match e with {
-    case Num(n) => return n
-    case Plus(e1, e2) => return bigstep(e1) + bigstep(e2)
-    case Mul(e1, e2) => return bigstep(e1) * bigstep(e2)
-  }
-}
-```
-
-```
-fn bigstep_nonrecursive(e:Exp) -> int {
-  let curr_exp = e
-  let kont = []
-
-  while !(curr_exp is Num and kont is empty) {
-    match curr_exp {
-      case Plus(e1, e2) => {
-        curr_exp = e1
-        kont.push_front(AddR(e2))
-      }
-      case Mul(e1, e2) => {
-        curr_exp = e1
-        kont.push_front(MulR(e2))
-      }
-      case Num(n1) => {
-        match cont.pop_front() {
-          case AddR(e) => {
-            curr_exp = e
-            kont.push_front(AddL(n1))
-          }
-          case MulR(e) => {
-            curr_exp = e
-            kont.push_front(MulL(n1))
-          }
-          case AddL(n2) => curr_exp = Num(n1 + n2)
-          case MulL(n2) => curr_exp = Num(n1 * n2)
-        }
-      }
-    }
-  }
-
-  return curr_exp.n // curr_exp must be a Num
-}
-```
-
-- show on `(1 PLUS [6 MUL 3]) PLUS (3 MUL 2)`
-
-- this is essentially what we'll be doing with our abstract machine, just using math instead of code
-
-- STATE
-
-    + the `Exp` part of the state is like `curr_exp` in the code
-    + the `Kont` part of the state is like `cont` in the code
-
-```
-ς ∈ State = Exp × Kont*
-κ ∈ Kont = addR Exp ⊍ addL ℤ ⊍ mulR Exp ⊍ mulL ℤ
-```
-
-- STATE TRANSITION RULES
-
-    + this is doing the same thing as the code
-
-```
-  (e1 PLUS e2, κ*) ⟶ (e1, addR e2 · κ*)
-   (e1 MUL e2, κ*) ⟶ (e1, mulR e2 · κ*)
-  (n, addR e · κ*) ⟶ (e, addL n · κ*)
-  (n, mulR e · κ*) ⟶ (e, mulL n · κ*)
-(n1, addL n2 · κ*) ⟶ (n1 + n2, κ*)
-(n1, mulL n2 · κ*) ⟶ (n2 * n1, κ*)
-```
-
-- show on `(1 PLUS [6 MUL 3]) PLUS (3 MUL 2)`
-
-## IMP concrete semantics
-
-- [see docs/imp-concrete.pdf]
-
-## concrete collecting semantics
-
-- the ideal program analysis solution (which is undecidable in general) is the exact set of states that a program could produce when it is executed
-
-    + a sound analysis over-approximates this set of states
-
-    + so in order to prove that our analysis is sound, we need to define what this ideal solution actually is, mathematically
-
-- the exact set of possible concrete states is called the `concrete collecting semantics`
-
-    + `concrete` because we're talking about the actual program execution
-
-    + `collecting` because we're collecting all states from all possible executions, not just a single execution
-
-- to formalize the collecting semantics for a program `P`:
-
-    + let `F` be the concrete semantics, lifted to operate on sets of states (i.e., `F` implements the abstract machine s.t., given a set of states, it outputs a new set of states using the state transition rules)
-
-    + let `i` be the initiate state for the program (before it starts executing)
-
-    + given a function `f : S -> S` over sets let `fᵁ(S) = S ∪ f(S)`, i.e., `fᵁ` unions its input with its output
-
-    + let the concrete lattice be the powerset of the set of all possible states (complete, but not noetherian)
-
-        - ⊤ = the set of all states
-        - ⊥ = the empty set
-        - ⊑ = ⊆
-        - ⊔ = ∪
-        - ⊓ = ∩
-
-    + then `⟦P⟧₊` = `lfpᵢ Fᵁ`
-
-    + in other words, it's the set of all possible _reachable_ states of the program starting from the initial state
-
-- so `⟦P⟧₊` is the exact analysis solution that we need to over-approximate
-
-## IMP abstract semantics
-
-- we define the abstract semantics using the same abstract machine method as we used for the concrete semantics
-
-    + instead of concrete values we use abstract values
-
-    + conditionals may be nondeterministic
-
-- [see docs/imp-abstract.pdf]
-
-## abstract collecting semantics
-
-- we can now define the abstract collecting semantics:
-
-    + let `F♯` be the abstract semantics, lifted to operate on sets of abstract states
-
-    + let `i♯` be the initiate abstract state for the program
-
-    + then `⟦P⟧♯₊` = `lfp_{i♯} F♯ᵁ`
-
-    + in other words, it's the set of all possible reachable abstract states starting from the initial abstract state
-
-- we can easily implement `⟦P⟧♯₊` as a straightforward translation from the mathematical description to code
-
-    + this is an implementation of the analysis
-
-    + however, we're getting a MOP solution rather than a MFP solution, with all the caveats that we had for DFA
-
-    + we'll look at getting a MFP solution using an easy and straightforward method in a bit
-
-- one complication: we want the sets of abstract states to form a complete lattice just like the concrete collecting semantics did
-
-    + if we defined the abstract domains used for the abstract states as complete lattices, then the abstract states form a complete lattice (e.g., given `a,b ∈ State♯`, we can ask things like: is `a ⊑ b`?)
-
-    + but we need _sets_ of abstract states to form a complete lattice, which isn't quite as easy
-
-        - we can't just use a powerset lattice like we did with concrete states
-
-        - why not? hint: 
-        
-            + (pp, x ↦ Even) ⊑ (pp, x ↦ ⊤)
-            + `{(pp, x ↦ Even)}` ⊈ `{(pp, x ↦ ⊤)}`
-
-    + first try: `∀A,B ∈ P(State#). A ⊑ B ⇔ ∀a ∈ A, ∃b ∈ B, a ⊑ b`
-
-        - i.e., if every state in `A` is over-approximated by some state in `B` then `A ⊑ B`
-
-    + this is almost right, except it isn't a partial order because it isn't anti-symmetric
-
-        - `{(pp, x ↦ Even), (pp, x ↦ ⊤)} ⊑ {(pp, x ↦ Odd), (pp, x ↦ ⊤)}`
-        - `{(pp, x ↦ Odd), (pp, x ↦ ⊤)} ⊑ {(pp, x ↦ Even), (pp, x ↦ ⊤)}`
-
-    + solution: use a "quotient lattice", which groups sets of states into equivalence classes based on ⊑
-
-- now `(℘(State♯), ⊑)` is a complete lattice and the solution to the abstract collecting semantics is an element of that lattice
-
-- if we assume that the individual abstract domains making up an abstract state are noetherian then the abstract lattice is also notherian, and thus the abstract collecting semantics is computable
-
-## proving soundness
-### problem statement
-
-- now we have a formal definition of the exact analysis solution (from the concrete semantics) and a formal definition of the approximate analysis solution (from the abstract semantics)
-
-- we need to show that the abstract semantics gives an over-approximation of the exact solution
-
-- we have:
-
-    - concrete lattice `L = (P(State), ⊆)`
-    - abstract lattice `L♯ = (P(State♯), ⊑)`
-    - abstraction function `α ∈ L ⟶ L♯`
-    - concretization function `γ ∈ L♯ ⟶ L`
-    - concrete transition function `F ∈ L ⟶ L`
-    - abstract transition function `F♯ ∈ L♯ ⟶ L♯`
-
-- we want to show `lfp_i Fᵁ ⊆ γ(lfp_α(i) F♯ᵁ)`
-
-    + or alternatively `∀ℓ∈L, F(ℓ) ⊆ γ(F♯(α(ℓ)))`
-    + this amounts to the same thing
-
-- this is our formal statement of what soundness means
-
-- EXAMPLE: constant propagation
-
-```
-L♯ [x↦0,y↦⊤,z↦3] ———————— F♯(x = y+z) --------→ [x↦⊤,y↦⊤,z↦3]
-          ↑                                              |
-          |                                              γ
-          α                                              ↓
-          |                                              X
-          |                                              ⊆
-L {[x↦0,y↦2,z↦3],[x↦0,y↦4,z↦3]} —- F(x = y+z) -→ {[x↦5,y↦2,z↦3],[x↦7,y↦4,z↦3]}
-```
-
-- BUT, this is only a safety condition: making everything ⊤ satisfies this requirement...we also want to ensure that the analysis solution is as precise as possible given the abstract domain we're using
-
-### galois connections
-
-- let `A`, `B` be posets and `F ∈ A⟶B`, `G ∈ B⟶A`; then `(F, G)` is a galois connection iff
-
-  + `F` and `G` are monotone
-  + `∀a∈A, b∈B, F(a) ⊑_B b ⇔ a ⊑_A G(b)`
-  + alternatively: `a ⊑_A (G∘F)(a)` and `(F∘G)(b) ⊑_B b`
-
-- this connection is denoted `A(galois double arrows F,G)B`
-
-- in terms of our analysis framework, `L(galois α,γ)L♯` iff:
-
-  + `α` and `γ` are monotone
-  + `∀x∈L, ∀x̂∈L♯, α(x) ⊑ x̂ ⇔ x ⊆ γ(x̂)`
-  + alternatively: `x ⊆ γ(α(x))` and `α(γ(x̂)) ⊑ x̂`
-
-- if we break the ⇔ into each direction, both are saying that `x̂` is a sound approximation of `x`, but having both directions guarantees that `x̂` is the "best" approximation of `x` (i.e., most precise given this particular abstract domain)
-
-- EXAMPLE: constant propagation
-
-    + `L = (𝒫(ℤ), ⊆)`
-    + `L♯ = (ℤ ∪ {⊥, ⊤}, ⊑)`
-    + for `n ∈ 𝐙, x ∈ 𝒫(𝐙)`, `α({}) = ⊥` and `α({n}) = n` else `α(x) = ⊤`
-    + for `n ∈ 𝐙, x̂ ∈ ℤ ∪ {⊥, ⊤}`, `γ(⊥) = {}` and `γ(n) = {n}` and `γ(⊤) = 𝐙`
-
-    + need to prove that `α` and `γ` are monotone (they are)
-    + need to prove that `x ⊆ γ(α(x))` and `α(γ(x̂)) ⊑ x̂`
-
-```
-L:  {} ⊆ {2} ⊆ {1,2} ⊆ {1,2,3} ⊆ ... ⊆ ℤ
-    |↑    |↑       \                    |↑
-    αγ    αγ        α                   αγ
-    ↓|    ↓|         \_________________ ↓|
-L♯: ⊥  ⊑  2                           ⊑ ⊤
-```
-
-- suppose we changed `α` so that `α({n}) = ⊤`; this is sound but not as precise as we could be
-
-    + then look specifically at `{2}` in the diagram above: its abstraction now goes to `⊤` instead of `2` and so `α(γ(2)) ̸⊑ 2`
-
-    + this example just builds intuition for why a galois connection guarantees that we are getting the best possible precision for a particular abstract domain
-
-- given a concrete semantics `F` and a galois connection `(α, γ)`, we can compute the best possible (i.e., most precise) abstract semantics `F♯` as:
-
-    + `F♯ = α ∘ F ∘ γ`
-
-    + in other words, given a set of abstract states we can compute the set of next abstract states by (1) using `γ` to get a set of concrete states, (2) using `F` to compute the next set of concrete states, then (3) using `α` to transform the next set of concrete states into a set of abstract states
-
-    + however, usually this is not a computable function
-
-- in reality we come up with our own `F♯` and then prove that `α ∘ F ∘ γ ⊑ F♯`
-
-- EXAMPLE: constant propagation
-
-    + we can prove that the abstract semantics we created before (shown below) is exactly implementing `α ∘ F ∘ γ`
-
-```
-   + | ⊤ | c2     | ⊥
- ----+---+--------+---
- ⊤   | ⊤ | ⊤     | ⊥
- c1  | ⊤ | c1+c2 | ⊥
- ⊥   | ⊥ | ⊥     | ⊥
-```
-
-- IMPORTANT NOTE: for certain abstract domains a galois connection may not exist
-
-    + example: convex polyhedra (conjunctions of linear inequalities on reals) and approximating a circle
-
-    + you can still define an `α` and `γ`, but that doesn't automatically mean that they form a galois connection---you have to prove the requirements hold
-
-    + if we can't have a galois connection, we fall back to our basic safety condition to prove soundness, i.e., `lfp_i Fᵁ ⊆ γ(lfp_α(i) F♯ᵁ)`
-
-## widening for control-flow
-
-- the abstract collecting semantics is, essentially, an MOP solution: we're computing all reachable states along all possible paths
-
-- to get a MFP solution (aka flow-sensitive), we can apply a simple procedure:
-
-    + let `ς1 ~ ς2` (i.e., state 1 is equivalent to state 2) iff they contain the same statement
-
-    + whenever we compute a set of abstract states, join all equivalent abstract states together, yielding at most a single abstract state per program point
-
-- mathematically we can specify this as a widening operator:
-
-    + for `X,Y ∈ 𝒫(State♯)`, `X ▽ Y = { ⨆_(s ∈ S) s | S ∈ (X ∪ Y)/~ }`
-
-    + in other words, take the collective set of states `X ∪ Y`; split them into their equivalence classes based on the `~` relation `(X ∪ Y)/~`; then for each equivalence class `S ∈ (X ∪ Y)/~` join all the states in that equivalence class together
-
-    + this meets all our requirements for being a widening operator
-
-- instead of computing `lfpᵢ F♯ᵁ`, compute `lfpᵢ F♯▿` (that is, use `▿` instead of `∪` to combine the abstract states)
-
-    + because it's a widening operator we potentially lose precision (depending on whether the analysis is distributive or not) but retain soundness, just like MFP vs MOP for DFA
-
-- this is an extremely versatile idea: we can specify and implement lots of different control-flow sensitivities by defining them as a widening operator this way (including all sorts of context sensitivities)
+\[L2-concrete-syntax.pdf section 2, the rest of the program\]
