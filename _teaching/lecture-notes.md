@@ -1,60 +1,8 @@
-# PLANS
+# TODO:
 
-- topics:
-
-    1. lexing (source --> tokens)
-    2. ll(1) parsing (tokens --> AST)
-    3. validation (AST)
-    4. lowering (AST --> LIR)
-    5. codegen (LIR --> x86)
-    6. register allocation (x86) -- naive graph coloring
-    7. optimization (LIR) -- constant propagation, dead store/assignment elimination, value numbering, copy propagation
-    8. memory management (GC)
-
-- assignment schedule:
-
-    - OPTION 1
-    - week 2T assign-1 (lexer) [10 days]
-    - week 3F assign-2 (parser/validation) [11 days]
-    - week 5T assign-3 (lowering) [10 days]
-    - week 6F assign-4 (codegen) [11 days]
-    - week 8T assign-5 (register allocation) [10 days]
-    - week 9F assign-6 (optimization) [14 days]
-    - finals [due friday]
-
-    - OPTION 2
-    - week 1R assign-1 (lexer) [11 days]
-    - week 3M assign-2 (parser/validation) [11 days]
-    - week 4F assign-3 (lowering) [12 days]
-    - week 6W assign-4 (codegen) [9 days]
-    - week 7F assign-5 (register allocation) [14 days]
-    - week 9F assign-6 (optimization) [14 days]
-    - finals [due friday]
-
-    - OPTION 3
-    - week 1R assign-1 (lexer) [11 days]
-    - week 3M assign-2 (parser/validation) [11 days]
-    - week 4F assign-3 (lowering) [12 days]
-    - week 6W assign-4 (codegen) [12 days]
-    - week 8M assign-5 (register allocation) [11 days]
-    - week 9F assign-6 (optimization) [14 days]
-    - finals [due friday]
-
-- grading strategy:
-
-    - assignments autograded with sets of test suites, each with a point value
-    - on-time submission: 100% of earned points
-    - within 5 days late: 89% of earned points
-    - before end of finals: 69% of earned points
-    - one assignment can be turned in before end of finals without any late penalty
-
-TODO:
-
-- revise lecture notes
-- create handouts for language, passes
+- create handouts for language, compiler passes
 - implement stuff for assignments
 - create autograders for assignments
-- reimplement cflat specifically for this class?
 
 # Spring 2024 notes
 ## lecture timing
@@ -80,6 +28,16 @@ TODO:
 - week 10.1: 
 - week 10.2: 
 
+## assignment timing
+
+- week 2T assign-1 (lexer) [10 days]
+- week 3F assign-2 (parser/validation) [11 days]
+- week 5T assign-3 (lowering) [10 days]
+- week 6F assign-4 (codegen) [11 days]
+- week 8T assign-5 (register allocation) [10 days]
+- week 9F assign-6 (optimization) [11 days]
+- finals [due tuesday]
+
 ## grading scale
 
 | percentage | letter grade |
@@ -97,6 +55,10 @@ TODO:
 | 63--66     | D            |
 | 60--62     | D-           |
 | 00--59     | F            |
+
+## code
+
+- see farrago/cflat repo under the 160-s24 branch for the implementation we used for this class
 
 # logistics
 
@@ -133,7 +95,7 @@ TODO:
 
     - TA office hours to be announced (mix of in-person and remote)
 
-- discussion sections: no new material; give examples and exercises, answer questions
+- discussion sections: no new material; review, give examples and exercises, answer questions
 
 - assessment:
 
@@ -193,7 +155,7 @@ TODO:
 
         - so we still need to be able to translate source code into machine code
 
-- EXAMPLE source code: [see OneNote] // FIXME:
+- source code: [see OneNote]
 
 ```
 "x = x + 2;"
@@ -323,9 +285,12 @@ mov eax, [esp+4]
 - the lexer takes source code (as a single string) and turns it into a sequence of _tokens_
 
     - lexer stands for "lexicographic analyzer"
-    - a token is a "word" in our programming language
 
-- EXAMPLE [see OneNote] FIXME:
+    - a token is a "word" in our programming language
+    
+    - the lexer categorizes substrings of the input into classes of recognized things in our language
+
+- lexing example [see OneNote]
 
 ```
 // as an example
@@ -358,7 +323,9 @@ while sum < total {
 
 - notice that lexing eliminated the comments and whitespace, what's left are the building blocks of the source code
 
-    - some tokens carry extra information (e.g., for VAR what the name is); these are ignored by the parser but necessary for later stages
+- the tokenizer recognizes that, e.g., "let" is a keyword instead of a variable, that "sum" is a variable, that "10" is a number, etc
+
+- some tokens carry extra information (e.g., for VAR what the name is); these are ignored by the parser but necessary for later stages
 
 - how does the lexer know what the tokens should be?
 
@@ -388,7 +355,7 @@ while sum < total {
 
 - the internal representation usually isn't the actual derivation tree because it contains a lot of things we don't care about when compiling (e.g., punctuation); instead we usually use an _abstract syntax tree_ (AST) that keeps the structure of the derivation tree but only keeps the important information
 
-- EXAMPLE [see OneNote] FIXME:
+- parsing example [see OneNote; draw tree]
 
 ```
 LET
@@ -453,7 +420,7 @@ y = x * y;
 
 - let's look at some examples (to keep things simple we'll just modify the source code itself instead of showing the IR):
 
-- original [see OneNote] FIXME:
+- original [see OneNote]
 
 ```
 let sum:int = 0, total:int = 5, x:int = 2;
@@ -509,7 +476,7 @@ while sum < 5 {
 
     - i'll use a pseudo assembly to keep things simple
 
-- EXAMPLE using original source code and assuming each variable corresponds to its own register [see OneNote] // FIXME:
+- EXAMPLE using original source code and assuming each variable corresponds to its own register [see OneNote]
 
 ```
     MOV #0, sum    // move constant into register
@@ -593,11 +560,738 @@ L2: MOV #10, tmp
 
 - of course, for real compilers we want _all_ of these things, and building a real compiler for a language you don't control is very difficult
 
-# introducing cflat TODO:
+# introducing cflat
 
-# lexing TODO:
+- [show example programs] [see OneNote]
 
-# parsing TODO:
+    - see `docs/linked_list.cb`
+    - see `docs/matrices.cb`
+
+- [show ambiguous grammar] [see OneNote]
+
+    - see `docs/grammar-1.md`
+
+# lexing
+
+- our first step is to define the tokens, i.e., the elements of our language
+
+- these come from our grammar: keywords, symbols, punctuation, constants, identifiers, etc
+
+    - [see grammar to point out tokens]
+    - [see OneNote for token list]
+
+- we specify what each kind of token looks like using regular expressions
+
+    - we're using somewhat extended regular expression notation, but it maps easily to the standard expressions you learned in 138
+
+```
+   r+ ⟶ rr*
+   r? ⟶ r | ϵ
+[abc] ⟶ a | b | c
+[a-z] ⟶ a | b | ... | z
+[^ab] ⟶ Σ - {a, b}
+```
+
+- our tokens:
+
+```
+TOKEN        REGEX
+---------------------------------------------
+Num(info)    [0-9]+
+Id(info)     [a-zA-Z][a-zA-Z0-9]*
+Int          int
+Struct       struct
+Nil          nil
+Break        break
+Continue     continue
+Return       return
+If           if
+Else         else
+While        while
+New          new
+Let          let
+Extern       extern
+Fn           fn
+Ampersand    &
+Colon        :
+Semicolon    ;
+Comma        ,
+Underscore   _
+Arrow        ->
+Plus         +
+Dash         -
+Star         *
+Slash        /
+Equal        ==
+NotEq        !=
+Lt           <
+Lte          <=
+Gt           >
+Gte          >=
+Dot          .
+Gets         =
+OpenParen    (
+CloseParen   )
+OpenBracket  [
+CloseBracket ]
+OpenBrace    {
+CloseBrace   }
+```
+
+- we also need to specify what whitespace and comments look like (we cheated a bit in the grammar by using `-` in the c-comment regex, this is technically regular but can be very expensive to compute)
+
+```
+whitespace = (' ' | '\t' | '\n' | '\r')+
+
+c++-comment = //[^'\n']*
+-- notice we don't require '\n' at the end, which handles comments that go to
+   EOF without terminating
+
+c-comment = /*([^*] | *⋆[^*/])⋆*+/
+-- using ⋆ for kleene star and * for the literal asterisk character
+
+unclosed-c-comment = /*([^*] | (*+[^*/]))⋆*⋆
+-- similarly we need to handle comments that go to EOF without terminating
+
+skip = (whitespace | c++-comment | c-comment)* (unclosed-c-comment | ϵ)
+```
+
+- notice that some tokens should carry extra information (the lexer and parser don't actually care about this extra info, but we'll need it for the rest of the compiler)
+
+    - if we have a Num, what were the digits? if we have an Id, what were the characters?
+
+    - we can represent this information as indices in the input string
+
+- now we know what our tokens are and what they look like; the next step is to map the actual characters in the input stream to a sequence of tokens
+
+    - the sequence of characters that make up a token is called a _lexeme_
+
+- example: "foo = bar + 01"
+
+```
+lexeme token
+------ -----
+foo    Id(foo)
+=      Gets
+bar    Id(bar)
++      Plus
+01     Num(01)
+```
+
+- we know how to recognize regular languages: convert a regular expression to an NFA, then simulate the NFA on some input
+
+    - simulating an NFA was covered in 138, now you need to implement it in code
+
+    - you could convert the regular expressions to NFA manually, but it's tedious and error-prone; i'd recommend implementing it in code (but it's up to you)
+
+- EXAMPLE [see OneNote]
+
+```
+RE
+| EmptyLang
+| EmptyString
+| CharRange { lower: char, upper: char } // e.g., [a-z]
+| Star { r: RE }
+| Concat { first: RE, second: RE }
+| Union { left: RE, right: RE }
+
+// for regex "/*([^*] | *⋆[^*/])⋆*+/":
+re = RE::char_seq("/*").then(
+        RE::anything_but('*').or(
+          RE::char('*').star().then(RE::anything_but(['*','/'])
+        ).star()
+     )
+     .then(RE::char('*').plus())
+     .then(RE::char('/')))
+
+NFA
+- states: set<State>
+- transitions: map<State, vector<(option<RE::CharRange>, set<State>)>>
+- init: State
+- accepting: set<State>
+
+nfa = re.convert_to_nfa()
+
+nfa.accepts("/* this is a comment */");
+```
+
+- but we don't have a single regular expression and a single lexeme, we have a set of regular expressions corresponding to different lexemes and an input that contains a sequence of lexemes
+
+- tag each accepting state of each nfa with the token it maps to (or Skip if it maps to a comment or whitespace), then union all the nfas together into a single nfa
+
+    - this handles the fact that we're looking for multiple lexemes: when we get a match, look at the accepting state to see what token should be produced
+
+    - keep walking though the input emitting tokens as we find them, starting at the position after the previous match, until we've processed the entire input
+
+- EXAMPLE/EXERCISE
+
+```
+suppose we have:
+- TkAB(chars) = a+b
+- TkBA(chars) = b+a
+- skip = c+
+
+[draw NFA]
+
+process input "aabbaccabcbba"
+
+token stream: [TkAB(0..2), TkBA(3..4), TkAB(7..8), TkBA(10..12)]
+```
+
+- still a problem: ambiguity between the token regular expressions
+
+    - consider the following examples:
+
+        - "ab" ⟶ `[Id(ab)]` vs `[Id(a), Id(b)]`
+        - "whilex" ⟶ `[While, Id(x)]` vs `[Id(whilex)]`
+        - "while" ⟶ `[While]` vs `[Id(while)]`
+
+    - how do we figure out which token to emit if there are multiple possibilities?
+
+- solution 1: maximal munch
+
+    - take the longest possible match
+
+    - when lexing, record the last accepting state reached but keep on going until matching fails---then backtrack to the last accepted character
+
+    - this handles the first two examples:
+
+        - "ab" ⟶ `[Id(ab)]`
+        - "whilex" ⟶ `[Id(whilex)]`
+
+- solution 2: priorities
+
+    - maximal munch doesn't help if both possible lexemes are the same size (like our third example, "while")
+
+    - we give priorities to the different accepting states, and if there are multiple accepting states then we pick the one with highest priority
+
+    - for our language we'll say that keywords have priority over identifiers; this handles the third example:
+
+        - "while" ⟶ `[While]`
+
+- EXAMPLE/EXERCISE
+
+```
+suppose we have:
+- TkAB(chars) = a*b*
+- TkBA(chars) = b*a*
+- with priority(TkAB) > priority(TkBA)
+
+[draw NFA]
+
+process input "bbaabbbb"
+
+token stream: [TkBA(0..3), TkAB(4..7)]
+```
+
+- final thoughts:
+
+    - lexing can be easy if we define our syntax carefully, but full of pitfalls if we're careless
+
+    - in general it's good to reduce ambiguity as much as possible; which token a lexeme corresponds to shouldn't depend on what context it's used in
+
+        - famous C++ example: `vector<set<int>>` is a syntax error because `>>` is read as a bitshift operator, you need to write `vector<set<int> >`
+
+    - why regular expressions, why not contex-free grammars?
+
+        - we can use CFGs (they can do anything REs can do), and there are examples where people have done so (see "scannerless parsers")
+
+        - in general lexing using regular expressions makes the parser a lot simpler and more efficient
+
+        - it does also explain why you can't nest c-style comments: proper nesting is context-free, you can't describe it using regular expressions
+
+# parsing
+## overview
+
+- we describe the syntax of our language as a context-free grammar, with tokens as the terminal symbols of our alphabet
+
+    - [show `docs/grammar-1.md` again]
+    - [show `docs/grammar-2.md` with regex productions]
+
+- given a CFG and a string, we can prove that the string is a member of the CFG's language using a derivation tree (aka parse tree, concrete syntax tree)
+
+```
+grammar:
+ E ::= [1] Id | [2] E Op E | [3] ( E )
+Op ::= [4] + | [5] *
+
+string: "(x + y) * z"
+
+tokens: [OpenParen, Id(x), Plus, Id(y), CloseParen, Mul, Id(z)]
+-- for clarity we'll abbreviate the tokens using the corresponding characters
+
+derivation tree [arrange as tree]:
+E -[2]→ E Op E
+  -[3]→ ( E ) Op E
+  -[2]→ ( E Op E ) Op E
+  -[1]→ ( x Op E ) Op E
+  -[4]→ ( x + E ) Op E
+  -[1]→ ( x + y ) Op E
+  -[5]→ ( x + y ) * E
+  -[1]→ ( x + y ) * z
+```
+
+- the internal nodes of the tree are nonterminals, with the root being the grammar start symbol; the leaves of the tree are the tokens (in order)
+
+- if we can create such a derivation tree, then the token stream represents a syntactically correct program
+
+    - the derivation i went through in the example is called a _leftmost derivation_ because i always expanded the leftmost leaf in the derivation tree
+
+    - we could expand the leaves in any order and get the same tree, but leftmost is a natural order to use when we're processing the input from the beginning to the end---we're matching the beginning of the input before matching the rest of the input
+
+- EXERCISE: using the same grammar, give a derivation tree for the input `x + y + x * z + z`
+
+    - there is more than one possible derivation
+
+- this is the essence of parsing: proving that an input belongs to the language by constructing a derivation tree
+
+    - as discussed previously we rarely actually construct the entire derivation tree explicitly, instead we construct an abstract syntax tree that is more useful for compilation
+
+    - however, IDEs _do_ construct the derivation tree so that they can do things like syntax highlighting, etc
+
+## ambiguity
+
+- the biggest problem we face showed up in the last exercise, and is the same thing we had to deal with in lexing: ambiguity
+
+    - a grammar is _ambiguous_ if there is at least one input in the language that has more than one parse tree
+
+- this is a problem because the parse tree determines how a program will be executed
+    
+    - consider the difference between `(1 + 2) * 3` and `1 + (2 * 3)`
+
+    - the syntactic structure of the program influences its meaning, the same as in english
+
+     - consider "she saw the man with a telescope"; what does it mean?
+
+- arithmetic expressions are an easy example, but it can come up in lots of places---a famous example is "dangling elses"
+
+```
+stmt ::= `if` exp `then` stmt `else` stmt
+       | `if` exp `then` stmt
+       | x `=` exp
+
+// code
+a = false;
+c = 1;
+if a then
+  if b then c = 2;
+else c = 3;
+```
+
+- what is the value of `c`?
+
+    - remember that whitespace is not significant, we skip it during lexing
+
+    - [show two parse trees, one where the `else` is attached to the first `if` and one where it is attached to the second]
+
+- so we want to avoid grammars that are ambiguous
+
+    - unfortunately, determining whether a grammar is ambiguous is undecidable
+
+    - but we _can_ determine whether a grammar is _deterministic_
+
+    - deterministic implies unambiguous, though unambiguous does _not_ imply deterministic
+
+- recall that a PDA is an NFA + a stack, a DPDA is a DFA + a stack, and DPDA are strictly less expressive than PDA (unlike regular languages where DFA and NFA are equally expressive)
+
+    - a PDA is deterministic if, from each state, the current input and the current top of the stack allows for at most one transition
+
+    - PDAs and CFGs are equivalent (we can transform each into the other)
+
+    - since DPDA are less expressive than PDA, there must be CFG that cannot be expressed as DPDA; these include all ambiguous grammars (and also some non-ambiguous grammars)
+
+    - a grammar that can be expressed with a DPDA is a deterministic grammar, and there is an algorithm that decides whether this is true
+
+- it's important to note that ambiguity is a property of a _grammar_, not a _formal language_
+
+    - the same formal language can have multiple grammars, some of which are ambiguous and some of which are not
+
+    - there exist formal languages that only have ambiguous grammars, but they don't arise for realistic programming languages
+
+- this gives us a solution: if the original grammar for our programming language syntax is not deterministic, transform it into one that is (while still describing the same syntax)
+
+    - this isn't always possible, but again for realistic programming languages it tends to be
+
+    - if it isn't, then we have to change our programming language syntax until it is
+
+- example (dangling elses again)
+
+```
+stmt ::= `if` exp `then` withelse `else` stmt
+       | `if` exp `then` stmt
+       | x `=` exp
+
+withelse ::= `if` exp `then` withelse `else` withelse
+           | x `=` exp
+```
+
+- this version of the grammar recognizes exactly the same set of inputs, but only allows for a single parse tree
+
+    - it requires any `else` to be associated with the "nearest" `if`
+
+- of course, we can always just change our programming language to make it obviously deterministic
+
+    - require that expressions use parentheses everywhere
+    - require that braces be used everywhere
+    - etc
+
+- this makes implementing the compiler easy, but can make programmers frustrated and annoyed
+
+    - it's often true that we can either make things convenient/nice for the programmer but complicated for the compiler implementor or vice-versa
+
+    - usually we should default to making things nice for the programmer even if it makes our lives difficult as compiler implementors
+
+## parsing strategies
+
+- we know what the goal of parsing is, but how do we do it? there are actually a large number of strategies with different tradeoffs in complexity, expressiveness, performance, ease of use, etc
+
+- let's take the same example we used earlier
+
+```
+grammar:
+ E ::= [1] Id | [2] E Op E | [3] ( E )
+Op ::= [4] + | [5] *
+
+string: "(x + y) * z"
+```
+
+- we can divide all of the strategies into two basic categories: top-down and bottom-up
+
+- TOP-DOWN: start from the root of the derivation tree, i.e., the grammar start symbol (`E` in this case) and work our way down to the leaves, selecting productions for each node that will result in the leaves matching the input string
+
+    - this seems like it involves a lot of guess-work, but clever versions of the approach can be very efficient
+
+    - [show top-down approach for example]
+
+- BOTTOM-UP: start from the leaves of the derivation tree, i.e., the input, and work our way up the tree selecting productions in reverse
+
+    - [show bottom-up approach for example]
+
+- besides top-down vs bottom-up, parsing strategies can be divided by what class of grammars they work for
+
+    - there are strategies that work for _any_ grammar, including ambiguous ones (e.g., CYK, Earley, GLL, GLR, etc); they are O(n³) and, for ambiguous inputs, result in a parse forest instead of a parse tree
+
+    - there are strategies that work for any _deterministic_ grammar (e.g., LR, a bottom-up strategy); these are linear but complex to implement (usually we resort to automatically generating an LR parser instead of coding it by hand)
+
+    - there are strategies that work for a _subset_ of deterministic grammars (e.g., LL(k), a top-down strategy); these are also linear and, even though they are less expressive, they have other nice properties
+
+        - LL(k) parsers can be handwritten, giving very fine control over parsing and allowing for easier error recovery and error messages
+
+        - a popular choice for mainstream compilers, including gcc and clang
+
+        - this is what we'll be implementing for our language
+
+## recursive descent and LL(1)
+### intro
+
+- we'll begin by assuming we have a suitable LL(1) grammar and discuss how to parse it; later we'll discuss how to transform a grammar into LL(1) if possible
+
+- LL(1) is an example of a top-down parser, and a common strategy for these types of parsers (which we'll be using) is _recursive descent_
+
+    - there are other strategies, but recursive descent is the most popular
+
+- we'll go over a naive recursive descent strategy first, then show how an LL(1) grammar can make it much more efficient
+
+- to illustrate the ideas we'll use the following simple grammar
+
+```
+S ::= aSa | bSb | c
+```
+
+### naive recursive descent
+
+- from 138 we know that we can transform any CFG into a PDA
+
+    - there are several possible transformations, but we'll use the one that yields a top-down strategy
+
+```
+q0 -[ϵ, ϵ⟶S$]→ q1 -[ϵ, $⟶ϵ]→ q2 (accepting)
+                ⇵
+             [ϵ, S⟶aSa]
+             [ϵ, S⟶bSb]
+             [ϵ, S⟶c]
+             [a, a⟶ϵ]
+             [b, b⟶ϵ]
+             [c, c⟶ϵ]
+```
+
+- this is _not_ a DPDA because there are 3 possible transitions if `S` is on top of the stack
+
+    - for now we'll assume we have some oracle that lets us always pick the right transition to use
+
+- let's see what happens with input `abcba`; pay particular attention to the stack
+
+```
+ϵ ⟶ S$ ⟶ aSa$ ⟶ ̸aSa$ ⟶ ̸abSba$ ⟶ ̸a̸bSba$ ⟶ ̸a̸bcba$ ⟶ ̸a̸b̸cba$ ⟶ ̸a̸b̸c̸ba$ 
+  ⟶ ̸a̸b̸c̸b̸a$ ⟶ ̸a̸b̸c̸b̸a̸$
+```
+
+- the stack is going through a top-down derivation for the input
+
+    - when the top of the stack is `S` we expand it by pushing a production
+
+    - when the top of the stack is a terminal we match it against the input
+
+    - starting from `S` we work our way to the entire input string, and because of how the stack works we're getting a leftmost derivation
+
+- this approach gives us what we want, but relies on having an oracle; what if we don't have one?
+
+    - then we need to guess, and if we guess wrong then we need to backtrack, i.e., if the PDA rejects we need to rollback to the last place we guessed and guess something different
+
+    - this can be exponential if we always guess wrong at first; we'll see soon how an LL(1) grammar can prevent this problem from happening
+
+- how would we implement this idea in code?
+
+    - the PDA stack is what's keeping track of the derivation
+
+    - we don't need to actually translate the grammar to a PDA, we can use the computer's implicit function stack [remind them how a function stack works]
+
+    - in other words, we use recursion
+
+- here's how it works for our example in pseudocode [see OneNote]
+
+```
+S ::= aSa | bSb | c
+
+fn S() {
+  saved_input = curr_input;
+
+  try { // aSa
+    curr_input.consume('a');
+    S();
+    curr_input.consume('a');
+  }
+  else try { // bSb
+    curr_input = saved_input;
+    curr_input.consume('b');
+    S();
+    curr_input.consume('b');
+  }
+  else try { // c
+    curr_input = saved_input;
+    curr_input.consume('c')
+  }
+  else {
+    curr_input = saved_input;
+    fail
+  }
+}
+```
+
+- [show what happens for input `abcba`]
+
+- notice that the recursive function stack is mimicking what happened with the PDA stack---it's tracking the derivation
+
+    - when we make a recursive call we save our current place in the code, process the call, then resume from where we left off---e.g., the stack lets us remember that after we match an `a` and then try to match `S()`, we still need to match another `a`
+
+- here's the general idea for any grammar
+
+    - create a set of mutually recursive functions, one per nonterminal
+
+    - each function `A()` will have a case for each rule `A ::= α` in the grammar
+
+    - when `A()` is called it tries each case in turn until it succeeds or runs out of cases and fails
+
+    - suppose we have rules `A ::= α₁α₂...αₙ | β₁β₂...βₘ`, where each `αᵢ` and `βᵢ` may be either a terminal (i.e., a character) or a nonterminal
+
+    - then we create a function `A()` that tries the first rule, then if it doesn't work it tries the second rule, then if that doesn't work it fails
+
+    - for each rule we look at `αᵢ` (or `βᵢ` depending on which rule we're trying) and:
+
+        - if `αᵢ` is a terminal, tries to consume matching characters from the input; if successful goes to `αᵢ₊₁` else fails this rule
+
+        - if `αᵢ` is a nonterminal, calls the corresponding function; if the function returns successfully then we go to `αᵢ₊₁` else we fail this rule
+
+### LL(1) recursive descent
+
+- backtracking kills performance, can we prevent it? not in general, but for some grammars yes we can
+
+- consider the PDA we created for our example gramar and note that we could make it a DPDA by adding _lookahead_
+
+```
+q0 -[ϵ, ϵ⟶S$]→ q1 -[ϵ, $⟶ϵ]→ q2 (accepting)
+                |↑
+      [a, ϵ⟶ϵ] || [ϵ, a⟶ϵ]
+                ↓|
+                qA
+                ⇵
+            [ϵ, S⟶aSa]
+
+[repeat construction for qB, qC]
+```
+
+- let's see what happens with input `abcba`
+
+    - [same as before, except not relying on oracle]
+
+    - it's completely deterministic, no guessing involved
+
+- what does that mean for our recursive descent algorithm? it means no backtracking is necessary [see OneNote]
+
+```
+fn S() {
+  if next token is 'a' { // aSa
+    input.consume('a');
+    S();
+    input.consume('a');
+  }
+  else if next token is 'b' { // bSb
+    input.consume('b');
+    S();
+    input.consume('b');
+  }
+  else if next token is 'c' { // c
+    input.consume('c');
+  }
+  else fail
+}
+```
+
+- there is a special case we need to worry about: what if a nonterminal has an ϵ production?
+
+    - just treat it as the default case, i.e., the thing to do if none of the other cases are true
+
+- new example grammar
+
+```
+A ::= xy | yBz
+B ::= wy | ϵ
+```
+
+- code
+
+```
+fn A() {
+  if next token is 'x' {
+    input.consume('x');
+    input.consume('y');
+  }
+  else if next token is 'y' {
+    input.consume('y');
+    B();
+    input.consume('z');
+  }
+  else fail
+}
+
+fn B() {
+  if next token is 'w' {
+    input.consume('w');
+    input.consume('y');
+  } else {
+    // don't consume anything, but still return success
+  }
+}
+```
+
+- the key is that by looking at the next token we _always_ know exactly what rule we should be trying to match (and if the next token isn't one we expect then the input is not syntactically correct)
+
+- a grammar s.t. we can use `k` tokens of lookahead to make it completely deterministic is an LL(k) grammar
+
+    - this isn't true of all grammars, or even all deterministic grammars, but we can often make it work for real programming languages
+
+- why `LL(k)`?
+
+    - we're processing the input from `L`eft to right
+    - we're tracking a `L`eftmost derivation
+    - we're using `k` tokens of lookahead
+
+### exercise
+
+- given the folling grammar
+
+```
+S ::= aPb | Qc | cRd | TcP 
+P ::= QR | TR | ε 
+Q ::= fR | b 
+R ::= d | gbc 
+T ::= ea | Ra
+```
+
+- write pseudocode for a recursive descent LL(1) parser
+
+- trace the parser for inputs:
+
+    - `afgbcdb`
+    - `daceagbc`
+
+- SOLUTION
+
+```
+fn S() {
+  if next token is 'a' {
+    input.consume('a');
+    P();
+    input.consume('b');
+  }
+  else if next token is 'f' {
+    Q();
+    input.consume('c');
+  }
+  else if next token is 'c' {
+    input.consume('c');
+    R();
+    input.consume('d');
+  }
+  else if next token is 'e' {
+    T();
+    input.consume('c');
+    P();
+  }
+  else fail
+}
+
+fn P() {
+  if next token is 'f' {
+    Q();
+    R();
+  }
+  else if next token is 'e' {
+    T();
+    R();
+  }
+}
+
+fn Q() {
+  if next token is 'f' {
+    input.consume('f');
+    R();
+  }
+  else if next token is 'b' {
+    input.consume('b');
+  }
+  else fail
+}
+
+fn R() {
+  if next token is 'd' {
+    input.consume('d');
+  }
+  else if next token is 'g' {
+    input.consume('gbc');
+  }
+  else fail
+}
+
+fn T() {
+  if next token is 'e' {
+    input.consume('ea');
+  }
+  else if next token is 'd' or 'g' {
+    R();
+    input.consume('a');
+  }
+  else fail
+}
+```
+
+## building the AST
+
+- TODO:
+
+## transforming a grammar to LL(1)
+
+- TODO:
 
 # validation TODO:
 
@@ -609,900 +1303,12 @@ L2: MOV #10, tmp
 
 # IR optimization TODO:
 
+# memory management TODO:
+
 # ==== OLD ===================================================================
-
-RETROSPECTIVE
-=============
-
-for the lexer, the students seem to have difficulty translating an
-NFA/DFA into code; maybe next time go a little deeper into the
-definition of \'delta\' and show them how to implement it as a table
-lookup.
-
-as a note, not just for this class but others involving type systems,
-having the AST nodes have explicit names (like ADD, FUNDEF, etc) makes
-it easier for students to map the AST nodes to the type system rules and
-vice versa. i should do this for all abstract syntax definitions instead
-of making it look like the concrete syntax.
 
 initial language/compiler (L1/C1)
 =================================
-
-L1 language
------------
-
--   single datatype: int32
--   arithmetic and relational operations on int32 (treating booleans as
-    int32)
--   assignment, conditionals, loops, functions
-
-concrete syntax (naive)
------------------------
-
-\[maybe start with example program and use that to motivate the
-grammar.\]
-
-### grammar
-
-\[see handout L1-concrete-syntax.pdf\]
-
-### keywords and symbols
-
-keywords = { \'int\', \'if\', \'else\', \'while\', \'def\', \'return\',
-\'output\' } symbols = { \'//\', \'+\', \'-\', \'\*\', \'(\', \')\',
-\'\<\', \'`', '<`\', \'&&\', \'\|\|\', \'!\', \';\', \':=\', \':\',
-\'{\', \'}\', \',\' }
-
-### example program
-
-\[see handout\]
-
-overall strategy
-----------------
-
-remember our overall strategy for a simplified compiler:
-
-1.  lex the input to get a token stream
-2.  parse the token stream using an LL(1) parser
-3.  construct an abstract syntax tree (AST)
-4.  generate x86 assembly code
-
-we\'ll take each piece in turn.
-
-lexing
-------
-
-we\'ve seen that lexing involves translating the input stream of
-characters into meaningful elements of the programming language:
-keywords, symbols, variable identifiers, etc. how do we do that?
-
-### identifying tokens
-
-the first step is to look at our language grammar and identify what the
-meaningful elements are; that is, what are the elements of the grammar?
-
-typical candidates:
-
--   language keywords like \'if\', \'else\', \'while\', etc.
--   constant values such as integers, etc.
--   operator symbols like \'+\', \'\*\', \'\<=\', etc.
--   grouping symbols like \'(\', \')\', \'{\', \'}\', etc.
--   miscellaneous symbols like \',\', \';\', etc.
-
-some of these elements need to be associated with more information. for
-example, in terms of parsing all we need to know is that something is an
-indentifier (token \<ID\>). but for the rest of compilation we need to
-know [which]{.underline} identifier, so we need to include that
-information: token \<ID,string\>.
-
-so what are the tokens for the L1 language?
-
-identifiers = \<regex\> integers = \<regex\> keywords = { \'int\',
-\'if\', \'else\', \'while\', \'def\', \'return\', \'output\' } symbols =
-{ \'//\', \'+\', \'-\', \'\*\', \'(\', \')\', \'\<\', \'`', '<`\',
-\'&&\', \'\|\|\', \'!\', \';\', \':=\', \':\', \'{\', \'}\', \',\' }
-
-\<ID, string\> \<NUM, integer\> \<TYPE, type\> \<IF\> \<ELSE\> \<WHILE\>
-\<DEF\> \<RETURN\> \<OUTPUT\> \<AOP,{+,-,\*}\> \<ROP,{\<,=,\<=}\>
-\<LBINOP,{&&,\|\|}\> \<LNEG\> \<LPAREN\> \<RPAREN\> \<LBRACE\>
-\<RBRACE\> \<SEMICOLON\> \<ASSIGN\> \<HASTYPE\> \<COMMA\>
-
-notice that we don\'t have tokens for comment or whitespace. these are
-irrelevant to the parser and so we just strip them out instead of
-creating tokens. there are languages where whitespace is not irrelevant
-(e.g., python) and we would need to keep track of it more carefully.
-
-### identifying lexemes
-
-now we know what the tokens are; how do we identify
-[lexemes]{.underline} (a sequence of characters that maps to a token)
-and map them to the appropriate token?
-
-we can use the techniques you learned in 138, specifically, regular
-expressions, NFAs, and DFAs.
-
-1.  regex extended notation
-
-    -   x+ → xx\*
-    -   x? → x\|ε
-    -   \[abc\] → a\|b\|c
-    -   \[a-z\] → a\|b\|...\|z
-    -   \[0-9a-z\] → 0\|1\|...\|9\|a\|b\|...\|z
-    -   \[^abc^\] → \^ is negation, matches anything [but]{.underline}
-        a\|b\|c
-    -   . → \[\^`\n`{=latex}\], i.e., any character except newline
-    -   \\( → matches the character (, used to match metacharacters
-
-2.  strategy
-
-    1.  specify each class of lexemes (that is, the set of strings that
-        correspond to a particular token) as a regular expression.
-
-    2.  convert the regular expressions into NFAs.
-
-    3.  tag each accepting state with the token it corresponds to.
-
-    4.  union all the NFAs into a single NFA.
-
-    do one of the following:
-
-    5a. implement the NFA in code using the subset construction (string
-    acceptance is O(mn) where m = size of NFA, n = size of input).
-
-    5b. convert the NFA to a DFA and implement that (string acceptance
-    is O(n) where n = size of input, but size of DFA can be exponential
-    in size of NFA).
-
-3.  example
-
-    let\'s take a subset of L1 as an example: while, if, else, and
-    integers.
-
-    \[show NFA\] \[walk through examples, including errors\] \[after
-    getting a match, restart at new input position\] \[for NUM, explain
-    how to collect token info\]
-
-    the corresponding DFA is trivial, just collapse the starting state
-    and epsilon transitions together.
-
-4.  exercises
-
-    assume you have the following lexeme-\>token mappings:
-
-    aa\[a-d\]\*gg --\> \<T1\> aaaf+e --\> \<T2\>
-
-    create the corresponding NFA and DFA, then confirm that you can
-    recognize the following input:
-
-    aaabcdggaaaffe --\> \<T1\>\<T2\>
-
-### implementing the lexer, take 1
-
-how do we actually implement this idea in code? i\'ll explain for the
-DFA strategy; the NFA strategy is similar except you need to keep track
-of a set of current states instead of a single current state.
-
-we\'ll assume that we have defined a set of states S0, S1, ... where S0
-is the start state, and a transition function delta that takes a state
-and a character and returns the next state.
-
-CODE:
-
-curr~state~ = S0; curr~inputpos~ = 0; curr~scanpos~ = 0;
-
-while (curr~scanpos~ \< input~length~) { curr~state~ =
-delta(curr~state~, input\[curr~scanpos~\]); curr~scanpos~++;
-
-if (curr~state~ is an error state) { report error and abort; }
-
-if (curr~state~ is final) { info = string~subset~(input, curr~inputpos~,
-curr~scanpos~); emit curr~state~\'s token (with info if required);
-
-curr~state~ = S0; curr~inputpos~ = curr~scanpos~; } }
-
-if (curr~inputpos~ != curr~scanpos~) { raise error and abort; }
-
-1.  example
-
-    show how this works with the previous DFA and the input
-    \"whileelse\".
-
-2.  exercise
-
-    go through the previous exercise but using the above pseudocode and
-    be sure that you get the right answer.
-
-### handling ambiguity
-
-unfortunately things aren\'t quite as easy as we\'ve made them out to
-be. the big problem is ambiguity: a string that could be legitimately
-tokenized in different ways. this is easy to see if we add variable
-identifiers to the mix.
-
-1.  ambiguity examples
-
-    take the input \"abc\": it can be tokenized as
-
-    -   \<ID,abc\>
-    -   \<ID,a\>\<ID,bc\>
-    -   \<ID,ab\>\<ID\<c\>
-    -   \<ID,a\>\<ID,b\>\<ID,c\>
-
-    now take the input \"whilex\": it can be tokenized as
-
-    -   \<WHILE\>\<ID,x\>
-    -   \<ID,whilex\>
-
-    in fact, take the input \"while\": it can be tokenized as
-
-    -   \<WHILE\>
-    -   \<ID,while\>
-
-    we need some way to resolve these ambiguities so that we get the
-    expected sequence of tokens from the lexer.
-
-2.  solutions
-
-    the first solution is to take the longest possible match (also
-    called \"maximal munching\").
-
-    -   example \"abc\": the longest match is \<ID,abc\>
-    -   example \"whilex\": the longest match is \<ID,whilex\>
-
-    this doesn\'t help with the \"while\" example which can be either an
-    identifier or a keyword. to handle this problem we assign priorities
-    to the matches, so that if multiple matches are possible we use the
-    one with highest priority.
-
-    -   example \"while\": we assign keyword matches as having priority
-        over identifier matches, so we get \<WHILE\>.
-
-    so our strategy will be to take the longest possible match, then if
-    there are still multiple possible matches take the one with highest
-    priority.
-
-### implementing the lexer, take 2
-
-curr~state~ = S0; curr~inputpos~ = 0; curr~scanpos~ = 0;
-curr~acceptedpos~ = -1; accepting~state~ = S0;
-
-while (curr~scanpos~ \< input~length~) { curr~state~ =
-delta(curr~state~, input\[curr~scanpos~\]); curr~scanpos~++;
-
-if (curr~state~ is final) { curr~acceptedpos~ = curr~scanpos~;
-accepting~state~ = curr~state~; }
-
-if (curr~state~ is an error state \|\| curr~scanpos~ == input~length~) {
-if (curr~acceptedpos~ == -1) { report error and abort; } else {
-curr~scanpos~ = curr~acceptedpos~; curr~acceptedpos~ = -1;
-
-info = string~subset~(input, curr~inputpos~, curr~scanpos~); emit
-accepting~state~\'s highest priority token (with info if required);
-
-curr~state~ = S0; curr~inputpos~ = curr~scanpos~; } } }
-
-note that there are pathological cases where we continually have to go
-all the way to the end of the input to figure out the next token to
-emit, which can make this algorithm expensive. however, these cases
-don\'t tend to happen in realistic languages and so this scheme performs
-well in practice (and is what pretty much all modern lexers use).
-
-1.  example
-
-    let\'s take the \'while\' keyword, \'+\' symbol, and identifiers
-    from L1.
-
-    \[show NFA\] \[walk though example for inputs \'abc+whilex\',
-    \'while\'\]
-
-2.  exercise
-
-    suppose that we have the following lexeme--\>token mapping:
-
-    -   aa --\> \<T1\>
-    -   bb --\> \<T2\>
-    -   aabb --\> \<T3\>
-    -   aabbccdd --\> \<T4\>
-    -   ccff --\> \<T5\>
-
-    construct the NFA/DFA and confirm that the input \"aabbccff\" yields
-    the tokens \<T3\>\<T5\>.
-
-### automating lexer generation
-
-creating the NFAs and DFAs by hand is tedious and error-prone. wouldn\'t
-it be better for the computer to do it? yes, and it can! just implement
-the RE--\>NFA--\>DFA conversions in code.
-
-we aren\'t using these tools in this class because you should understand
-how they work underneath the hood, but normally compiler developers will
-use them.
-
-### lexing difficulties
-
-if we are careful when defining our language syntax, lexing is easy. but
-if we aren\'t, there can be all sorts of problems
-
-reserved words are important
-
--   in PL/I there are no reserved words, allowing statements like \"if
-    then then then = else; else else = then\"
-
-significant whitespace is important
-
--   in Fortran whitespace isn\'t significant:
-    -   do 10 i = 1,25 ⇒ do loop
-    -   do 10 i = 1.25 ⇒ assignment to variable \"do10i\"
-
-in general, making lexemes easy to distinguish is important:
-
--   C++ example:
-    -   \"vector\<vector\<int\>\> v;\" results in an error because the
-        lexer mistakes \"\>\>\" as the bitwise shift operator. you have
-        to use \"vector\<vector\<int\> \> v;\" instead
-
-### limitations of the lexer and regular languages
-
-\[lexemes must be regular\] \[why not use CFG for everything?
-scannerless parsing\]
-
-LL(1) parsing
--------------
-
-### general parsing intro
-
-1.  describing PL with CFG
-
-    the tokens we get from the lexer are the terminal symbols of our
-    programming language. we describe the syntax of the programming
-    language as a context-free grammar over those terminals.
-
-    \[refer to L1-concrete-syntax.pdf, and that the keywords, symbols,
-    etc should be interpreted as representing tokens rather than ASCII
-    characters\]
-
-2.  CFG review
-
-    let\'s review some CFG concepts from 138.
-
-    1.  CFG as generator
-
-        here is an example CFG: \[remember to be consistent with
-        L1-concrete-syntax in how the grammar is written\]
-
-        Exp ::= \[1\]Id \| \[2\]Exp Op Exp \| \[3\](Exp) Op ::= \[4\]+
-        \| \[5\]− \| \[6\]× \| \[7\]÷
-
-        we can think of a CFG as a generator of strings:
-
-        Exp -\[2\]-\> Exp Op Exp -\[2\]-\> Exp Op Exp Op Exp -\[1\]-\> x
-        Op Exp Op Exp -\[5\]-\> x - Exp Op Exp -\[1\]-\> x - y Op Exp
-        -\[6\]-\> x - y \* Exp -\[1\]-\> x - y \* z
-
-        we say that Exp derives the string \"x - y \* z\". we could also
-        represent the derivation another way, as a tree:
-
-        \[show derivation tree for above\]
-
-        the start symbol, where we begin the derivation, is at the root
-        of the tree and the derived string (a sequence of terminals) is
-        read off of the leaves of the tree.
-
-        a derivation tree is also called a parse tree; it shows the
-        syntactic structure of the string being derived. a parse tree
-        isn\'t quite the same as an AST, but we\'ll talk about the
-        difference later.
-
-        1.  exercise
-
-            for the expression grammar, give a parse tree for the
-            following input (there\'s more than one possible parse
-            tree):
-
-            x + y - x \* z + z
-
-    2.  leftmost and rightmost derivations
-
-        the derivation i gave for this example is called a \"leftmost
-        derivation\" because i always expanded the leftmost nonterminal.
-        we could choose to expand any nonterminal in any order; for
-        example we could do a rightmost derivation:
-
-        \[show rightmost derivation sequence and tree\] \[be sure to
-        choose same expansions to get same parse tree!\]
-
-        notice that we get exactly the same parse tree either way; in
-        order words, the parse tree is independent of what order we
-        expand the nonterminals in.
-
-    3.  CFG as recognizer
-
-        we\'ve thought of a CFG as a string generator, but we can also
-        think of it as a string recognizer: given an input string, does
-        there exist a derivation from the start symbol to that string?
-
-        input string: x \* (y + x) Exp --\>\*? x \* (y + x) \[show parse
-        tree\]
-
-        this is the essence of parsing: proving that a string is
-        recognized by a grammar by producing a parse tree showing the
-        derivation.
-
-    4.  ambiguity
-
-        there is a fly in the ointment, the same one we ran into with
-        lexing: ambiguity. a grammar is ambiguous is there exists at
-        least one string that has more than one parse tree.
-
-        let\'s take the first example grammar and the string \"x - y \*
-        z\":
-
-        \[show parse tree 1\] \[show parse tree 2\]
-
-        this is a problem for programming languages: we need a specific
-        input (the source code) to always create exactly one parse tree.
-        why?
-
-        \[show difference between interpreting parse trees 1 and 2\]
-
-        in other words, the syntactic structure of the program
-        influences its meaning. this is the same as english; consider
-        the sentence \"she saw the man with a telescope\". does it mean:
-
-        she used a telescope in order to see the man she saw the man,
-        who was holding a telescope
-
-        for PL i showed the problem with arithmetic expressions already,
-        but it can come up in lots of different places. a famous example
-        is the following grammar:
-
-        Stmt ::= if Exp then Stmt else Stmt
-
-          ------------------
-          if Exp then Stmt
-          Assignment
-          ------------------
-
-        and consider the following program:
-
-        a:= 1; if x then if y then a := 2; else a := 3;
-
-        suppose that x is false; what is the value of a? we can parse
-        this program in two ways:
-
-        \[show parse trees\]
-
-        in one version the \'else\' is bound to the first \'if\', so a
-        is 3; in the other the \'else\' is bound to the second \'if\'
-        (which is never reached if x is false), so a is 1.
-
-        1.  exercise
-
-            for expression grammar and input from exercise 1, give two
-            more parse trees.
-
-            x + y - x \* z + z
-
-            for each of the three parse trees, give the result assuming
-            x = 1, y = 2, z = 3.
-
-    5.  determinism
-
-        so ambiguity is bad. unfortunately, it turns out that
-        determining whether a grammar is ambiguous or not is
-        undecidable. but there is a characteristic that is decidable,
-        and efficiently so: determinism.
-
-        determinism is easiest to explain for PDAs. recall that a PDA is
-        basically an FA along with a stack; the transitions between
-        states can depend both on the current input character and the
-        top of the stack. also recall that, unlike DFAs and NFAs which
-        are equivalent, deterministic PDAs (DPDA) and nondeterministic
-        PDAs are not equivalent: PDAs are strictly more powerful than
-        DPDAs. a PDA is deterministic if the FA can make exactly one
-        transition from each state given the current input character and
-        top of the stack.
-
-        PDAs are equivalent to CFGs; we can transform PDA--\>CFG and
-        CFG--\>PDA. since DPDAs are strictly weaker than PDAs, it
-        follows that there are CFGs that cannot be expressed as DPDAs.
-        it turns out that this includes all ambiguous CFGs (along with
-        some unambiguous ones as well).
-
-        a CFG that can be expressed as a DPDA is called a DCFG. DCFGs
-        are guaranteed to be unambiguous, and there is a well-defined
-        algorithm for determining whether a grammar is a DCFG or not.
-
-    6.  dealing with ambiguity
-
-        \[from here out we may be getting into things that weren\'t
-        covered in 138, so this material may be new\]
-
-        remember that ambiguity is a characteristic of a grammar, not a
-        language: the same language can have multiple grammars that
-        describe it, and some of them may be ambiguous while others may
-        not (though there provably exist languages s.t. all grammars
-        describing it must be ambiguous, this doesn\'t happen for
-        practical PLs).
-
-        what this means is that even if we start with an ambiguous
-        grammar for our PL (such as the concrete grammar given in the
-        handout, which is definitely ambiguous), we can transform that
-        grammar into a new, deterministic (and thus unambiguous) grammar
-        that describes the same language. of course this can\'t work for
-        all context-sensitive languages because DCFGs are strictly
-        weaker than CFGs, but again it\'s true for practical PLs
-
-        so our general strategy will be to take the original,
-        potentially ambiguous grammar and transform it to be
-        deterministic while still describing the same language. if it
-        turns out that the original language can\'t be described with a
-        DCFG then we\'ll have to change that language so that it can be.
-
-        let\'s look at an example, the ambiguous if..else..else case:
-
-        Stmt ::= if Exp then Stmt else Stmt
-
-          ------------------
-          if Exp then Stmt
-          Assignment
-          ------------------
-
-        and the input
-
-        a:= 1; if x then if y then a := 2; else a := 3;
-
-        which could be parsed in two different ways. we can transform
-        the grammar as follows:
-
-        Stmt ::= if Exp then WithElse else Stmt
-
-          ------------------
-          if Exp then Stmt
-          Assignment
-          ------------------
-
-        WithElse ::= if Exp then WithElse else WithElse
-
-          ------------
-          Assignment
-          ------------
-
-        this new grammar recognizes exactly the same set of strings, but
-        only admits one possible parse tree for every input. it requires
-        that every \'else\' be associated with the nearest unclosed
-        \'if\'. so for the example input we\'ll necessarily get:
-
-        \[show parse tree\]
-
-        note that this simple example grammar doesn\'t have a way to
-        express that we want that last \'else\' to be associated with
-        the outermost \'if\'; in a more complete grammar we could
-        indicate that using braces. also note that the L1 concrete
-        syntax requires braces for all conditionals and thus this
-        \"dangling else\" problem isn\'t an issue for us (but it is for
-        C/C++, which allow the programmer to either use braces or not).
-
-        1.  exercise
-
-            given the following input, show that it has at least two
-            parse trees using the original conditional grammar and that
-            it has a single parse tree using the new conditional
-            grammar.
-
-            if x then if y then if z then a := 1; else a := 2; else a :=
-            3;
-
-    7.  another solution
-
-        i should point out that another solution to this whole ambiguity
-        problem is just to change the languauge itself, i.e., the
-        concrete syntax, so that ambiguity can\'t happen:
-
-        -   change the syntax for arithmetic expressions to require
-            explicit parentheses everywhere
-        -   change conditionals to use \'ifelse\' and \'endif\'
-            explicitly everywhere
-        -   etc
-
-        lisp-like languages go to an extreme and every possible
-        expression is parenthesized to make it completely and trivially
-        unambiguous, which makes it extremely easy to parse.
-
-        however, programmers mostly tend to dislike this solution
-        because it makes them type more and can make the program harder
-        to read. since programmers are the main consumers of PLs, this
-        means that most PLs have to work at dealing with ambiguity
-        without messing with the language syntax too much.
-
-3.  parsing strategies
-
-    so now we know what parsing is, but how do we do it? let\'s survey
-    the landscape before we drill down on LL(1), the specific strategy
-    we\'ll be discussing (and implementing) first.
-
-    there are many different strategies, but they can all be divided
-    into two basic approaches: top-down and bottom-up. let\'s look at
-    the example expression grammar from before:
-
-    Exp ::= \[1\]Id \| \[2\]Exp Op Exp \| \[3\](Exp) Op ::= \[4\]+ \|
-    \[5\]− \| \[6\]× \| \[7\]÷
-
-    and some input like \"x + y \* z\". our goal is to create a parse
-    tree (for now don\'t worry about the fact that this grammar is
-    ambiguous).
-
-    TOP-DOWN: start from the root of the parse tree and work our way
-    down to the leaves, selecting productions s.t. when we get to the
-    leaves they\'ll match the string. this seems like it involves a lot
-    of guess-work, but clever versions of this approach won\'t need to
-    guess anything.
-
-    \[show example using above grammar and input\]
-
-    BOTTOM-UP: start from the leaves (i.e., the input) and work our way
-    up the tree, picking productions in reverse.
-
-    \[show example using above grammar and input\]
-
-    the parsing strategies can also be divided based on which grammars
-    they actually work for. there are parsing algorithms that will
-    handle any CFG: CYK, Earley, GLL, GLR, ...
-
-    these algorithms are all O(n^3^), which is way too expensive to be
-    desirable for compilers that operate on large programs (millions of
-    lines of code). they also result in parse forests instead of parse
-    trees because of ambiguity, which means that after parsing we need
-    some way to deterministically select which parse tree we actually
-    want.
-
-    GLL and GLR are actually somewhat recent additions that have the
-    nice property that their complexity depends on the grammar: if the
-    grammar is unambiguous they are O(n); the more ambiguous the grammar
-    is the more the asymptotic complexity grows until it hits O(n^3^).
-    this means that we can have grammars that are only a little bit
-    ambiguous (which can be convenient in some cases) without a big
-    penalty. however, they are fairly complicated algorithms and even
-    when O(n) the constant factor is pretty high. still, there are
-    commercial frontends for languages like C++ that use GLL or GLR.
-
-    classically, compilers focus on parsing algorithms for deterministic
-    grammars.
-
-    \[draw venn diagram: DCFG inside CFG\]
-
-    there is a classic parsing algorithm called LR, a bottom-up
-    algorithm, that can work for any deterministic grammar.
-
-    there is another classic parsing algorithm called LL(k), a top-down
-    algorithm, that works for a large subset of deterministic grammars.
-    the different in expressiveness between LL(k) and LR is exactly due
-    to the fact that LR is bottom-up and LL(k) is top-down.
-
-    \[extend venn diagram\] \[for reference, include regular\]
-
-    even though LL(k) is not as expressive as LR, it\'s still a very
-    popular choice and one that can work for most PLs. for example, both
-    gcc and clang/llvm use parsers based on LL(k) for their C/C++
-    frontends. we\'ll see why it\'s a popular choice once we describe
-    how it works.
-
-### recursive descent and LL(1)
-
-let\'s go over how we can implement an LL(1) parser for a suitable
-grammar; once we understand how it works we\'ll discuss how to try to
-transform a grammar into something suitable for LL(1).
-
-a common implementation strategy for top-down parsers in general is
-called \"recursive descent\". there are other ways to implement them,
-but recursive descent is used a lot. i\'ll describe a naive recursive
-descent implementation first, then show how LL(1) can make it efficient.
-
-to illustrate the concepts, let\'s use the following CFG:
-
-S ::= aSa \| bSb \| c
-
-1.  naive recursive descent
-
-    we know that we can convert any CFG into an equivalent PDA (there
-    are, in fact, a number of possible transformations). we\'ll use the
-    transformation that yields a top-down strategy:
-
-    \>q0 --\[ε/ε-\>S\]-\> q1 \[reflexive transitions: ε/S-\>aSa,
-    ε/S-\>bSb, ε/S-\>c, a/a-\>ε, b/b-\>ε, c/c-\>ε\]
-
-    note that this is not a DPDA because there are three possible
-    transitions that can happen if an S in on top of the stack; for now
-    we\'ll assume we have access to an oracle that always let\'s us make
-    the right choice. let\'s see what happens with the input \"abcba\";
-    obviously we\'ll go from q0 to q1 and stay in q1, the interesting
-    part is what happens to the stack:
-
-    S --\> aSa --\> \[a\]Sa --\> \[a\]bSba --\> \[ab\]Sba --\> \[ab\]cba
-    --\> \[abc\]ba --\> \[abcb\]a --\> \[abcba\]
-
-    the stack is going through a derivation of the string: we start by
-    pushing the start symbol, then one of two things happens:
-
-    1.  the top symbol is a terminal, so we try to match it against the
-        input
-    2.  the top symbol is a nonterminal, so we expand it
-
-    this builds a derivation starting from the start symbol and working
-    towards the input string, i.e., a top-down strategy. in fact,
-    because of the way we\'re pushing things on the stack we\'re always
-    going to expand the leftmost nonterminal, so we\'re getting a
-    leftmost derivation.
-
-    what if we didn\'t have the oracle to tell us the right choice? then
-    we would need to guess, and if we guess wrong we would have to
-    backtrack: roll everything back to a previous guess and guess
-    something different.
-
-    example: S --\> bSb --\> !! backtrack
-
-    notice that the PDA stack is what\'s keeping track of the derivation
-    and what we need to match with the input. it turns out that we
-    don\'t actually need to explicitly translate the CFG into a PDA to
-    parse the input; instead we can take advantage of the implicit
-    function stack that progamming languages use to enable recursion.
-
-    you should know that every time you recursively call a function you
-    get a new instance of all the parameters and local variables. this
-    happens because the parameters and locals are stored on the function
-    stack; whenever a function is called a new \"stack frame\" is pushed
-    onto the stack; whenever a function returns its stack frame is
-    popped off of the stack.
-
-    \[draw a simple picture\]
-
-    we can use this function stack as the PDA stack so that we can track
-    the derivation without having to create an explicit PDA. here\'s the
-    idea:
-
-    create a set of mutually recursive functions, one per nonterminal.
-    each function A() will have a case for each rule A ::= α. when the
-    function is called it will try each case in turn until successful
-    (or it runs out of cases and signals failure).
-
-    suppose we\'re in a case for the rule A ::= α1 α2 ... α~n~, where
-    each α may be a terminal or nonterminal. loop starting from i == 1:
-
-    1.  if α~i~ is a terminal, try to match it to the current input
-        character. a. if successful, consume the character and set i =
-        i+1. b. if failed, backtrack to the state when the function was
-        entered and try the next case.
-
-    2.  if α~i~ is a nonterminal, call the corresponding function. a. if
-        the function returns successfully, set i = i+1. b. if the
-        function signals an error, backtrack to the state when the
-        function was entered and try the next case.
-
-    let\'s look at our example again:
-
-    S ::= aSa \| bSb \| c
-
-    we only have one nonterminal, S, so we\'ll have one recursive
-    function S():
-
-    S() { old~inputpos~ = curr~inputpos~;
-
-    try { // case: aSa match(a); S(); match(a); } else try { // case:
-    bSb curr~inputpos~ = old~inputpos~; match(b); S(); match(b); } else
-    try { // case: c curr~inputpos~ = old~inputpos~; match(c); } else {
-    raise failure; } }
-
-    match(token) { if (token == input\[curr~inputpos~\]) {
-    curr~inputpos~++; } else raise failure; }
-
-    let\'s see what happens with the input \"abcba\":
-
-    call S() enter case 1 match(a): success call S() enter case 1
-    match(a): failure enter case 2 match(b): success call S() enter case
-    1 match(a): failure enter case 2 match(b): failure enter case 3
-    match(c): success return from S() match(b): success return from S()
-    match(a): success return from S()
-
-    the obvious problem with this approach is that it\'s extremely
-    inefficient: exponential in the size of the input (in fact, for some
-    grammars it never terminates at all).
-
-2.  LL(1) recursive descent
-
-    let\'s go back to our PDA for our example grammar. note that we can
-    make it a DPDA by adding something called \"lookahead\":
-
-    \[show old version, then new version\]
-
-    \>q0 --\[ε/ε-\>S\]-\> q1 --\[\$/ε-\>ε\]-\> qF
-
-      ----
-      \^
-      ----
-
-    \[a/ε-\>ε\]\|\|
-
-      -- -------------
-         \[ε/a-\>ε\]
-      -- -------------
-
-    v\| qa \[reflexive transition: ε/S-\>aSa\]
-
-    !! repeat for qb, qc
-
-    let\'s see what happens on the input \"abcba\"; it\'s completely
-    deterministic! what does that mean for the recursive descent
-    version? it means no backtracking:
-
-    S() { if (next~token~ is a) { // case: aSa match(a); S(); match(a);
-    } else if (next~token~ is b) { // case: bSb match(b); S(); match(b);
-    } else if (next~token~ is c) { // case: c match(c); } else { raise
-    failure; } }
-
-    match(token) { if (token == input\[curr~inputpos~\]) {
-    curr~inputpos~++; } else raise failure; }
-
-    what happens on input \"abcba\"?
-
-    call S() enter case 1 match(a): success call S() enter case 2
-    match(b): success call S() enter case 3 match(c): success return
-    from S() match(b): success return from S() match(a): success return
-    from S()
-
-    1.  special case: ε
-
-        what happens if a nonterminal has an ε production? just treat it
-        as the default case (i.e., the thing to do if none of the other
-        cases are true). because of the structure of an LL(1) grammar,
-        this is guaranteed to be safe.
-
-        example:
-
-        A ::= xy \| Bz B ::= wy \| ε
-
-        implementation:
-
-        A() { if (next~token~ is x) { match(x); match(y); } else { B();
-        match(z); } }
-
-        B() { if (next~token~ is w) { match(w); match(y); } }
-
-    2.  wrap-up
-
-        a grammar with the property that we can use 1 token of lookahead
-        to make it completely deterministic is an LL(1) grammar. we\'ll
-        formalize this property soon and show how we can try to
-        transform a grammar so that it has this property. it doesn\'t
-        work for all grammars (even all deterministic grammars), but it
-        works often enough.
-
-3.  exercise
-
-    given the following grammar:
-
-    S ::= aPb \| Qc \| cRd \| TcP P ::= QR \| TR \| ε Q ::= fR \| b R
-    ::= d \| gbc T ::= ea \| Ra
-
-    write pseudocode for a recursive descent LL(1) parser, then trace it
-    for the inputs \"afgbcdb\" and \"daceagbc\".
-
-    \[show answer\]
-
-4.  why \"LL(1)\"?
-
-    if we look at the operation of the LL(1) parser, we can observe the
-    following:
-
-    1.  it reads the input from left to right.
-    2.  it tracks a leftmost derivation.
-    3.  it uses 1 token of lookahead.
-
-    thus, it\'s \"\[L\]eft-to-right, \[L\]eftmost derivation, \[1\]
-    token of lookahead\", or LL(1). we can actually use any constant
-    number of lookahead symbols, though the more we use the more
-    expensive things get; the general class is called LL(k). there are
-    more general algorithms (like the one used by ANTLR) called LL(\*)
-    that use a DFA for lookahead instead of a constant number of tokens.
 
 ### transforming to LL(1)
 
