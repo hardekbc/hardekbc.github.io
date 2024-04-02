@@ -77,12 +77,6 @@
 
     - be sure to stay on top of slack notifications
 
-    - when asking questions:
-
-        - if it makes sense to do so, please make it public so that others can benefit from the answer
-
-        - if DMing, for best results DM the entire instructional team not just one person
-
 - if you are trying to register for the class, see the CS advising staff (not me)
 
     - i have told them to take as many people as possible given constraints like number of TAs
@@ -119,7 +113,7 @@
 
     - programming in C++
 
-    - 138: REs, NFAs, DFAs, PDAs, CFGs
+    - 138: REs, NFAs, PDAs, CFGs
 
 - please ask questions and correct my mistakes!
 
@@ -131,7 +125,7 @@
 
 - this course is about _compilers_, which you've been using for years now
 
-    - you put C++ (or whatever) source code in, and get an executable out
+    - you put C++ (or whatever) source code in, and get an executable out (or error messages)
 
     - up to now it's just been a black box that works by _magic_
 
@@ -141,7 +135,7 @@
 
     - computer chips are designed with an _instruction set architecture_ (ISA); an ISA is a set of binary values that correspond to certain actions by the computer (e.g., take two registers, add their values, and put the result in another register)
 
-        - different architectures use different ISAs (e.g., x86, ARM, RISC-V, MIPS) but they basically all work the same way
+        - different architectures use different ISAs (e.g., x86, ARM, RISC-V, MIPS) but they are all the same basic idea
 
         - ISA instructions are also called _machine code_, in contrast to _source code_
 
@@ -267,9 +261,9 @@ mov eax, [esp+4]
     - back end: responsible for generating machine code
 
 ```
-[source code] --> [front end] --> [internal representation] --> [back end] --> [assembly]
-                                           ⇵
-                                     middle end
+[source code] -[front end]→ [internal representation] -[back end]→ [assembly]
+                                    ⇵
+                              [middle end]
 ```
 
 ## front end
@@ -403,7 +397,7 @@ x = new int;
 y = x * y;
 ```
 
-- here `x` is an integer but we're storing a pointer value (i.e., address)
+- here `x` is an integer but we're storing a pointer value (i.e., address); multiplying by an address doesn't make sense
 
 - we need to make several checks, but perhaps the most important is _type checking_
 
@@ -503,7 +497,7 @@ L2: MOV #10, tmp
         - perform the operation
         - store the result to memory
     
-    - memory is _really_ slow, this has a huge performance penalty
+    - memory is _really_ slow, this has a huge performance penalty; we want to keep things in registers as much as possible and go to memory as little as possible
 
     - register allocation gives us a smarter way to assign variables to registers so that we have to go to memory as few times as possible
 
@@ -1287,6 +1281,54 @@ fn T() {
 
 ## building the AST
 
+- recall that the derivation tree (aka parse tree, concrete syntax tree) contains more information than we really need after parsing
+
+    - e.g., punctuation, parentheses, braces, etc
+
+    - it shows _how_ the program was parsed, but all we need after parsing is the underlying structure of the program
+
+    - this structure is called the _abstract syntax tree_ (AST)
+
+- example [see OneNote] // FIXME:
+
+```
+E ::= FX
+X ::= + FX | ε
+F ::= GY
+Y ::= * GY | ε
+G ::= (E) | id
+```
+
+```
+"x + y * z"
+
+E ⟶ FX ⟶ GYX ⟶ id(x) YX ⟶ id(x) X ⟶ id(x) + FX ⟶ id(x) + GYX
+  ⟶ id(x) + (id(y)YX) ⟶ id(x) + (id(y) * GYX) ⟶ id(x) + (id(y) * id(z)YX)
+  ⟶ id(x) + (id(y) * id(z)X) ⟶ id(x) + (id(y) * id(z))
+```
+
+```
+(Add
+  Var(x)
+  (Mul
+    Var(y)
+    Var(z)
+  )
+)
+```
+
+- it's called the _abstract_ syntax tree because it abstracts out the (now that parsing is over) unimportant information from the concrete parse tree
+
+- we often directly compute the AST during parsing rather than creating a concrete parse tree and then abstracting it
+
+- we do this by inserting the AST construction logic directly into the functions doing the parsing
+
+    - instead of functions just consuming the input and returning nothing, they'll consume the input and return AST sub-trees
+
+    - when a function calls another function, it takes the returned AST sub-tree and adds it to the AST tree it's creating
+
+- so we need to define the AST data structure, then insert the appropriate logic into our parsing functions
+
 - TODO:
 
 ## transforming a grammar to LL(1)
@@ -1884,38 +1926,6 @@ initial language/compiler (L1/C1)
         A ::= BC \| xyz B ::= p \| q C ::= xD \| w D ::= y \| z
 
 ### building an AST
-
-1.  what is an AST
-
-    a parse tree of an L1 program contains more information than we
-    really need or want; it shows exactly [how]{.underline} a program
-    was parsed using the grammar, but all we want is the underlying
-    structure of the program. this structure is represented in a data
-    structure called the [abstract syntax tree]{.underline} (AST).
-
-    let\'s look at an example:
-
-    E ::= FE\' E\' ::= + FE\' \| ε F ::= GF\' F\' ::= \* GF\' \| ε G
-    ::= (E) \| id
-
-    and compute the parse tree for \"x + y \* z\": \[show parse tree\]
-
-    this contains a lot of info that we don\'t care about, like exactly
-    how we derived an identifier or an empty string. all we really need
-    to know is the following:
-
-    \[ADD \[x\] \[MUL \[y\] \[z\]\]\]
-
-    this is why we call it an AST; it abstracts out the unimportant
-    information from the parse tree and just gives us what we need. how
-    do we compute the AST during parsing? we just insert the appropriate
-    logic into the parsing functions: given the exact input characters
-    they recognized, they create the appropriate AST nodes and return
-    the root of the tree they created.
-
-    so what we do is (1) define the AST data structure; and (2)
-    determine how to insert the appropriate logic into the parsing
-    functions. let\'s look at this in action on the grammar above.
 
 2.  example
 
