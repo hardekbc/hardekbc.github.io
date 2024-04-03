@@ -7,7 +7,7 @@
 # Spring 2024 notes
 ## lecture timing
 
-- week  1.1: 
+- week  1.1: through `overview` -> `putting it all together`
 - week  1.2: 
 - week  2.1: 
 - week  2.2: 
@@ -1289,7 +1289,7 @@ fn T() {
 
     - this structure is called the _abstract syntax tree_ (AST)
 
-- example [see OneNote] // FIXME:
+- example grammar (arithmetic expressions with precedence to enforce LL(1))
 
 ```
 E ::= FX
@@ -1299,20 +1299,22 @@ Y ::= * GY | ε
 G ::= (E) | id
 ```
 
-```
-"x + y * z"
+- concrete syntax tree for `x + y * z` (draw as tree)
 
-E ⟶ FX ⟶ GYX ⟶ id(x) YX ⟶ id(x) X ⟶ id(x) + FX ⟶ id(x) + GYX
-  ⟶ id(x) + (id(y)YX) ⟶ id(x) + (id(y) * GYX) ⟶ id(x) + (id(y) * id(z)YX)
-  ⟶ id(x) + (id(y) * id(z)X) ⟶ id(x) + (id(y) * id(z))
 ```
+E ⟶ [FX] ⟶ [GY]X ⟶ [id(x)]YX ⟶ id(x)[]X ⟶ id(x)[+]FX ⟶ id(x)+[GY]X
+  ⟶ id(x)+[id(y)]YX ⟶ id(x)+id(y)[*GY]X ⟶ id(x)+id(y)*[id(z)]YX
+  ⟶ id(x)+id(y)*id(z)[]X ⟶ id(x)+id(y)*id(z)[]
+```
+
+- abstract syntax tree (draw as tree)
 
 ```
 (Add
-  Var(x)
+  Id(x)
   (Mul
-    Var(y)
-    Var(z)
+    Id(y)
+    Id(z)
   )
 )
 ```
@@ -1329,7 +1331,252 @@ E ⟶ FX ⟶ GYX ⟶ id(x) YX ⟶ id(x) X ⟶ id(x) + FX ⟶ id(x) + GYX
 
 - so we need to define the AST data structure, then insert the appropriate logic into our parsing functions
 
-- TODO:
+- example: for the grammar above, we could use the following data structure as the AST
+
+```
+AST
+| Id { name: string }
+| Add { left: AST, right: AST }
+| Mul { left: AST, right: AST }
+```
+
+- the recursive descent parser for the grammar [see OneNote]
+
+```
+fn E() { 
+  F();
+  X();
+}
+
+fn X() {
+  if next token is `+` {
+    input.consume('+');
+    F();
+    X();
+  }
+}
+
+fn F() {
+  G();
+  Y(); 
+}
+
+fn Y() {
+  if next token is '*' {
+    input.consume('*');
+    G();
+    Y();
+  }
+}
+
+fn G() {
+  if next token is `(` {
+    input.consume('(');
+    E();
+    input.consume(')');
+  }
+  else if next token is id(name) {
+    input.consume(id);
+  }
+  else fail
+}
+```
+
+- modified to produce an AST [see OneNote]
+
+```
+fn E() -> AST { 
+  a = F();
+  b = X();
+  if b is nil { return a; }
+  else { return AST::Add(a, b); }
+}
+
+fn X() -> AST {
+  if next token is `+` {
+    input.consume('+');
+    a = F();
+    b = X();
+    if b is nil { return a; }
+    else { return AST::Add(a, b); }
+  }
+  return nil;
+}
+
+fn F() -> AST {
+  a = G();
+  b = Y();
+  if b is nil { return a; }
+  else { return AST::Mul(a, b); }
+}
+
+fn Y() -> AST {
+  if next token is '*' {
+    input.consume('*');
+    a = G();
+    b = Y();
+    if b is nil { return a; }
+    else { return AST::Mul(a, b); }
+  }
+  return nil;
+}
+
+fn G() -> AST {
+  if next token is `(` {
+    input.consume('(');
+    ast = E();
+    input.consume(')');
+    return ast;
+  }
+  else if next token is id(name) {
+    input.consume(id);
+    return AST::Id(name);
+  }
+  else fail
+}
+```
+
+- example OR exercise: given the grammar and parser below, modify the parser to return an AST as also defined below and run it on `payawazaxa` [see OneNote]
+
+ambiguous grammar (think of `w`, `x`, `y`, `z` as binary operators, `p` as a unary operator, and `a` as a constant):
+```
+A ::= AyB | AzB | B
+B ::= BwC | BxC | C
+C ::= pC | a
+```
+
+LL(1) grammar:
+```
+A ::= BX
+X ::= yBX | zBX | ε
+B ::= CY
+Y ::= wCY | xCY | ε
+C ::= pC | a
+```
+
+```
+AST
+| a
+| w { op1: AST, op2: AST }
+| x { op1: AST, op2: AST }
+| y { op1: AST, op2: AST }
+| z { op1: AST, op2: AST }
+| p { op: AST }
+```
+
+recursive descent parser:
+```
+fn A() {
+  B();
+  X();
+}
+
+fn X() {
+  if next token is 'y' or 'z' {
+    if next token is 'y' { input.consume('y'); }
+    else { input.consume('z'); }
+    B();
+    X();
+  }
+}
+
+fn B() {
+  C();
+  Y();
+}
+
+fn Y() {
+  if next token is 'w' or 'x' {
+    if next token is 'w' { input.consume('w'); }
+    else { input.consume('x'); }
+    C();
+    Y();
+  }
+}
+
+fn C() {
+  if next token is 'p' {
+    input.consume('p');
+    C();
+  }
+  else if next tokan is 'a' {
+    input.consume('a');
+  }
+  else fail
+}
+```
+
+modified parser (SOLUTION)
+```
+fn A() -> AST {
+  a = B();
+  b = X();
+  if X matched 'y' { return AST::y(a, b); }
+  else if X matched 'z' { return AST::z(a, b); }
+  else { return a; }
+}
+
+fn X() -> AST {
+  if next token is 'y' or 'z' {
+    if next token is 'y' { input.consume('y'); }
+    else { input.consume('z'); }
+    a = B();
+    b = X();
+    if X matched 'y' { return AST::y(a, b); }
+    else if X matched 'z' { return AST::z(a, b); }
+    else { return a; }
+  }
+  return nil;
+}
+
+fn B() -> AST {
+  a = C();
+  b = Y();
+  if Y matched 'w' { return AST::w(a, b); }
+  else if Y matched 'x' { return AST::y(a, b); }
+  else { return a; }
+}
+
+fn Y() -> AST {
+  if next token is 'w' or 'x' {
+    if next token is 'w' { input.consume('w'); }
+    else { input.consume('x'); }
+    a = C();
+    b = Y();
+    if Y matched 'w' { return AST::w(a, b); }
+    else if Y matched 'x' { return AST::y(a, b); }
+    else { return a; }
+  }
+  return nil;
+}
+
+fn C() -> AST {
+  if next token is 'p' {
+    input.consume('p');
+    return AST::p(C());
+  }
+  else if next tokan is 'a' {
+    input.consume('a');
+    return AST::a;
+  }
+  else fail
+}
+```
+
+AST for `payawazaxa`
+```
+y(
+  p(a),
+  z(
+    w(a, a)
+    x(a, a)
+  )
+)
+```
+
+- what is the AST for cflat? [see OneNote]
+
+    - see `docs/ast.md`
 
 ## transforming a grammar to LL(1)
 
@@ -1924,115 +2171,6 @@ initial language/compiler (L1/C1)
         solution:
 
         A ::= BC \| xyz B ::= p \| q C ::= xD \| w D ::= y \| z
-
-### building an AST
-
-2.  example
-
-    we can define the AST in a way that looks like a grammar, but we\'ll
-    interpret it as describing a tree instead. for the example grammar,
-    we can define the following AST:
-
-    E ::= id \| add E E \| mul E E
-
-    notice that we don\'t care about ambiguity at all for the AST
-    definition, because the concrete syntax grammar already took care of
-    that for us. we\'re just describing the data structure that will
-    hold the result of the parse. think of E as the abstract base class
-    of the AST and each righthand side as a different type of node in
-    the AST data structure:
-
-    abstract class E { ... } class Id : public E { string name; } class
-    Add : public E { E\* left~child~; E\* right~child~ } class Mul :
-    public E { E\* left~child~; E\* right~child~ }
-
-    now the recursive descent parser for the above grammar would be:
-
-    E() { F(); E\'(); } E\'() { if (next == \'~~\') { match(~~); F();
-    E\'(); } } F() { G(); F\'(); } F\'() { if (next == \'**\') {
-    match(**); G(); F\'(); } } G() { if (next == \'(\') { match(\'(\');
-    E(); match(\')\'); } else { match(id); } }
-
-    to create the AST we modify the functions appropriately:
-
-    E() { a = F(); b = E\'(); if (b != nil) return Add(a, b); else
-    return a; } E\'() { if (next == \'~~\') { match(~~); a = F(); b =
-    E\'(); if (b != nil) return Add(a, b); else return a; } return nil;
-    } F() { a = G(); b = F\'(); if (b != nil) return Mul(a, b); else
-    return a; } F\'() { if (next == \'**\') { match(**); a = G(); b =
-    F\'(); if (b != nil) return Mul(a, b); else return a; } } G() { if
-    (next == \'(\') { match(\'(\'); a = E(); match(\')\'); return a; }
-    else { a = match(id); return Id(a); } }
-
-    \[go through the \"x + y \* z\" input again and show that it returns
-    the AST we want\] \[note that this makes all the operators right
-    associative; if we want them to be left associative we can modify
-    the way we build the AST\]
-
-3.  exercise
-
-    given the following grammar:
-
-    A ::= A y B \| A z B \| B B ::= B w C \| B x C \| C C ::= p C \| a
-
-    and the following AST definition:
-
-    AST ::= a \| wOp AST AST \| xOp AST AST \| yOp AST AST \| zOp AST
-    AST \| pOp AST
-
-    apply left recursion elimination to make the grammar predictive,
-    then write a recursive descent parser that produces an appropriate
-    AST.
-
-    verify the the input \"p a y a w a z a x a\" produces the AST:
-
-    \[yOp \[pOp a\] \[zOp \[wOp a a\] \[xOp a a\] \] \]
-
-    1.  solution
-
-        1.  transformed grammar
-
-            A ::= B A\' A\' ::= y B A\' \| z B A\' \| ε B ::= C B\' B\'
-            ::= w C B\' \| x C B\' \| ε C ::= p C \| a
-
-        2.  parser without AST building:
-
-            A() { B(); A\'(); }
-
-            A\'() { if (next == \'y\') { match(y); B(); A\'(); } else if
-            (next == \'z\') { match(z); B(); A\'(); } }
-
-            B() { C(); B\'(); }
-
-            B\'() { if (next == \'w\') { match(w); C(); B\'(); } else if
-            (next == \'x\') { match(x); C(); B\'(); } }
-
-            C() { if (next == \'p\') { match(p); C(); } else match(a); }
-
-        3.  parser with AST building
-
-            A() { d = B(); e = A\'(); if (A\' matched \'y\') return
-            yOp(d,e); else if (A\' matched \'z\') return zOp(d,e); else
-            return d; }
-
-            A\'() { if (next == \'y\' or \'z\') { if (next == \'y\')
-            match(y); else if (next == \'z\') match(z); d = B(); e =
-            A\'(); if (A\' matched \'y\') return yOp(d,e); else if (A\'
-            matched \'z\') return zOp(d,e); else return d; } return nil;
-            }
-
-            B() { d = C(); e = B\'(); if (B\' matched \'w\') return
-            wOp(d,e); else if (B\' matched \'x\') return xOp(d,e); else
-            return d; }
-
-            B\'() { if (next == \'w\' or \'x\') { if (next == \'w\')
-            match(w); else if (next == \'x\') match(x); d = C(); e =
-            B\'(); if (B\' matched \'w\') return wOp(d,e); else if (B\'
-            matched \'x\') return xOp(d,e); else return d; } return nil;
-            }
-
-            C() { if (next == \'p\') { match(p); d = C(); return pOp(d);
-            } else { match(a); return Id(a); } }
 
 validating AST
 --------------
