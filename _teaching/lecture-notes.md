@@ -1,9 +1,3 @@
-# TODO:
-
-- create handouts for language, compiler passes
-- implement stuff for assignments
-- create autograders for assignments
-
 # Spring 2024 notes
 ## lecture timing
 
