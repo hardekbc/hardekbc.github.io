@@ -8,7 +8,7 @@
 ## lecture timing
 
 - week  1.1: through `overview` -> `putting it all together`
-- week  1.2: 
+- week  1.2: through `lexing` (projector broken, had to improvise)
 - week  2.1: 
 - week  2.2: 
 - week  3.1: 
@@ -606,7 +606,7 @@ New          new
 Let          let
 Extern       extern
 Fn           fn
-Ampersand    &
+Address      &
 Colon        :
 Semicolon    ;
 Comma        ,
