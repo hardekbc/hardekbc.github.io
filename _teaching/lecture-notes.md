@@ -25,7 +25,7 @@
 ## assignment timing
 
 - week 2T assign-1 (lexer) [10 days]
-- week 3F assign-2 (parser/validation) [11 days]
+- week 3F assign-2 (parser/validation) [11 days] [could move validation to assign-3]
 - week 5T assign-3 (lowering) [10 days]
 - week 6F assign-4 (codegen) [11 days]
 - week 8T assign-5 (register allocation) [10 days]
@@ -845,11 +845,11 @@ E -[2]→ E Op E
 
 - this is a problem because the parse tree determines how a program will be executed
     
-    - consider the difference between `(1 + 2) * 3` and `1 + (2 * 3)`
+    - consider `1 + 2 * 3` and the difference between `(1 + 2) * 3` and `1 + (2 * 3)` (draw as trees)
 
     - the syntactic structure of the program influences its meaning, the same as in english
 
-     - consider "she saw the man with a telescope"; what does it mean?
+    - consider "she saw the man with a telescope"; what does it mean?
 
 - arithmetic expressions are an easy example, but it can come up in lots of places---a famous example is "dangling elses"
 
