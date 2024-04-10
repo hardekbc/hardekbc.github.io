@@ -54,6 +54,18 @@
 
 - see farrago/cflat repo under the 160-s24 branch for the implementation we used for this class
 
+## notes for future
+
+- assign-1:
+
+    - `lex_gen.rs` doesn't generate any numbers larger than an i32 can hold, and so the student tests don't test that they can match arbitrarily long digits; also it generates random ids that could potentially include keywords (but probably won't, and so is missing testing that case for maximal munch) and could possibly _be_ a keyword (which would result in an incorrect expected result---not a problem for the student test cases because i used my own lex result instead, but an issue nonetheless)
+
+        - FIXED in 160-s24 branch; need to regenerate student tests for assign-1
+
+    - some of the students aren't actually using an NFA data structure, instead they're just, in a loop, trying each possible lexeme description in turn using string operations until they find one that works (and backtracking if they try one that doesn't work); this will give the correct answer if they try them in the correct order for maximal munch and prioritization and/or insert appropriate checks but is asymptotically less efficient---is there a way to test for this behavior and prevent it?
+
+        - maybe have them print out the NFA and compare with mine?
+
 # logistics
 
 - introduce myself and TAs
