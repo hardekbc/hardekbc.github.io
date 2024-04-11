@@ -1092,15 +1092,15 @@ fn S() {
 
     - when `A()` is called it tries each case in turn until it succeeds or runs out of cases and fails
 
-    - suppose we have rules `A ::= α₁α₂...αₙ | β₁β₂...βₘ`, where each `αᵢ` and `βᵢ` may be either a terminal (i.e., a character) or a nonterminal
+        - suppose we have rules `A ::= α₁α₂...αₙ | β₁β₂...βₘ`, where each `αᵢ` and `βᵢ` may be either a terminal (i.e., a character) or a nonterminal
 
-    - then we create a function `A()` that tries the first rule, then if it doesn't work it tries the second rule, then if that doesn't work it fails
+        - then we create a function `A()` that tries the first rule, then if it doesn't work it tries the second rule, then if that doesn't work it fails
 
-    - for each rule we look at `αᵢ` (or `βᵢ` depending on which rule we're trying) and:
+        - for each rule we look at `αᵢ` (or `βᵢ` depending on which rule we're trying) and:
 
-        - if `αᵢ` is a terminal, tries to consume matching characters from the input; if successful goes to `αᵢ₊₁` else fails this rule
+            - if `αᵢ` is a terminal, tries to consume matching characters from the input; if successful goes to `αᵢ₊₁` else fails this rule
 
-        - if `αᵢ` is a nonterminal, calls the corresponding function; if the function returns successfully then we go to `αᵢ₊₁` else we fail this rule
+            - if `αᵢ` is a nonterminal, calls the corresponding function; if the function returns successfully then we go to `αᵢ₊₁` else we fail this rule
 
 ### LL(1) recursive descent
 
@@ -1202,7 +1202,7 @@ fn B() {
 
 ### exercise
 
-- given the folling grammar
+- given the following grammar
 
 ```
 S ::= aPb | Qc | cRd | TcP 
@@ -1229,21 +1229,21 @@ T ::= ea | Ra
 
 ```
 fn S() {
-  if next token is 'a' {
+  if next token is a {
     input.consume('a');
     P();
     input.consume('b');
   }
-  else if next token is 'f' {
+  else if next token is in {f, b} {
     Q();
     input.consume('c');
   }
-  else if next token is 'c' {
+  else if next token is c {
     input.consume('c');
     R();
     input.consume('d');
   }
-  else if next token is 'e' {
+  else if next token is in {e, d, g} {
     T();
     input.consume('c');
     P();
@@ -1252,42 +1252,42 @@ fn S() {
 }
 
 fn P() {
-  if next token is 'f' {
+  if next token is in {f, b} {
     Q();
     R();
   }
-  else if next token is 'e' {
+  else if next token is in {e, d, g} {
     T();
     R();
   }
 }
 
 fn Q() {
-  if next token is 'f' {
+  if next token is f {
     input.consume('f');
     R();
   }
-  else if next token is 'b' {
+  else if next token is b {
     input.consume('b');
   }
   else fail
 }
 
 fn R() {
-  if next token is 'd' {
+  if next token is d {
     input.consume('d');
   }
-  else if next token is 'g' {
+  else if next token is g {
     input.consume('gbc');
   }
   else fail
 }
 
 fn T() {
-  if next token is 'e' {
+  if next token is e {
     input.consume('ea');
   }
-  else if next token is 'd' or 'g' {
+  else if next token is in {d, g} {
     R();
     input.consume('a');
   }
@@ -1387,24 +1387,7 @@ FIRST(Bwz) = { 0, 1 }
 
 ### look-ahead with ϵ
 
-- expanded example
-
-```
-S ::= AB
-A ::= xBw | yBz | Bwz
-B ::= 0 | 1 | ϵ
-
-  FIRST(S) = { x, y, 0, 1, w }
-  FIRST(A) = { x, y, 0, 1, w }
-  FIRST(B) = { 0, 1 }
-FIRST(xBw) = { x }
-FIRST(yBz) = { y }
-FIRST(Bwz) = { 0, 1, w }
-```
-
-- for this example we can just "read past" the ϵ to fill in the FIRST sets, but this isn't always sufficient
-
-- example 2
+- example
 
 ```
 A ::= xBA | f
@@ -1806,7 +1789,7 @@ F ::= [E] | (E) | ϵ
 
     - becomes `A ::= αB`, `B ::= β₁ | β₂ | ... | β₃`
 
-### a final note
+### a final note [only need to cover if someone asks about it]
 
 - you might have learned in 138 that we can transform any grammar to remove ϵ rules, which might seem to make FOLLOW sets unnecessary
 
