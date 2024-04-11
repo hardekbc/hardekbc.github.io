@@ -56,6 +56,8 @@
 
 ## notes for future
 
+- TODO: remember to run plagiarism detection on all assignments after the deadline (and after late assignments are turned in); just use the built-in gradescope detector
+
 - assign-1:
 
     - `lex_gen.rs` doesn't generate any numbers larger than an i32 can hold, and so the student tests don't test that they can match arbitrarily long digits; also it generates random ids that could potentially include keywords (but probably won't, and so is missing testing that case for maximal munch) and could possibly _be_ a keyword (which would result in an incorrect expected result---not a problem for the student test cases because i used my own lex result instead, but an issue nonetheless)
@@ -64,7 +66,7 @@
 
     - some of the students aren't actually using an NFA data structure, instead they're just, in a loop, trying each possible lexeme description in turn using string operations until they find one that works (and backtracking if they try one that doesn't work); this will give the correct answer if they try them in the correct order for maximal munch and prioritization and/or insert appropriate checks but is asymptotically less efficient---is there a way to test for this behavior and prevent it?
 
-        - maybe have them print out the NFA and compare with mine?
+        - not really, this is basically a poor implementation of a backtracking NFA; maybe have them actually print out the NFA and compare with mine? at least this makes sure they've figured the NFA out correctly even if they don't use it, and if they have it why wouldn't they use it
 
 # logistics
 
@@ -984,8 +986,6 @@ string: "(x + y) * z"
 ## recursive descent and LL(1)
 ### intro
 
-- we'll begin by assuming we have a suitable LL(1) grammar and discuss how to parse it; later we'll discuss how to transform a grammar into LL(1) if possible
-
 - LL(1) is an example of a top-down parser, and a common strategy for these types of parsers (which we'll be using) is _recursive descent_
 
     - there are other strategies, but recursive descent is the most popular
@@ -1104,7 +1104,9 @@ fn S() {
 
 ### LL(1) recursive descent
 
-- backtracking kills performance, can we prevent it? not in general, but for some grammars yes we can
+- backtracking kills performance, and for some grammars recursion can result in non-termination---how can we make this strategy efficient?
+
+    - that's where an LL(1) grammar comes in
 
 - consider the PDA we created for our example gramar and note that we could make it a DPDA by adding _lookahead_
 
@@ -1190,6 +1192,8 @@ fn B() {
 
     - this isn't true of all grammars, or even all deterministic grammars, but we can often make it work for real programming languages
 
+    - for us, k = 1 (and for most real programming languages)
+
 - why `LL(k)`?
 
     - we're processing the input from `L`eft to right
@@ -1208,7 +1212,13 @@ R ::= d | gbc
 T ::= ea | Ra
 ```
 
-- write pseudocode for a recursive descent LL(1) parser
+- write pseudocode for a recursive descent LL(1) parser; remember: 
+
+    - for each nonterminal there is a function
+    
+    - the function contains a case for each production rule for that nonterminal
+
+    - we use one token of look-ahead to determine which case to execute
 
 - trace the parser for inputs:
 
@@ -1285,15 +1295,534 @@ fn T() {
 }
 ```
 
+## formalizing LL(1)
+### intro
+
+- how do we know if a grammar is LL(1) and thus suitable for implementing in this way? there are two criteria:
+
+    - no _left recursion_
+
+    - deterministic look-ahead (using 1 token)
+
+### left recursion
+
+- a grammar is _left recursive_ if there exists a derivation `A -->* Aα` for some nonterminal `A`
+
+    - this means that when matching `A`, we recursively need to match `A` again _without_ consuming any input
+
+    - if we're using recursion, this means that we're caught in an infinite recursive cycle
+
+- example
+
+```
+S ::= Sa | b
+
+fn S() {
+  if next token is `b` {
+    input.consume('b');
+  }
+  else if next token is `a` {
+    S();
+    input.consume('a');
+  }
+}
+
+input: "baa"
+```
+
+- in order to allow a recursive descent parsing strategy, we have to forbid left-recursive grammars
+
+### deterministic look-ahead
+
+- our intuition is that for any given nonterminal `A` that has multiple rules, looking at the next token in the input is sufficient to determine which rule we need to pick
+
+    - we call a grammar for which this is true a _predictive grammar_
+
+- our simple example from earlier: `S ::= aSa | bSb | c`
+
+    - if we have an `S` symbol and need to expand it with one of these rules, by looking at the next token in the input we can tell which rule to use
+
+- in general it may be a bit more complicated to figure out the symbols to use; take the grammar from the previous exercise, where some rules (e.g., for `P`) themselves start with nonterminals
+
+```
+S ::= aPb | Qc | cRd | TcP 
+P ::= QR | TR | ε 
+Q ::= fR | b 
+R ::= d | gbc 
+T ::= ea | Ra
+```
+
+- we can formalize this intuition; first we'll do so assuming there are no ϵ rules, then we'll add in ϵ rules (which make things a bit more complicated)
+
+### look-ahead without ϵ
+
+- let α, β be strings of terminals (T) and nonterminals (N), then:
+
+```
+FIRST(α) = { t ∈ T | α -->* tβ }
+```
+
+- in other words, FIRST(α) is the set of terminals that can be derived from α with 0 or more applications of the grammar production rules
+
+    - there is an algorithm to compute FIRST sets (given in the textbook), but for many grammars it's easy enough to compute manually by inspection
+
+- example
+
+```
+S ::= AB
+A ::= xBw | yBz | Bwz
+B ::= 0 | 1
+
+  FIRST(S) = { x, y, 0, 1 }
+  FIRST(A) = { x, y, 0, 1 }
+  FIRST(B) = { 0, 1 }
+FIRST(xBw) = { x }
+FIRST(yBz) = { y }
+FIRST(Bwz) = { 0, 1 }
+```
+
+- if a grammar is LL(1), then for any nonterminal `A ::= α | β` it must be true that FIRST(α) is disjoint from FIRST(β)
+
+    - thus, we just need to see if the next token belongs to FIRST(α) or FIRST(β) to determine which rule to use
+
+### look-ahead with ϵ
+
+- expanded example
+
+```
+S ::= AB
+A ::= xBw | yBz | Bwz
+B ::= 0 | 1 | ϵ
+
+  FIRST(S) = { x, y, 0, 1, w }
+  FIRST(A) = { x, y, 0, 1, w }
+  FIRST(B) = { 0, 1 }
+FIRST(xBw) = { x }
+FIRST(yBz) = { y }
+FIRST(Bwz) = { 0, 1, w }
+```
+
+- for this example we can just "read past" the ϵ to fill in the FIRST sets, but this isn't always sufficient
+
+- example 2
+
+```
+A ::= xBA | f
+B ::= xwB | ϵ
+
+  FIRST(A) = { x, f }
+  FIRST(B) = { x }
+FIRST(xBA) = { x }
+  FIRST(f) = { f }
+FIRST(xwB) = { x }
+  FIRST(ϵ) = {}
+```
+
+- at first it seems things are OK: for both `A` and `B` the FIRST sets of the productions rules are disjoint---but consider the input `xxf`
+
+    - `A` is the start symbol, so we begin matching there
+    - look-ahead = `x`, so we use the first rule `xBA` and consume `x`
+    - now we're matching `BA`
+    - look-ahead = `x`, so we use the first rule `xwB` and consume `x`
+    - now we're matching `wBA`
+    - ERROR: next input symbol is `f` which doesn't match `w`
+
+- what happened? the correct way to parse input `xxf` would be:
+
+    - expand `A` to `xBA`
+    - consume `x`
+    - expand `B` to ϵ
+    - expand `A` to `xBA`
+    - consume `x`
+    - expand `B` to ϵ
+    - expand `A` to `f`
+    - consume `f`
+
+- but we can't figure this out just looking at the next token because the ϵ allows us to "throw away" a nonterminal at any time (by picking the ϵ rule when expanding it)
+
+    - therefore looking at the next token doesn't always tell us what the correct thing to do is
+
+- enter FOLLOW sets: for any nonterminal `A`, `FOLLOW(A)` is the set of terminals that can _immediately_ follow any expansion of `A`
+
+    - that is, for all production rules `αAβ` FIRST(β) is included in FOLLOW(A)
+
+    - note that FOLLOW is only for nonterminals, whereas FIRST was for any string of terminals or nonterminals
+
+    - there is another algorithm for computing FOLLOW sets (in the textbook), but again it's often easy enough to manually compute it by inspection
+
+```
+A ::= xBA | f
+B ::= xwB | ϵ
+
+FOLLOW(A) = {}
+FOLLOW(B) = FIRST(A) = { x, f }
+```
+
+- if a grammar is LL(1), then for any nonterminal `A ::= α | β` it must be true that if α -->* ϵ, then FIRST(β) and FOLLOW(A) are disjoint
+
+    - in other words, by looking at the next token we can decide whether we should expand `A` or throw it away using ϵ
+
+    - when matching `A`, if the next token is in FIRST(α) expand to α, else if the first token is in FIRST(β) expand to β, else assume we're using the ϵ and match without consuming any input
+
+    - this is exactly the strategy we used when making our recursive descent parser---this property of LL(1) grammars is why it's guaranteed to work correctly
+
+- based on this requirement, the example grammar is _not_ LL(1) because FIRST(xwb) ∩ FOLLOW(B) = { x }, so they are not disjoint
+
+- to sum up:
+
+    - FIRST sets tell us which production rule to use based on the look-ahead, and for an LL(1) grammar this is unambiguous
+    
+    - FOLLOW sets tell us whether using the FIRST sets this way will actually work in the presence of ϵ rules, and for an LL(1) grammar it must be true that they will
+
+### exercise
+
+- compute the FIRST and FOLLOW sets of the following grammar and explain all the reasons why it is _not_ predictive
+
+```
+A ::= xBy | Bx | zCw
+B ::= wB | ε
+C ::= wC | DB
+D ::= yD | ε
+```
+
+- solution
+
+```
+    FIRST   FOLLOW
+--- ------- --------
+A   w,x,z   ∅
+B   w       x,y
+C   w,y     w
+D   y       w
+
+for A: FIRST(xBy) ∩ FIRST(Bx) = {x}
+for C: FIRST(wC) ∩ FIRST(DB) = {w}
+for C: FIRST(wC) ∩ FOLLOW(C) = {w}
+```
+
+### what about regular expressions in the production rules?
+
+- remember that the regular expressions are just convenient short-hand; expanding them back to "standard" CFGs helps understand how to deal with them
+
+- if the grammar is LL(1), then we can always determine how to handle them based on the look-ahead
+
+- dealing with `?`: remember that `r?` is just `r | ϵ`
+
+    - in the following example, if the grammar is LL(1) then α₂ and α₃ must begin with different terminals and so we can immediately tell whether to consume α₂ or α₃
+
+```
+// using ?
+A ::= α₁ α₂? α₃
+
+// we don't have to actually translate to this version, but it makes
+// clear how to process the ?
+A ::= α₁ B α₃
+B ::= α₂ | ϵ
+```
+
+- dealing with `*`: this means that the expression can happen any number of times (including 0)
+
+    - in the example below, if the grammar is LL(1) then α₂ and α₃ must begin with different terminals and so we can immediately tell whether to consume α₂ or α₃---then we keep asking that question in a loop until the answer is to consume α₃
+
+    - note that we had to translate the `*` using _right_ recursion since LL(1) grammars can't have left recursion, which automatically makes the parse right-associative; this is a problem if we actually want it to be left-associative
+
+        - we have to parse and then modify the AST afterwards
+
+        - it's easiest to not translate the grammar and just parse using the `*` operator directly per the below bullet
+
+    - if we're directly using the `*` in our parser instead of translating then we just use a loop to get a vector of α₂, then make it left- or right-associative when we put it into the AST depending on what we have specified for the language
+
+```
+// using *
+A ::= α₁ α₂* α₃
+
+// we don't have to actually translate to this version, but it makes
+// clear how to process the *
+A ::= α₁ B α₃
+B ::= α₂B | ϵ
+```
+
+- dealing with `+`: remember that `r+` is just `rr*`, we can deal with it just like `r*` except we require that there's at least one α₂
+
+## transforming a grammar to LL(1)
+### intro
+
+- how do we take a grammar that isn't LL(1) and turn it into a grammar that is LL(1)?
+
+    - for example, our cflat grammar is not LL(1) and so we cannot use it for a recursive descent LL(1) parser as-is
+
+- there are three main things to we need to worry about
+
+    - precedence: when there are multiple ways to parse a given string, we need to refactor the grammar to enforce a single possible parse
+
+    - left-recursion: a grammar that has nonterminals in the "wrong" places can prevent recursive descent parsers from ever terminating, so we need to refactor the grammar to make sure this doesn't happen
+
+    - look-ahead: we need to make sure that the grammar is deterministic using a given amount of _look-ahead_
+
+### establishing precedence
+
+- if there are multiple ways to parse a given string, we need to force the grammar to allow only a single parse
+
+- we do this by establishing _precedence_: we enforce that one parse is preferable and should always be used if possible
+
+- example ambiguous grammar
+
+```
+E ::= id | E + E | E - E | E * E | E / E | (E)
+```
+
+- conventionally multiplication should have precedence over addition
+
+    - given `a + b * c`, we should treat it as `a + (b * c)`
+
+- there are several strategies that have been developed to enforce precedence in a grammar, but we'll use the classical solution that modifies the grammar itself to enforce the desired precedence
+
+- method:
+
+    - decide on the levels of precedence, e.g., {`()`} > {`*`,`/`} > {`+`,`-`}
+
+    - create a nonterminal for each level of precedence (we can reuse the original nonterminal for the lowest predecedence level)
+
+    - factor out the operations into the appropriate nonterminal for their level of precedence
+
+- example:
+
+```
+G = {`()`}
+F = {`*`,`/`}
+E = {`+`,`-`}
+
+E ::= E + F | E - F | F
+F ::= F * G | F / G | G
+G ::= (E) | id
+```
+
+- notice the following properties:
+
+    - each nonterminal rule that applies a binary operator has one operand that is the same nonterminal again and the other is the next highest precedence level nonterminal
+
+        - this allows the expression to have multiple of the same precedence level operators in a row
+        
+        - choosing which side is which controls the associativity of the operator: having the same nonterminal on the left makes the operator left associative; having it on the right makes the operator right associative
+
+    - each nonterminal (except the highest precedence, `G`) allows for applying an operator at the level of predecence or directly falling through to the next level
+
+        - this allows the expression to not have any operators at the lower precedence level, e.g., an expression that doesn't have `+` in it
+
+    -  the base cases for expressions (e.e., `id`) are always at the highest level of precedence
+
+        - this allows the expression to just be an identifier without any operators at all
+
+- examples
+
+```
+  x + y * z ==> x + (y * z)
+  x * y + z ==> (x * y) + z
+  x * y * z ==> (x * y) * z
+(x + y) * z ==> (x + y) * z
+```
+
+- we've looked at this using arithmetic operators as our examples, but it applies in many other situations, e.g.:
+
+    - relational and logical operators: `!(x < y) && z < y`
+
+    - subscript operators: `a + b[i]`
+
+    - type casts: `(double)a / b`
+
+- exercise: rewrite the following grammar assuming that all operator are left-associative and using the following precedence levels:
+
+    - {`p`} > {`w`,`x`} > {`y`,`z`}
+
+```
+A ::= A R A | p A | a
+R ::= w | x | y | z
+```
+
+- solution
+
+```
+A ::= A y B | A z B | B
+B ::= B w C | B x C | C
+C ::= p C | a
+```
+
+### removing left-recursion
+#### intro
+
+- we saw before that left recursion causes non-termination in a recursive descent parser; how can we remove it?
+
+- we can define two kinds of left recursion
+
+    - _direct_: there is a production of the form `A ::= Aα`
+
+    - _indirect_: there is a set of mutually recursive productions that allow a left-recursive derivation (possibly involving an ϵ rule)
+
+- example 1: indirect left recursion
+
+```
+A ::= B | alice
+B ::= C | bob
+C ::= A charlie
+
+consider A --> B --> C --> A charlie
+```
+
+- example 2: indirect left recursion with ϵ
+
+```
+A ::= B | alice
+B ::= C | bob
+C ::= DA charlie
+D ::= dave | ε
+
+consider A --> B --> C --> DA charlie --> A charlie
+```
+
+#### removing direct left recursion
+
+- this is easy to fix: any left-recursive production can be changed to an equivalent right-recursive production as follows
+
+- given: `A ::= Aα | β | γ` s.t. α,β,γ don't start with `A`
+
+    - this grammar says that there can be an arbitrary sequence of β and γ ending in a sequence of α
+
+- transformed: `A ::= βB | γB`, `B ::= αB | ϵ`
+
+    - this grammar says the same thing, but using right-recursion
+
+- any left-recursive rule must have some non-recursive base case (β and γ in the above example), otherwise the recursive would never terminate
+
+    - we just rearrange those base cases to use right-recursion instead of left-recursion
+
+- what if there are multiple left-recursive rules for `A`?
+
+    - there must still be at least one base case that we can use
+
+    - example: `A ::= Aα | Aβ | γ`
+
+    - transformed: `A ::= γB`, `B ::= αB | βB | ϵ`
+
+- example
+
+```
+E ::= E+F | E-F | F
+F ::= (E) | id
+```
+
+- transformed
+
+```
+E ::= FG
+F ::= (E) | id
+G ::= +FG | -FG | ϵ
+```
+
+#### removing indirect left recursion
+
+- there are several strategies for removing indirect left recursion, but the conceptually simplest is to just inline productions to turn indirect recusion into direct recursion and then applying the transformation from earlier
+
+- example
+
+```
+A ::= B | alice
+B ::= C | bob
+C ::= A charlie
+```
+
+```
+A ::= C | bob | alice
+B ::= C | bob
+C ::= A charlie
+```
+
+```
+A ::= A charlie | bob | alice
+B ::= C | bob
+C ::= A charlie
+```
+
+```
+A ::= bob D | alice D
+D ::= charlie D | ϵ
+B ::= C | bob
+C ::= A charlie
+```
+
+- note that now `B` and `C` are not reachable from the start symbol `A` and can be removed; in general that may or may not happen
+
+- this strategy also works for dealing with ϵ
+
+```
+A ::= B | alice
+B ::= C | bob
+C ::= DA charlie
+D ::= dave | ϵ
+```
+
+```
+A ::= C | bob | alice
+B ::= C | bob
+C ::= DA charlie
+D ::= dave | ϵ
+```
+
+```
+A ::= DA charlie | bob | alice
+B ::= C | bob
+C ::= A charlie
+D ::= dave | ϵ
+```
+
+```
+A ::= dave A charlie | A charlie | bob | alice
+B ::= C | bob
+C ::= A charlie
+D ::= dave | ϵ
+```
+
+### left-factoring for predictability
+
+- after establishing precedence and removing left recursion, the grammar still may not be predictive
+
+- _left factoring_ is a transformation that can possibly make it predictive (but doesn't work for all grammars)
+
+- example: this grammar is not predictive because all three rules start with `id`
+
+```
+E ::= id | id[E] | id(E)
+```
+
+- but we can make it predictive by factoring out the `id`
+
+```
+E ::= id F
+F ::= [E] | (E) | ϵ
+```
+
+- this is the left-factoring transformation; in general terms:
+
+    - `A ::= αβ₁ | αβ₂ | ... | αβₙ`
+
+    - becomes `A ::= αB`, `B ::= β₁ | β₂ | ... | β₃`
+
+### a final note
+
+- you might have learned in 138 that we can transform any grammar to remove ϵ rules, which might seem to make FOLLOW sets unnecessary
+
+- however, this transformation can make the grammar non-predictive, which we would need to fix using left-factoring
+
+- but left-factoring may re-introduce the ϵ rules, so we have to deal with them
+
 ## building the AST
 
 - recall that the derivation tree (aka parse tree, concrete syntax tree) contains more information than we really need after parsing
 
-    - e.g., punctuation, parentheses, braces, etc
+    - e.g., punctuation, parentheses, braces, etc, as well as the exact sequence of expanded nonterminals used to build the tree
 
     - it shows _how_ the program was parsed, but all we need after parsing is the underlying structure of the program
 
-    - this structure is called the _abstract syntax tree_ (AST)
+    - this underlying structure is called the _abstract syntax tree_ (AST)
 
 - example grammar (arithmetic expressions with precedence to enforce LL(1))
 
@@ -1442,7 +1971,7 @@ fn G() -> AST {
 }
 ```
 
-- example OR exercise: given the grammar and parser below, modify the parser to return an AST as also defined below and run it on `payawazaxa` [see OneNote]
+- example (or exercise): given the grammar and parser below, modify the parser to return an AST as also defined below and run it on `payawazaxa` [see OneNote]
 
 ambiguous grammar (think of `w`, `x`, `y`, `z` as binary operators, `p` as a unary operator, and `a` as a constant):
 ```
@@ -1584,11 +2113,43 @@ y(
 
     - see `docs/ast.md`
 
-## transforming a grammar to LL(1)
-
-- TODO:
-
 # validation TODO:
+
+# front-end recap
+
+- let's review the steps we needed to go through to define our compiler front-end
+
+- given: a grammar for the concrete syntax of the language
+
+    - determine tokens and their regex descriptions
+
+    - define token data structure
+
+    - translate token descriptions to NFA and use maximal munch and prioritization to remove any ambiguity
+
+    - implement lexer to translate from source code to token stream
+
+    - check if grammar is LL(1), if not:
+
+        - decide on precedence levels and factor grammar to enforce them
+
+        - eliminate any left recursion
+
+        - check if grammar is predictive, apply left-factoring if necessary
+        
+        - if grammar is still not LL(1), we need to change the concrete syntax
+
+    - define the AST data structure
+
+    - translate grammar to recursive descent parser
+
+    - instrument parser functions to build AST
+
+    - validate AST
+
+- i want to emphasize that we've simplified some issues that happen in real-world languages like C, C++, Java, etc
+
+    - these often require some creative thinking to get them to fit into the frontend framework we've covered here, mostly because of ambiguity in the lexemes and/or grammar or because lexemes aren't strictly regular
 
 # lowering TODO:
 
@@ -1604,579 +2165,6 @@ y(
 
 initial language/compiler (L1/C1)
 =================================
-
-### transforming to LL(1)
-
-1.  intro
-
-    we know now how to implement a suitable grammar using a recursive
-    descent LL(1) parser; now we\'ll talk about how to make a grammar
-    suitable.
-
-    note that so far we haven\'t covered how to build an actual parse
-    tree or AST, we\'ve just returned a boolean; we\'ll ignore building
-    the AST for now and once we have a suitable grammar i\'ll show how
-    to tweak it to build the AST.
-
-2.  establishing precedence
-
-    the initial example of an ambiguous grammar i gave earlier was a
-    simple expression grammar, something like:
-
-    E ::= id \| E + E \| E \* E \| (E)
-
-    the problem was that a string such as \"x + y \* z\" could be parsed
-    two ways:
-
-    (x+y)\*z x+(y\*z)
-
-    the grammar admits either one. we need to enforce a single
-    interpretation for the parser; we do this by specifying the relative
-    precedence of the operators. conventionally, for example,
-    multiplication has a higher precedence than addition so we would
-    want \"x + y \* z\" to be parsed as x+(y\*z).
-
-    there are several strategies that have been developed to enforce
-    precedence in a grammar, but we\'re going to go with the classical
-    solution which involves modifying the grammar itself to enforce the
-    levels of precedence. how do we do this?
-
-    1.  decide on the levels of precedence, e.g., {()} {\*,÷} {+,-}
-
-    2.  create a nonterminal for each level of precedence (we can reuse
-        the original nonterminal for the lowest level of precedence).
-
-    3.  factor out the operations into the appropriate nonterminal for
-        their level of precedence, e.g.:
-
-        E ::= E + F \| F F ::= F \* G \| G G ::= (E) \| id
-
-    here we have three precedence levels, so three nonterminals: E is
-    for the lowest precedence operator +, F is for the next precedence
-    level \*, and G is for the highest precedence level ().
-
-    notice the following properties:
-
-    1.  each nonterminal rule that applies an operator has one operand
-        that is the same nonterminal again and the other is the next
-        highest precedence level nonterminal
-
-        this allows the expression to have multiple of the same
-        precedence level operators in a row. choosing which side is
-        which controls the associativity of the operator: having the
-        same nonterminal on the left makes the operator left
-        associative; having it on the right makes the operator right
-        associative.
-
-    2.  each nonterminal (except the highest precedence, G) allows for
-        applying an operator at the level of predecence or directly
-        falling through to the next level.
-
-        this allows the expression to not have any operators at the
-        lower precedence level, e.g., an expression that doesn\'t have +
-        in it.
-
-    3.  the base cases for expressions (identifiers, constants, etc) are
-        always at the highest level of precedence.
-
-        this allows the expression to just be an identifier or constant
-        without any operators at all.
-
-    let\'s look at some examples:
-
-    1.  x + y \* z
-    2.  x + y + z
-    3.  x \* y + z
-    4.  (x + y) \* z
-
-    we\'ve looked at this using arithmetic operators as our examples,
-    but it applies in many other situations:
-
-    1.  relational and logical operators: !(x \< y) && (z \< y)
-
-    2.  subscript operators: a + b\[i\]
-
-    3.  type casts: (double)a / b
-
-    etc.
-
-    1.  exercise
-
-        here is a toy grammar:
-
-        A ::= A R A \| p A \| a R ::= w \| x \| y \| z
-
-        suppose we define the following precedence levels: {p} {w,x}
-        {y,z}
-
-        and say that the operators are left associative. rewrite the
-        grammar to enforce the correct prededence, then verify the
-        following example inputs are handled correctly:
-
-        p a y a w a z a x a ==\> (((p a) y (a w a)) z (a x a)) a z p a w
-        p a x a y a ==\> ((a z (((p a) w (p a)) x a)) y a)
-
-        solution:
-
-        A ::= A y B \| A z B \| B B ::= B w C \| B x C \| C C ::= p C \|
-        a
-
-3.  dealing with left recursion
-
-    1.  what is left recursion
-
-        once we\'ve established precedence, we have another problem to
-        worry about: nontermination. this problem is an artifact of the
-        way we\'re implementing the parser using recursive descent,
-        i.e., implementing the PDA implicitly using recursive function
-        calls. consider the factored grammar from before:
-
-        E ::= E + F \| F F ::= F \* G \| G G ::= (E) \| id
-
-        assume that we implement this using a recursive descent parser,
-        as explained in a previous lecture, and let\'s see what happens
-        on an example input \"x + y \* z\".
-
-        call E() enter case E + F call E() enter case E + F call E() ...
-
-        notice that we just keep recursively calling E() forever (or
-        until we get a stack overflow). why does this happen? because
-        there is a recursive cycle in the grammar E --\>\* E that does
-        not consume any input tokens, i.e., there is no call to match()
-        between invocations of E().
-
-        this is an example of what\'s called [left
-        recursion]{.underline}. a grammar is left recursive if there
-        exists a derivation A --\>\* Aα for some nonterminal A. any
-        recursive descent parser may fail to terminate for a left
-        recursive grammar.
-
-    2.  direct, indirect, and hidden left recursion
-
-        we can define three different kinds of left recursion (though
-        some texts lump the second two into a single category):
-
-        direct left recursion: there is a production of the form A ::=
-        Aα.
-
-        -   there are two examples of direct left recursion in the
-            previous grammar example.
-
-        indirect left recursion: there is a set of mutually recursive
-        productions the allow a left-recursive derivation.
-
-        -   example:
-
-            A ::= B \| alice B ::= C \| bob C ::= A charlie
-
-            consider the derivation A --\> B --\> C --\> A charlie
-
-        hidden left recursion: like indirect except there is an epsilon
-        rule that hides the left recursion.
-
-        -   example:
-
-            A ::= B \| alice B ::= C \| bob C ::= DA charlie D ::= dave
-            \| ε
-
-            consider the derivation A --\> B --\> C --\> DA charlie --\>
-            A charlie
-
-        in order to create an LL(1) recursive descent parser for a
-        grammar, we must transform the grammar to remove all left
-        recursion.
-
-    3.  removing direct left recursion
-
-        direct left recursion is the easiest to fix: any left-recursive
-        production can be changed to an equivalent right-recursive set
-        of rules as follows:
-
-        given: A ::= Aα \| β \| γ
-
-        where the greek letters are sequences of terminals and
-        nonterminals not starting with A. this grammar specifies βα\* or
-        γα\*. we can transform it into a non-left-recursive grammar that
-        specifies the same language:
-
-        A ::= βA\' \| γA\' A\' ::= αA\' \| ε
-
-        we\'re expressing the same strings in different ways. a left
-        recursive rule must have some non-recursive base case (β and γ
-        above); the left recursion is saying that we can repeat the
-        recursive part as many times as we want (α above) and then
-        finish with the base cases. the rewritten rules says the same
-        thing, but puts the recursion on the right instead of the left.
-        this means that a recursive descent parser must consume a
-        terminal from the input before making the recursive call; since
-        the input is finite the parser must terminate.
-
-        note that we assume α is not ε. if it is then we have the rule
-        \'A ::= A\', which we can trivially delete.
-
-        what if we have multiple left recursive rules for A?
-
-        given: A ::= Aα \| Aβ \| γ
-
-        then:
-
-        A ::= γA\' A\' ::= αA\' \| βA\' \| ε
-
-        again, there always has to be at least one rule that is not left
-        recursive or we can trivially delete all the rules.
-
-        EXAMPLE 1:
-
-        E ::= E + T \| E - T \| T T ::= (E) \| id
-
-        becomes
-
-        E ::= T E\' E\' ::= + T E\' \| - T E\' \| ε T ::= (E) \| id
-
-        \[go through parsing example: x + y - z\] \[notice that left
-        associative has become right associative\]
-
-        EXAMPLE 2:
-
-        E ::= E + F \| F F ::= F \* G \| G G ::= (E) \| id
-
-        changes to
-
-        E ::= FE\' E\' ::= + FE\' \| ε F ::= GF\' F\' ::= \* GF\' \| ε G
-        ::= (E) \| id
-
-        \[go through parsing example: x + y \* z\]
-
-    4.  removing indirect left recursion
-
-        to remove indirect recursion there are several possible
-        strategies, of which we\'ll look at the classical solution. the
-        basic idea is to inline productions to turn the indirect
-        recursion into direct recursion, then apply the transformation
-        that removes direct recursion.
-
-        let\'s see an example of that in action:
-
-        A ::= B \| alice B ::= C \| bob C ::= A charlie
-
-        we can start from A, B, or C to expose the indirect left
-        recursion:
-
-        A --\> B --\> C --\> A charlie B --\> C --\> A charlie --\> B
-        charlie C --\> A charlie --\> B charlie --\> C charlie
-
-        it doesn\'t matter which one we choose, as long as we break the
-        left recursive cycle. let\'s pick A and inline once:
-
-        A ::= C \| bob \| alice B ::= C \| bob C ::= A charlie
-
-        then inline again:
-
-        A ::= A charlie \| bob \| alice B ::= C \| bob C ::= A charlie
-
-        then remove the direct left recursion:
-
-        A ::= bob A\' \| alice A\' A\' ::= charlie A\' \| ε B ::= C \|
-        bob C ::= A charlie
-
-        notice in this example that B and C are no longer reachable from
-        the starting nonterminal A; in general this may or may not be
-        true.
-
-        let\'s see what happens if we had picked C instead of A to start
-        with:
-
-        A ::= B \| alice B ::= C \| bob C ::= B charlie \| alice charlie
-
-        and inline again:
-
-        A ::= B \| alice B ::= C \| bob C ::= C charlie \| bob charlie
-        \| alice charlie
-
-        now remove the direct left recursion:
-
-        A ::= B \| alice B ::= C \| bob C ::= bob charlie C\' \| alice
-        charlie C\' C\' ::= charlie C\' \| ε
-
-        it can be tedious and error-prone to manually try to find left
-        recursive cycles. we can apply an algorithm to preventatively
-        transform the grammar so that left recursive cycles can\'t
-        possibly happen. this gives us a larger and more complex grammar
-        than we might get if we did it manually because it transforms
-        rules even when they aren\'t left recursive.
-
-        the key insight of the algorithm is to order the nonterminals
-        arbitrarily. then a left recursive cycle can only possibly
-        happen if a nonterminal with order i directly derives a
-        nonterminal with order j s.t. j \< i. we then inline the
-        lower-ordered nonterminal into this rule. continue this process
-        for all rules, then remove any direct left recursion from the
-        final rule set:
-
-        let the nonterminal be arbitrarily labeled A1..An. then:
-
-        for i = 1 to n: if Ai ::= Aj α for j \< i then inline Aj into
-        Ai\'s right-hand side transform any direct left recursive rules
-
-        let\'s look at the following example again, assuming that A \< B
-        \< C:
-
-        A ::= B \| alice B ::= C \| bob C ::= A charlie
-
-        rule A ::= B `=> CHECK
-        rule A ::` alice `=> CHECK
-        rule B ::` C `=> CHECK
-        rule B ::` bob `=> CHECK
-        rule C ::` A charlie `=> A < C, inline: C ::` B charlie \| alice
-        charlie rule C ::= alice charlie `=> CHECK
-        rule C ::` B charlie `=> B < C, inline: C ::` C charlie \| bob
-        charlie rule C ::= bob charlie `=> CHECK
-        rule C ::` C charlie ==\> CHECK done
-
-        now there is one direct left recursive rule: C ::= C charlie.
-        transform that and we\'re finished.
-
-    5.  removing hidden left recursion
-
-        note that the algorithm for preventing indirect left recursion
-        doesn\'t work if there is hidden left recusion.
-
-        A ::= B \| alice B ::= C \| bob C ::= DA charlie D ::= dave \| ε
-
-        \[go through each rule, show that they all CHECK\]
-
-        there are two basic ways to handle hidden left recursion, which
-        end up actually being pretty similar. the first is transform the
-        grammar to eliminate ε rules. there is a standard algorithm to
-        do so, which you may have learned in 138. the second is to (1)
-        compute which nonterminals are [nullable]{.underline}, i.e.,
-        which nonterminals can derive ε (directly or indirectly),
-        then (2) modify the above algorithm to take this information
-        into account. this end up looking a lot like what you would do
-        to remove ε rules altogether.
-
-        A ::= B \| alice B ::= C \| bob C ::= DA charlie \| A charlie D
-        ::= dave
-
-    6.  exercise
-
-        remove all left recursion in the following grammar:
-
-        A ::= BC B ::= CA \| b C ::= AA \| a
-
-        solution:
-
-        \[after inlining\] A ::= BC B ::= CA \| b C ::= CACA \| bCA \| a
-
-        \[after direct recursion elimination\] A ::= BC B ::= CA \| b C
-        ::= bCAC\' \| aC\' C\' ::= ACAC\' \| ε
-
-4.  lookahead
-
-    1.  basic idea
-
-        now that we\'ve fixed precedence to ensure that we get the
-        correct AST and we\'ve removed left recursion to ensure
-        termination, the remaining thing to worry about is making sure
-        that the grammar is deterministic via lookahead (thus avoiding
-        the need for backtracking).
-
-        remember that [lookahead]{.underline} means peeking ahead in the
-        input to the next token(s) in order to determine which
-        production rule to use next. we\'re specifically going to allow
-        a fixed, constant amount of lookahead (in our case, 1 token),
-        which means that we won\'t be able to handle some grammars. for
-        any fixed amount of lookahead we can come up with a grammar that
-        requires more lookahead to become deterministic. but 1-token
-        lookahead turns out to be good enough in most cases we care
-        about.
-
-        our intuition is that the property we\'re looking for in a
-        grammar is that for any given nonterminal A that has multiple
-        rules, looking at the next token in the input is sufficient to
-        determine which rule we need to pick. a simple example is:
-
-        S ::= aSa \| bSb \| c
-
-        if we have an S symbol and need to expand it with one of these
-        rules, by looking at the next token in the input we can tell
-        which rule to use: \'a\': aSa; \'b\': bSb; \'c\': c.
-
-        \[show with input \"bacab\"\]
-
-        we\'ll say that a grammar with this property is a [predictive
-        grammar]{.underline}. let\'s formalize this property. first
-        we\'ll assume that there are no ε rules; then we\'ll expand the
-        formalization to handle ε rules.
-
-    2.  formal property without ε
-
-        let α, β be strings of grammar symbols (T and NT)
-
-        FIRST(α) = { t ∈ T \| α --\>\* tγ }
-
-        in other words, FIRST(α) is the set of the [first]{.underline}
-        terminals that can be derived from α with 0 or more applications
-        of the grammar\'s production rules.
-
-        there is an algorithm in the textbook to compute FIRST sets, but
-        for simple grammars we can do it by inspection.
-
-        EXAMPLE
-
-        S ::= AB A ::= xBw \| yBz \| Bwz B ::= 0 \| 1
-
-        FIRST(S) = {x,y,0,1} FIRST(A) = {x,y,0,1} FIRST(B) = {0,1}
-        FIRST(xBw) = {x} FIRST(yBz) = {y} FIRST(Bwz) = {0,1}
-
-        a grammar can be parsed with no backtracking using a lookahead
-        of 1 IF the following holds: for any nonterminal A such that A
-        ::= α \| β, FIRST(α) ∩ FIRST(β) = ∅.
-
-        during parsing when we\'re expanding an A node, we just need to
-        look at the next token t in the input to determine which
-        production to use (i.e., the one that has t in its FIRST set).
-
-    3.  formal property with ε
-
-        now suppose that we [do]{.underline} have ε productions (which
-        is likely if we needed to remove left recursion).
-
-        \#\# EXAMPLE 1
-
-        S ::= AB A ::= xBw \| yBz \| Bwz B ::= 0 \| 1 \| ε
-
-        FIRST(S) = {x,y,0,1,w} FIRST(A) = {x,y,0,1,w} FIRST(B) = {0,1}
-        FIRST(xBw) = {x} FIRST(yBz) = {y} FIRST(Bwz) = {0,1,w}
-
-        mostly we can just \"read past\" the ε to fill in the FIRST
-        sets, but sometimes this isn\'t sufficient.
-
-        \#\# EXAMPLE 2
-
-        A ::= xBA \| f B ::= xwB \| ε
-
-        FIRST(A) = {x,f} FIRST(B) = {x} FIRST(xBA) = {x} FIRST(f) = {f}
-        FIRST(xwB) = {x} FIRST(ε) = {}
-
-        at a glance, this looks predictive: for both A and B
-        productions, the FIRST sets of the alternative productions are
-        disjoint. but consider parsing the input \"xxf\":
-
-        A expands to xBA consume x from input B expands to xwB consume x
-        from input ERROR: terminal w doesn\'t match token f
-
-        the correct way to parse this would be to expand B to ε, then A
-        to xBA, then B to ε, then A to f. but we can\'t figure this out
-        just by looking at the next token in the input. what\'s going
-        on? ε allows us to \"throw away\" the nonterminal at any time,
-        and we don\'t know when we should do that or not.
-
-        enter FOLLOW sets. for any NT A, FOLLOW(A) is the set of
-        [first]{.underline} terminals that can immediately follow any
-        expansion of A. the textbook has another algorithm for this, but
-        again for simple grammars we can do it by hand. for the example
-        above:
-
-        FOLLOW(A) = {} FOLLOW(B) = {x,f}
-
-        now we revisit the criteria for being a predictable grammar. in
-        addition to the original requirement for A ::= α \| β, we add
-        the following:
-
-        if α --\>\* ε then FIRST(β) ∩ FOLLOW(A) = ∅
-
-        in other words, we can tell by looking at the next token whether
-        we should expand A to something or use the ε to throw A away.
-
-        consider our previous example and note that FIRST(xwB) ∩
-        FOLLOW(B) = {x} ∩ {x,f} = {x}, and thus this grammar is
-        [not]{.underline} predictive.
-
-    4.  exercise
-
-        compute the FIRST and FOLLOW sets of the following grammar and
-        confirm that it is [not]{.underline} predictive:
-
-        A ::= xBy \| Bx \| zCx B ::= wB \| ε C ::= wC \| DB D ::= yD \|
-        ε
-
-              FIRST   FOLLOW
-          --- ------- --------
-          A   w,x,z   ∅
-          B   w       x,y
-          C   w,y     x
-          D   y       w
-
-        -   for A, FIRST(xBy) and FIRST(Bx) are not disjoint (both
-            have x)
-        -   for C, FIRST(wC) and FIRST(DB) are not disjoint (both
-            have w)
-
-5.  left factoring
-
-    1.  the transformation
-
-        if a grammar is not predictive, sometimes we can transform it to
-        make it predictive. one heuristic we can use is a transformation
-        called [left factoring]{.underline}.
-
-        EXAMPLE: suppose we add arrays and functions to expressions
-
-        Factor ::= Id \| Id \[ ExpList \] \| Id ( ExpList ) ExpList ::=
-        Exp, ExpList \| Exp
-
-        this is not predictive, but we can make it predictive:
-
-        Factor ::= Id Args Args ::= \[ ExpList \] \| ( ExpList ) \| ε
-        ExpList ::= Exp, ExpList \| Exp
-
-        this transformation is called LEFT-FACTORING.
-
-        WHAT\'S HAPPENING:
-
-        A ::= αβ1 \| αβ2 \| αβ3
-
-        becomes:
-
-        A ::= αZ Z ::= β1 \| β2 \| β3
-
-        in other words, we factor out the common prefix α and push the
-        things after α into a different nonterminal.
-
-        there is an algorithm for left-factoring in the textbook, but it
-        essentially just says to repeat the above transformation as
-        necessary. note that not all grammars can be made predictive
-        (and it is undecidable to figure out whether one can be).
-
-    2.  note about ε elimination
-
-        one might think that we could get rid of FOLLOW sets by
-        eliminating ε from the grammar as we said was possible when we
-        discussed dealing with left recursion. the problem is that this
-        elimination can render the grammar non-predictive, and applying
-        left factoring to make it predictive again re-introduces the ε.
-
-        EXAMPLE:
-
-        T ::= F T\' T\' ::= × F T\' \| ÷ F T\' \| ε
-
-        remove ε:
-
-        T ::= F T\' \| F T\' ::= × F T\' \| × F \| ÷ F T\' \| ÷ F
-
-        note that the grammar is no longer predictive and we need to use
-        left factoring, which reintroduces ε.
-
-    3.  exercise
-
-        left-factor the following grammar:
-
-        A ::= Bxy \| Bxz \| Bw \| xyz B ::= p \| q
-
-        solution:
-
-        A ::= BC \| xyz B ::= p \| q C ::= xD \| w D ::= y \| z
 
 validating AST
 --------------
@@ -2233,37 +2221,6 @@ doesn\'t really matter to us.
 
 def foo(int a, int a) : int { x := bar(42); return x; } def foo() : int
 { return 42; } output foo(1, 2);
-
-frontend wrap-up
-----------------
-
-we\'ve gone through a lot of steps to get through the frontend; let\'s
-recap what\'s going on and put it all together.
-
-given: grammar for concrete syntax of the language
-
-1.  decide on precedence levels
-2.  factor grammar to enforce desired precedence
-3.  eliminate left recursion
-4.  check if grammar is predictive
-    -   if not, apply left factoring
-    -   recheck if grammar is predictive now
-    -   if not, the concrete grammar needs to change somehow
-5.  define AST data structure
-6.  translate grammar to recursive descent parser
-7.  install AST-building logic into parsing functions
-
-given: a sequence of characters representing the source code
-
-1.  lexer: convert to sequence tokens using DFA/NFA
-2.  parser: convert sequence of tokens into AST
-3.  check AST for validity
-
-i want to emphasize that we\'ve simplified some issues that happen in
-real-world languages like C, C++, Java, etc. these often require some
-creative thinking to get them to fit into the frontend framework we\'ve
-covered here, mostly because of ambiguity in the lexemes and/or grammar
-or because lexemes aren\'t regular.
 
 naive codegen
 -------------
