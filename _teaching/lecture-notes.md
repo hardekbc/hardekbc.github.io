@@ -1,10 +1,28 @@
 # Spring 2024 notes
+## TODO:
+
+- remember to run plagiarism detection on all assignments after the deadline (and after late assignments are turned in); just use the built-in gradescope detector
+
+- need to reimplement validation for 160 version of cflat
+
+- need to create test suites and autograder for parsing/validation assignment
+
+- need to reimplement lowering for 160 version of cflat
+
+- need to create test suites and autograder for lowering assignment
+
+- need to create test suites and autograder for codegen assignment
+
+- need to create test suites and autograder for register allocation assignment
+
+- need to create test suites and autograder for optimization assignment
+
 ## lecture timing
 
 - week  1.1: through `overview` -> `putting it all together`
 - week  1.2: through `lexing` (projector broken, had to improvise)
 - week  2.1: through `parsing` -> `parsing strategies`
-- week  2.2: 
+- week  2.2: through `parsing` -> `formalizing LL(1)`
 - week  3.1: 
 - week  3.2: 
 - week  4.1: 
@@ -54,9 +72,7 @@
 
 - see farrago/cflat repo under the 160-s24 branch for the implementation we used for this class
 
-## notes for future
-
-- TODO: remember to run plagiarism detection on all assignments after the deadline (and after late assignments are turned in); just use the built-in gradescope detector
+## notes
 
 - assign-1:
 
@@ -67,6 +83,12 @@
     - some of the students aren't actually using an NFA data structure, instead they're just, in a loop, trying each possible lexeme description in turn using string operations until they find one that works (and backtracking if they try one that doesn't work); this will give the correct answer if they try them in the correct order for maximal munch and prioritization and/or insert appropriate checks but is asymptotically less efficient---is there a way to test for this behavior and prevent it?
 
         - not really, this is basically a poor implementation of a backtracking NFA; maybe have them actually print out the NFA and compare with mine? at least this makes sure they've figured the NFA out correctly even if they don't use it, and if they have it why wouldn't they use it
+
+- assign-2:
+
+    - we can either have the students transform the grammar into LL(1) or give them the LL(1) grammar directly; the problem with the former is that they might end up with the wrong grammar, the problem with the second is that it doesn't test their understanding of LL(1), and writing the recursive descent parser given a suitable grammar is the easy part
+
+        - maybe give them the cflat LL(1) grammar, but add an automatically graded Gradescope quiz about LL(1) in general?
 
 # logistics
 
@@ -2148,62 +2170,6 @@ y(
 
 initial language/compiler (L1/C1)
 =================================
-
-validating AST
---------------
-
-once we have the AST we\'re almost finished. we need to validate the AST
-to make sure it isn\'t nonsense (i.e., syntactically correct but
-semantically meaningless). for our language there are only a few trivial
-checks that we need to perform:
-
-1.  is every variable declared before it\'s used?
-2.  is every called function defined?
-3.  is every parameter name and defined function name unique?
-
-for (1) we just write a checker to do a recursive traversal of the AST
-with a set DECLARED that contains the variables declared in the current
-scope. it starts empty; each time we enter a block of code we add in
-that block\'s declared variables. for each statement, we look at all
-variables it refers to and verify that they are in the current DECLARED
-set.
-
-the only thing we need to be a little careful of is to distinguish
-between different scopes. consider:
-
-int x; int y; if (x \< y) { int x; int z; y := x + z; } else { y := x -
-z; }
-
-there is an error here because \'z\' is not in scope in the conditional
-false branch. there\'s an easy way to ensure we do it correctly: given a
-DECLARED set D, when the checker makes a recursive call we always pass
-in a copy of D rather than D itself. so in the above example, the
-initial D would have {x,y}. we pass in a copy of D when making a
-recursive checker call to the true branch and modify the copy to contain
-{x,y,z}. when the recursive call returns we throw away the copy and pass
-the orignal D when making a recursive checker call to the false branch.
-this keeps the branches separate and everything works right.
-
-for (2) it\'s even easier: just collect the set of defined functions,
-then go through all call statements and check that they only call one of
-the defined functions. we also need to check that the call uses the
-correct number of arguments.
-
-for (3) all we do is go through the defined functions and check that
-their names are unique, then for every function\'s parameter list go
-through and check that they are all distinct from each other. note that
-many languages don\'t require unique function names as long as the
-function signatures are different; we\'ll keep things simple and require
-uniqueness.
-
-in general the AST validation phase can be much more complicated. type
-checking makes up a big piece, but since we only have one type it
-doesn\'t really matter to us.
-
-### example {#example-4}
-
-def foo(int a, int a) : int { x := bar(42); return x; } def foo() : int
-{ return 42; } output foo(1, 2);
 
 naive codegen
 -------------
