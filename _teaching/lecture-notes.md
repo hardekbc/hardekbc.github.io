@@ -3,6 +3,8 @@
 
 - remember to run plagiarism detection on all assignments after the deadline (and after late assignments are turned in); just use the built-in gradescope detector
 
+- need to implement AST pretty-printer
+
 - need to reimplement validation for 160 version of cflat
 
 - need to create test suites and autograder for parsing/validation assignment
@@ -2118,7 +2120,203 @@ y(
 
     - see `docs/ast.md`
 
-# validation TODO:
+# validation
+
+- just because a program is syntactically correct doesn't mean that it's a valid program
+
+    - remember the example from before:
+
+```
+let x:int = 0, y:int = 10;
+x = new int;
+y = x * y;
+```
+
+- we need to make sure that the program "makes sense" before we continue trying to compile it
+
+    - after this step, we can assume that the program we're compiling is valid for whatever we define "valid" to mean
+
+- there are some simple rules that are trivial to check, but the biggest aspect of validation is usually _type checking_ (at least, for statically typed languages like cflat)
+
+    - a type describes a set of possible values (e.g., `int` describes the set of integers, `&int` describes the set of pointers to integers, etc)
+
+    - if we give an expression a type, that means that, when evaluated during program execution, that expression's value will belong to the set described by that type
+
+    - an operation is _well-typed_ if it always makes sense for all values described by the types of its operands
+
+        - e.g., `x * y` is well-typed iff `x` and `y` are type `int`, because multiplication only makes sense for integers (not, e.g., pointers)
+
+    - a static type system guarantees that well-typed programs can't "go wrong" in a well-defined sense
+
+    - this is covered in detail in CS 162, so i won't spend much time on it here
+
+- [go over `docs/validation.pdf` and explain how the typing rules can be turned into recursive functions]
+
+    - [remind them what the AST data structure looks like]
+
+    - [give an example for each rule]
+
+- EXAMPLE: [see OneNote]
+
+```
+struct list {
+  value: int,
+  next: &list
+}
+
+fn main() -> int {
+  let n:&list, m:&list, i:int = 3;
+
+  n = new list;
+  m = n;
+  while i > 0 {
+    n.next = new list;
+    n.value = i;
+    n = n.next;
+    i = i - 1;
+  }
+
+  return aggregate(m);
+}
+
+fn aggregate(p: &list) -> int {
+  let m:&list, i:int = 0;
+
+  while m != nil {
+    i = 10 * i + m.value;
+    m = m.next;
+  }
+
+  return i;
+}
+```
+
+```
+Program(
+  globals = [],
+  structs = [
+    Struct(
+      name = list,
+      fields = [
+        Decl(value, Int),
+        Decl(next, Ptr(list))
+      ]
+    )
+  ],
+  externs = [],
+  functions = [
+    Function(
+      name = main,
+      params = [],
+      rettyp = Int,
+      locals = [
+        (Decl(n, Ptr(list)), _),
+        (Decl(m, Ptr(list)), _),
+        (Decl(i, Int), Num(3))
+      ],
+      stmts = [
+        Assign(
+          lhs = Id(n),
+          rhs = New(list, Num(1))
+        ),
+        Assign(
+          lhs = Id(m),
+          rhs = Id(n)
+        ),
+        While(
+          guard = BinOp(
+            op = Gt,
+            left = Id(i),
+            right = Num(0)
+          ),
+          body = [
+            Assign(
+              lhs = FieldAccess(
+                ptr = Id(n),
+                field = next
+              ),
+              rhs = New(list, Num(1))
+            ),
+            Assign(
+              lhs = FieldAccess(
+                ptr = Id(n),
+                field = value
+              ),
+              rhs = Id(i)
+            ),
+            Assign(
+              lhs = Id(n),
+              rhs = FieldAccess(
+                ptr = Id(n),
+                field = next
+              )
+            ),
+            Assign(
+              lhs = Id(i),
+              rhs = BinOp(
+                op = Sub,
+                left = Id(i),
+                right = Num(1)
+              )
+            )
+          ]
+        ),
+        Return(
+          Call(
+            callee = Id(aggregate),
+            args = [Id(m)]
+          )
+        )
+      ]
+    ),
+    Function(
+      name = aggregate,
+      params = [Decl(p, Ptr(list))],
+      rettyp = Int,
+      locals = [
+        (Decl(m, Ptr(list)), _),
+        (Decl(i, Int), Num(0))
+      ],
+      stmts = [
+        While(
+          guard = BinOp(
+            op = NotEq,
+            left = Id(m),
+            right = Nil
+          ),
+          body = [
+            Assign(
+              lhs = Id(i),
+              rhs = BinOp(
+                op = Add,
+                left = BinOp(
+                  op = Mul,
+                  left = Num(10),
+                  right = Id(i)
+                ),
+                right = FieldAccess(
+                  ptr = Id(m),
+                  field = value
+                )
+              )
+            ),
+            Assign(
+              lhs = Id(m),
+              rhs = FieldAccess(
+                ptr = Id(m),
+                field = next
+              )
+            )
+          ]
+        ),
+        Return(
+          Id(i)
+        )
+      ]
+    )
+  ]
+)
+```
 
 # front-end recap
 
