@@ -3,11 +3,11 @@
 
 - remember to run plagiarism detection on all assignments after the deadline (and after late assignments are turned in); just use the built-in gradescope detector
 
-- need to implement AST pretty-printer
+- need to create solution, test suites, and autograder for parsing assignment
 
-- need to reimplement validation for 160 version of cflat
-
-- need to create test suites and autograder for parsing/validation assignment
+    - use afl_syntax, afl_invalid/gen_invalid, gen_valid to create test suites
+        - need to see what kinds of errors afl_invalid/gen_invalid yield, possibly modify them
+    - need to tweak validate.rs (hopefully, instead of reimplementing)
 
 - need to reimplement lowering for 160 version of cflat
 
