@@ -5,8 +5,8 @@
 
 - need to create solution, test suites, and autograder for parsing assignment
 
-    - use afl_syntax, afl_invalid/gen_invalid, gen_valid to create test suites
-        - need to see what kinds of errors afl_invalid/gen_invalid yield, possibly modify them
+    - use afl_syntax, gen_valid to create two of the test suites
+    - implement "almost-well-typed" program generator for the other test suite
     - need to tweak validate.rs (hopefully, instead of reimplementing)
 
 - need to reimplement lowering for 160 version of cflat
@@ -1811,7 +1811,7 @@ F ::= [E] | (E) | ϵ
 
     - `A ::= αβ₁ | αβ₂ | ... | αβₙ`
 
-    - becomes `A ::= αB`, `B ::= β₁ | β₂ | ... | β₃`
+    - becomes `A ::= αB`, `B ::= β₁ | β₂ | ... | βₙ`
 
 ### a final note [only need to cover if someone asks about it]
 
@@ -1844,9 +1844,17 @@ G ::= (E) | id
 - concrete syntax tree for `x + y * z` (draw as tree)
 
 ```
-E ⟶ [FX] ⟶ [GY]X ⟶ [id(x)]YX ⟶ id(x)[]X ⟶ id(x)[+]FX ⟶ id(x)+[GY]X
-  ⟶ id(x)+[id(y)]YX ⟶ id(x)+id(y)[*GY]X ⟶ id(x)+id(y)*[id(z)]YX
-  ⟶ id(x)+id(y)*id(z)[]X ⟶ id(x)+id(y)*id(z)[]
+E ⟶ [FX] 
+  ⟶ [GY]X 
+  ⟶ [id(x)]YX 
+  ⟶ id(x)[ϵ]X 
+  ⟶ id(x)[+FX] 
+  ⟶ id(x)+[GY]X
+  ⟶ id(x)+[id(y)]YX 
+  ⟶ id(x)+id(y)[*GY]X 
+  ⟶ id(x)+id(y)*[id(z)]YX
+  ⟶ id(x)+id(y)*id(z)[ϵ]X 
+  ⟶ id(x)+id(y)*id(z)[ϵ]
 ```
 
 - abstract syntax tree (draw as tree)
