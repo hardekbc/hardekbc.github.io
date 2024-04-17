@@ -7,7 +7,7 @@
 
     - use afl_syntax, gen_valid to create two of the test suites
     - implement "almost-well-typed" program generator for the other test suite
-    - need to tweak validate.rs (hopefully, instead of reimplementing)
+    - implement type checker
 
 - need to reimplement lowering for 160 version of cflat
 
@@ -25,7 +25,7 @@
 - week  1.2: through `lexing` (projector broken, had to improvise)
 - week  2.1: through `parsing` -> `parsing strategies`
 - week  2.2: through `parsing` -> `formalizing LL(1)`
-- week  3.1: 
+- week  3.1: through `parsing`
 - week  3.2: 
 - week  4.1: 
 - week  4.2: 
@@ -88,9 +88,11 @@
 
 - assign-2:
 
-    - we can either have the students transform the grammar into LL(1) or give them the LL(1) grammar directly; the problem with the former is that they might end up with the wrong grammar, the problem with the second is that it doesn't test their understanding of LL(1), and writing the recursive descent parser given a suitable grammar is the easy part
+    - we give the students the cflat LL(1) grammar instead of making them derive it, mostly because they already need to figure out how to produce an AST and also implement the typing rules so deriving the grammar seemed too much; still this means they never actually have to transform a grammar
 
-        - maybe give them the cflat LL(1) grammar, but add an automatically graded Gradescope quiz about LL(1) in general?
+        - we could give them a separate quiz about transforming grammars to LL(1), online and automatically graded
+
+        - not this time, but think about it for next time (and maybe use those quizzes for other concepts as well, just to give students practice with automated feedback); the quizzes don't have to count as a grade either
 
 # logistics
 
@@ -1692,7 +1694,7 @@ consider A --> B --> C --> DA charlie --> A charlie
 
 - given: `A ::= Aα | β | γ` s.t. α,β,γ don't start with `A`
 
-    - this grammar says that there can be an arbitrary sequence of β and γ ending in a sequence of α
+    - this grammar says that there can be β or γ then a sequence of αs
 
 - transformed: `A ::= βB | γB`, `B ::= αB | ϵ`
 
@@ -2158,6 +2160,8 @@ y = x * y;
 
     - this is covered in detail in CS 162, so i won't spend much time on it here
 
+- TODO: [maybe go over a simple type system before going to cflat; how do we come up with type systems?]
+
 - [go over `docs/validation.pdf` and explain how the typing rules can be turned into recursive functions]
 
     - [remind them what the AST data structure looks like]
@@ -2325,6 +2329,8 @@ Program(
   ]
 )
 ```
+
+- [if time, riff a bit on static vs dynamic typing and their pros and cons]
 
 # front-end recap
 
