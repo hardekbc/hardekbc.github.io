@@ -3,11 +3,10 @@
 
 - remember to run plagiarism detection on all assignments after the deadline (and after late assignments are turned in); just use the built-in gradescope detector
 
-- need to create solution, test suites, and autograder for parsing assignment
+- need to create test suites for parsing assignment
 
     - use afl_syntax, gen_valid to create two of the test suites
     - implement "almost-well-typed" program generator for the other test suite
-    - implement type checker
 
 - need to reimplement lowering for 160 version of cflat
 
@@ -2146,7 +2145,9 @@ y = x * y;
 
     - after this step, we can assume that the program we're compiling is valid for whatever we define "valid" to mean
 
-- there are some simple rules that are trivial to check, but the biggest aspect of validation is usually _type checking_ (at least, for statically typed languages like cflat)
+    - validity is determined by the language designer
+
+- there are often some simple rules that are easy to check, but the biggest aspect of validation is usually _type checking_ (at least, for statically typed languages like cflat)
 
     - a type describes a set of possible values (e.g., `int` describes the set of integers, `&int` describes the set of pointers to integers, etc)
 
@@ -2160,13 +2161,29 @@ y = x * y;
 
     - this is covered in detail in CS 162, so i won't spend much time on it here
 
-- TODO: [maybe go over a simple type system before going to cflat; how do we come up with type systems?]
+- a language's _type system_ is defined by:
 
-- [go over `docs/validation.pdf` and explain how the typing rules can be turned into recursive functions]
+    - the set of types the language recognizes
+
+    - the typing rules that describe how to assign types to parts of a program (i.e., AST nodes)
+
+- the typing rules consist of:
+
+    - _typing judgements_, that state that a particular typing fact holds
+
+    - _inference rules_, that state how to make typing judgements
+
+- there is a very strong connection between type systems and formal logic
+
+    - judgements and inference rules come from the _natural deduction_ style of formal logic
+
+    - the _curry-howard correspondance_ states that types are propositions and programs are proofs; from this perspective a type checker is a proof verifier
+
+- [go over `docs/validation.pdf`]
 
     - [remind them what the AST data structure looks like]
 
-    - [give an example for each rule]
+    - [explain how the rules ensure only "sensible" operations happen]
 
 - EXAMPLE: [see OneNote]
 
@@ -2330,7 +2347,89 @@ Program(
 )
 ```
 
-- [if time, riff a bit on static vs dynamic typing and their pros and cons]
+- these typing rules can easily be turned into an executable type checker
+
+    - note: this isn't true for all type system, just ones that meet certain conditions---which our type system does
+
+    - [describe how the rules can be turned into recursive functions]
+
+- cflat has a simple, static, strong, explicit type system; what does this mean?
+
+    - simple: no polymorphism, dependent types, substructural types, etc
+
+    - static: types are checked at compile-time
+
+    - strong: a well-typed program cannot perform invalid operations
+
+    - explicit: the programmer explicitly annotates type information in the code
+
+- expressiveness:
+
+    - determining exact program behavior is undecidable---in order to guarantee that programs don't behave badly, we must necessarily flag some programs that _wouldn't_ behave badly (example: `let x:int; if false { x = *x}`)
+
+    - we can make type systems more and more powerful and expressive to recognize more and more programs as correct, but type checking becomes more and more expensive and complicated; we can easily move into the realm of undecidable type checking
+
+    - besides undecidability, advanced type systems can also be complicated for programmers to use and require lots of expertise
+
+- static vs dynamic:
+
+    - benefits of static
+
+        - static type systems can guarantee the absence of entire classes of runtime errors
+
+        - potential errors are detected at compile time instead of lurking in production code waiting to be triggered by a user
+
+        - type annotations can serve as useful code documentation (that is automatically checked by the compiler so can't go stale)
+
+        - static type information allows the compiler to do a much better job optimizing the code and results in much faster executables
+
+    - benefits of dynamic:
+
+        - faster, more flexible development because the programmer doesn't need to satisfy the type checker
+
+        - easier for the language designer because they don't need to create a type system or implement a type checker
+
+- strong vs weak:
+
+    - a strong type system provides guarantees (a well-typed program "can't go wrong"), a weak type system provides no guarantees (a well-typed program _can_ "go wrong")
+
+        - C and C++ are the most well-known and widely-used languages with weak type systems
+
+    - obviously strong guarantees are preferable, why would we use a weak type system?
+
+        - the essential reason is _performance_, and specifically dealing with _memory_ (there are other reasons, but this is a big one)
+
+        - garbage collection requires lots of runtime resources and causes unpredictable performance and requires high memory usage (all of this was especially true back when C and C++ were being developed; it's less true today but still true)
+
+            - until recently, all strongly-typed languages had to use garbage collection
+
+        - if we don't want that overhead, then (at least until recently) the only alternative was to allow the programmer to manage memory manually (e.g., `free` and `delete`)
+
+            - but programmers often get manual memory management wrong, and that leads to memory unsafety (e.g., use-after-free errors) and that memory unsafety violates the guarantees provided by the type system
+
+            - these errors also lead to lots of security vulnerabilities
+
+        - why use a type system at all, then? again because of performance: having static types lets the compiler do a much better job of optimizing, and performance was the whole reason behind the weak type system anyway
+
+    - recently a third alternative has arisen: linear type systems
+
+        - the idea isn't that recent, it's been in academic papers for decades
+
+        - but `rust` is the first mainstream language to adopt the idea and put it into practice
+
+        - linear types allow for automatic memory management _without_ using a garbage collector; this means that programmers aren't allowed to make mistakes and hence the type system can be strong
+
+- explicit vs implicit:
+
+    - some people conflate static typing with explicit typing because that's all they're familiar with, but it isn't true
+
+    - languages with implicit types allow the programmer to omit type annotations, so the program looks just like a dynamically-typed one; the compiler must then _infer_ what the types should be in order to perform type checking
+
+        - obviously the more expressive the type system the more difficult and expensive this process is
+
+        - however, it also really helps with the complexity of advanved type systems
+
+    - a number of more modern languages take a middle-point, where the programmer must annotate _some_ type information (e.g., the types of function parameters and function return values) but the rest can be inferred by the compiler
 
 # front-end recap
 
