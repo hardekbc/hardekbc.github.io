@@ -3,11 +3,6 @@
 
 - remember to run plagiarism detection on all assignments after the deadline (and after late assignments are turned in); just use the built-in gradescope detector
 
-- need to create test suites for parsing assignment
-
-    - use afl_syntax, gen_valid to create two of the test suites
-    - implement "almost-well-typed" program generator for the other test suite
-
 - need to reimplement lowering for 160 version of cflat
 
 - need to create test suites and autograder for lowering assignment
@@ -25,7 +20,7 @@
 - week  2.1: through `parsing` -> `parsing strategies`
 - week  2.2: through `parsing` -> `formalizing LL(1)`
 - week  3.1: through `parsing`
-- week  3.2: 
+- week  3.2: `validation` except the example and discussing design space
 - week  4.1: 
 - week  4.2: 
 - week  5.1: 
@@ -84,6 +79,10 @@
     - some of the students aren't actually using an NFA data structure, instead they're just, in a loop, trying each possible lexeme description in turn using string operations until they find one that works (and backtracking if they try one that doesn't work); this will give the correct answer if they try them in the correct order for maximal munch and prioritization and/or insert appropriate checks but is asymptotically less efficient---is there a way to test for this behavior and prevent it?
 
         - not really, this is basically a poor implementation of a backtracking NFA; maybe have them actually print out the NFA and compare with mine? at least this makes sure they've figured the NFA out correctly even if they don't use it, and if they have it why wouldn't they use it
+
+    - a number of students are encountering an issue where copy-pasting the gradescope output for a failed test yields a test that they pass locally; this is because of special characters that don't get copied properly by the copy-paste.
+
+        - i think for testing `\r`, `\t`, etc there isn't a way around this, but it might help to avoid any other non-printable ascii characters (which currently can show up in comments, where i thought it wouldn't matter)
 
 - assign-2:
 
@@ -2479,9 +2478,6 @@ Program(
 
 # ==== OLD ===================================================================
 
-initial language/compiler (L1/C1)
-=================================
-
 naive codegen
 -------------
 
@@ -3837,28 +3833,6 @@ target 32-bit x86 assembly instructions.
         below the current stack pointer) while those for a and b are
         negative (meaning above the stack pointer).
 
-language L2: structs and dynamic memory allocation
-==================================================
-
-new syntax
-----------
-
-\[see handouts/L2-concrete-syntax.pdf\]
-
-new frontend
-------------
-
-nothing novel for lexing and parsing, a small extension of what we\'ve
-already done.
-
-AST validation is more interesting, specifically typechecking now that
-we have more than one type. we won\'t talk about it in detail for now
-(we\'ll just assume correct programs), but essentially we need to
-verify:
-
--   struct field access is to struct that contains that field
--   no pointer arithmetic in arithmetic expressions
-
 new codegen
 -----------
 
@@ -4127,158 +4101,6 @@ the int stored at offset 8 ld \[FR-4\] OR ; get the address stored in
 \'x\' ld \[OR+4\] OR ; get the address stored at offset 4 sto RR \[OR\]
 ; store the right-hand value into \'x.b.d\' at offset 0
 
-### enable collecting the root set for GC
-
-the last piece we need to worry about is how codegen will interact with
-our runtime memory management. we already handled one aspect: when we
-allocate a struct, the codegen will be sure to write the necessary
-information about the struct fields into the header word. but there\'s
-one more thing to do.
-
-for our L2 memory management we\'re going to use a scheme called a
-\'tracing garbage collector\'. we\'ll explain what that actually means
-in a different lecture, but for now just accept the following: for that
-scheme to work, the GC needs to be able to look at the function stack at
-any point during execution and identify which memory locations in the
-stack represent pointers to structs in the heap.
-
-this is more difficult than it might sound. remember that the stack is
-constantly growing and shrinking, and the same memory location may
-represent a pointer or not depending on when exactly during program
-execution we look at it. how can we implement codegen in order to enable
-the runtime GC to collect this information?
-
-there are many possible strategies with different tradeoffs between
-complexity, flexibility, and efficiency. i\'m going to describe one
-strategy that, going along with our usual mantra of \"make it as simple
-as possible as long as it works\", focuses on being easy to implement at
-the expense of some flexibility.
-
-key to this strategy is that the only heap pointers on the stack will be
-either function parameters or function local variables. here\'s the
-idea:
-
-1.  move all nested variable declarations up to the top of the function
-    they\'re in, renaming them as necessary to avoid name clashes. this
-    transformation expands the amount of stack memory the function will
-    consume, but otherwise doesn\'t change the program behavior (as long
-    as we remember to initialize the values to 0 at the same points as
-    before).
-
-2.  modify the prologue instruction sequence for function codegen,
-    specifically immediately after we push the old frame pointer value
-    onto the stack: push two additional words onto the stack after that
-    but before allocating stack space for local variables. remember that
-    we need to adjust the offsets of the local variables accordingly in
-    the symbol table. call these two words the \"argument info word\"
-    and the \"local info word\".
-
-3.  in the argument info word, set it as a bit vector s.t. a bit is set
-    iff the corresponding function parameter is a struct pointer.
-    remember that the function arguments are pushed onto the stack by
-    the pre-call instruction sequence, so by looking at the argument
-    info word we can tell which positive offsets from the frame pointer
-    correspond to a pointer argument.
-
-4.  in the local info word, set it as a bit vector s.t. a bit is set iff
-    the corresponding local variable is a struct pointer. remember that
-    the function locals are pushed onto the stack by the prologue
-    instruction sequence immediately after the local info word, so by
-    looking at the local info word we can tell which negative offsets
-    from the frame pointer correspond to a pointer local.
-
-so, how would this work at runtime to identify all heap pointers on the
-stack? recall that the current frame pointer is always holding the
-address of the old frame pointer for the caller function (this is
-enforced by our calling convention). at the point when we need to
-compute this information:
-
-1.  get the current frame pointer.
-
-2.  read the argument info word (at frame pointer - 4); for each set bit
-    representing offset X, return the memory address \'frame pointer +
-    X\'.
-
-3.  read the local info word (at frame pointer - 8); for each set bit
-    representing offset X, return the memory address \'frame pointer -
-    X\'.
-
-4.  get the value pointed to by the current frame pointer, which is the
-    value of the old frame pointer.
-
-5.  set the current frame pointer value to that old value, then go to 2.
-
-repeat these steps until we\'ve walked the entire stack and looked at
-all of the stack frames. then we\'ve returned all possible pointers into
-the heap.
-
-1.  example
-
-    PROGRAM: struct %foo { int a; };
-
-    def bar(%foo c) : int { %foo d; int e;
-
-    d := new %foo; if (0 \< c.a) { d.a = c.a - 1; e = bar(d); }
-
-    return e; }
-
-    %foo x; int y;
-
-    x := new %foo; x.a := 10; y := bar(x);
-
-    output y;
-
-    suppose we execute this program, and after a few function calls
-    decide to find all pointers on the stack. assume there are no
-    caller- or callee-save registers for convenience.
-
-    STACK:
-
-    ADDRESS CONTENTS
-
-    ------------------------------------------------------------------------
-
-    0x900: 0x1000 ; old frame pointer 0x0 ; argument info word: there
-    are no pointer arguments 0x1 ; local info word: \'x\' is a pointer
-    0xab0 ; the value of \'x\', a pointer into the heap 0x0 ; the value
-    of \'y\', an int 0xab0 ; the call argument, i.e., \'x\' 0xd0f ; the
-    return address 0x800: 0x900 ; old frame pointer 0x1 ; argument info
-    word: there is 1 pointer argument 0x01 ; local info word: there is 1
-    pointer local 0xac0 ; the value of \'d\' 0x0 ; the value of \'e\'
-    0xac0 ; the call argument, i.e., \'d\' 0xdef ; the return address
-    0x700: 0x800 ; old frame pointer 0x1 ; argument info word: there is
-    1 pointer argument 0x01 ; local info word: there is 1 pointer local
-    0xad0 ; the value of \'d\' 0x0 ; the value of \'e\'
-
-    this is the stack after the first recursive call to \'bar\'. the
-    current frame pointer is 0x700, which points to the most recent
-    \'old frame pointer\' on the stack.
-
-    1.  go to 0x700-4 to get the argument info word
-    2.  there is 1 set bit: return 0x700+8 as the memory location of a
-        pointer
-    3.  go to 0x700-8 to get the local info word
-    4.  there is 1 set bit: return 0x700-12 as the memory location of a
-        pointer
-    5.  set the current frame pointer as 0x800 (the address of the next
-        most recent frame pointer)
-    6.  go to 0x800-4 to get the argument info word
-    7.  there is 1 set bit: return 0x800+8 as the memory location of a
-        pointer
-    8.  go to 0x800-8 to get the local info word
-    9.  there is 1 set bit: return 0x800-12 as the memory location of a
-        pointer
-    10. set the current frame pointer as 0x900 (the address of the next
-        next most recent frame pointer)
-    11. go to 0x900-4 to get the argument info word
-    12. there are no pointer arguments
-    13. go to 0x900-8 to get the local info word
-    14. there is 1 set bit: return 0x900-12 as the memory location of a
-        pointer
-    15. set the current frame pointer as 0x1000 (the address of the next
-        next next most recent frame pointer)
-    16. say that 1000 is the base of the stack, so we\'re done.
-
 ### exercise {#exercise-15}
 
 generate code for the following program (again assuming no caller- or
@@ -4337,11 +4159,6 @@ put it in \'s\'
 value of \'s.a\'
 
 ; FOO epilogue mov FR SR pop FR ret
-
-memory management schemes
--------------------------
-
-\[see memory management slides\]
 
 middle-end: optimization (back to L1)
 =====================================
@@ -6253,62 +6070,3 @@ SSA
 ---
 
 \[omitted for time\]
-
-type systems
-============
-
-we have a fairly complete compiler at this point: lexer, parser,
-optimizer, codegen, and garbage collector. for language L1 we only
-skimmed an important piece of the front-end though: validating the AST
-after parsing. for L1 this is a simple process that only involves a few
-easy checks. when we move to language L2 things get more interesting.
-
-The most common method of validating the AST is by a process called
-[type checking]{.underline}. let\'s look at type systems and type
-checking in general, then apply those ideas to L2 to develop our own
-type system and type checker. you have all used languages with type
-systems and type checkers before (e.g., C++, Java), but do you know what
-a type actually is or what they are used for? now you will.
-
-\[handout3-typedLC.pdf section 1\]
-
-now that we understand what types are used for, how do we specify a type
-system for a language? it turns out that type systems are closely
-related to mathematical logic, and we can specify type systems in a
-similar way using a system called [natural deduction]{.underline}.
-
-simple type system
-------------------
-
-let\'s look at a simple example before we tackle the entire L2 language.
-
-\[simple-type-system.pdf\]
-
-### example 1
-
-\[type check the AST example given in simple-type-system.pdf\]
-
-### example 2 {#example-2-1}
-
-def foo(bool a) : int { return if (a) {1} else {2}; } def bar(int a) :
-int { return a + 1; } if (foo(false) \<= bar(0)) { true } else { false }
-
-### exercise {#exercise-22}
-
-def foo(int a) : int { return a + (if (a \<= 0) { a+1 } else { 42 }); }
-if (((1 + 2) + -12) \<= foo(12)) { 3 \<= 4 } else { false }
-
-L2 type system
---------------
-
-now that we have a handle on the idea, let\'s look at L2.
-
-\[L2-abstract-syntax.pdf\] \[L2-type-system.pdf\]
-
-### example {#example-12}
-
-\[L2-concrete-syntax.pdf section 2, the \'insert\' function\]
-
-### exercise {#exercise-23}
-
-\[L2-concrete-syntax.pdf section 2, the rest of the program\]
