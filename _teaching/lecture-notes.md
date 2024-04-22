@@ -2466,7 +2466,59 @@ Program(
 
     - these often require some creative thinking to get them to fit into the frontend framework we've covered here, mostly because of ambiguity in the lexemes and/or grammar or because lexemes aren't strictly regular
 
-# lowering TODO:
+# lowering
+
+- TODO: [what follows are notes for creating the lecture notes]
+
+    - motivate LIR and lowering
+
+        - simplify, make things explicit (order, control-flow)
+        - better for optimization
+        - easier to do codegen for various backends (LIR is essentially ISA-agnostic assembly)
+
+    - hand-wavy example for simplification and making things more regular
+    
+        - maybe assignment with complex lhs and rhs including function call (for argument evaluation order)
+
+        - make clear this is pseudo-code, we'll explicitly define our IR later
+
+        - idea of "three-address code", i.e., no instruction will have more than three addresses (think `variables`)
+
+    - hand-wavy example for making control-flow explicit
+
+        - if statement, while loop
+
+    - define CFG, basic blocks
+
+        - AST is a tree, but CFG is a graph
+
+        - give CFG construction algorithm given list of instructions
+
+        - give example/exercise
+
+    - define LIR, go over it as a data structure
+
+        - i separate LirInst from Terminal to make clear that only certain things can go at the end of basic blocks
+
+        - your implementation doesn't need to differentiate
+
+    - need to translate from AST to LIR
+
+        - SOMEWHERE need to explain what Lvals are and how they are different from expressions; where should that go? maybe that should have been back during parsing? but it only really matters now that we're translating
+
+    - give simple example of AST and resulting LIR
+
+    - go over transformation
+
+        - recursive traversal of AST (e.g., using visitor design pattern if you defined the AST using classes)
+
+        - doesn't need to produce best possible code, we can clean it up with optimizations
+
+        - first emit sequence of instructions, then construct CFG (using LIR data structure)
+
+    - give more involved example/exercise
+
+    - [maybe stage explanation into (1) translating to vector with examples/exercises, then (2) constructing CFG with examples/exercises]
 
 # codegen TODO:
 
