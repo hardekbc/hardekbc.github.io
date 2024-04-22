@@ -7,6 +7,18 @@
 
 - need to create test suites and autograder for lowering assignment
 
+    - this should be easy, just need to decide what the test suites will be and generate valid programs for them
+
+    - the students need to read in an AST; by default i can just give them the AST as a text file but then they need to parse it; optionally i can make it easier for them by:
+
+        - also giving them the tokens so they can use their solution to assign-2 to construct the AST
+
+        - give them the AST on JSON format so they can read it in using a JSON library and then translate to their data structure
+
+            - i would need to define a suitable AST and convert the actual AST to that format so i can use serde to serialize it
+
+            - i would need to think about how to allow the JSON library in the autograder; maybe just pick one that's header-only and have them use that?
+
 - need to create test suites and autograder for codegen assignment
 
 - need to create test suites and autograder for register allocation assignment
@@ -2468,57 +2480,269 @@ Program(
 
 # lowering
 
-- TODO: [what follows are notes for creating the lecture notes]
+- now that we have a valid AST we could directly generate ISA code from it, but most modern compilers don't do that---instead, they _lower_ the AST into a simpler, lower-level intermediate representation (LIR)
 
-    - motivate LIR and lowering
+    - LIR is essentially ISA-agnostic assembly, which is particulary useful if the compiler has multiple backends---a lot of compilation work can be implemented once, for LIR, and then we only need to do individual codegen for each backend from the LIR
 
-        - simplify, make things explicit (order, control-flow)
-        - better for optimization
-        - easier to do codegen for various backends (LIR is essentially ISA-agnostic assembly)
+    - LIR makes the code simpler and more explicit (e.g., the order of evaluation and the flow of control); each instruction does just one thing
 
-    - hand-wavy example for simplification and making things more regular
-    
-        - maybe assignment with complex lhs and rhs including function call (for argument evaluation order)
+    - LIR is better for optimization because it's easier to reason about and transform
 
-        - make clear this is pseudo-code, we'll explicitly define our IR later
+- there are various forms of IR, but a common one (and the one we'll use) is _three-address code_ IR
 
-        - idea of "three-address code", i.e., no instruction will have more than three addresses (think `variables`)
+    - no instruction will have more than three "addresses" (think "variables/constants")
 
-    - hand-wavy example for making control-flow explicit
+- example of how LIR simplifies the AST code and makes evaluation order explicit (using more human-readable notation)
 
-        - if statement, while loop
+    - instead of a deeply-nested tree of expressions, we end up with a flat sequence of simple instructions
 
-    - define CFG, basic blocks
+    - [see OneNote] FIXME:
 
-        - AST is a tree, but CFG is a graph
+```
+[source]
+*x = foo(y+z+1, z*3).fld
 
-        - give CFG construction algorithm given list of instructions
+[AST]
+Assign(
+    Deref(Id(x)), 
+    RhsExp(
+        FieldAccess(
+            ptr: Call(
+                callee: Id(foo),
+                args: [
+                    Add(Add(Id(y), Id(z)), Num(1)),
+                    Mul(Id(z), Num(3))
+                ]
+            )
+            field: fld
+        )
+    )
+)
 
-        - give example/exercise
+[LIR]
+_t1 = $arith add y z
+_t2 = $arith add _t1 1
+_t3 = $arith mul z 3
+_t4 = $call_ext foo(_t2, _t3)
+_t5 = $gfp _t4 fld
+_t6 = $load _t5
+$store x _t6
+```
 
-    - define LIR, go over it as a data structure
+- our LIR is in the form of a _control-flow graph_ (CFG)
 
-        - i separate LirInst from Terminal to make clear that only certain things can go at the end of basic blocks
+    - the abbreviation is an unfortunate pun, this is _not_ "CFG" meaning "context-free grammar"
 
-        - your implementation doesn't need to differentiate
+    - a CFG is an explicit representation of the possible execution paths in a program---that is, when a program is executed, what are the possible sequences of instructions it may execute?
 
-    - need to translate from AST to LIR
+    - a CFG is composed of nodes called _basic blocks_ (a labeled sequence of instructions) connected by edges representing control-flow between blocks
 
-        - SOMEWHERE need to explain what Lvals are and how they are different from expressions; where should that go? maybe that should have been back during parsing? but it only really matters now that we're translating
+    - a basic block is a linear sequence of instructions s.t. (1) it can only be entered at the beginning, and (2) it can only be left at the end
 
-    - give simple example of AST and resulting LIR
+        - i.e., there is no way to jump into or out of the middle of a basic block: you have to enter at the first instruction and can only leave after the last instruction
 
-    - go over transformation
+        - every basic block has a label, which is used to target that basic block when transferring control from some other basic block
 
-        - recursive traversal of AST (e.g., using visitor design pattern if you defined the AST using classes)
+        - every basic block ends in a _terminal_ instruction that says what basic block to go to next
 
-        - doesn't need to produce best possible code, we can clean it up with optimizations
+    - every function has a single _entry_ basic block and a single _exit_ basic block (containing the sole `$return` instruction)
 
-        - first emit sequence of instructions, then construct CFG (using LIR data structure)
+        - we always start executing the function at the entry block and leave the function after the exit block
 
-    - give more involved example/exercise
+- [introduce LIR data structure] [see OneNote] FIXME:
 
-    - [maybe stage explanation into (1) translating to vector with examples/exercises, then (2) constructing CFG with examples/exercises]
+    - i separate LirInst from Terminal to make clear that only certain things can go at the end of basic blocks; your implementation doesn't need to differentiate
+
+- example 1 (draw graph) [see OneNote] FIXME:
+
+```
+[source]
+let x:int = input(), y:int = 0, z:int = 0;
+if (x != 0) {
+  x = 3;
+  y = 2;
+} else {
+  x = 2;
+  y = 3;
+}
+z = x + y;
+return z;
+
+[AST]
+locals: [
+    (Decl(x, Int), Call(callee: Id(input), args: [])),
+    (Decl(y, Int), Num(0)),
+    (Decl(z, Int), Num(0))
+]
+stmts: [
+    If(
+        guard: BinOp(NotEq, Id(x), Num(0)),
+        tt: [
+            Assign(Id(x), Num(3)),
+            Assign(Id(y), Num(2)),
+        ]
+        ff: [
+            Assign(Id(x), Num(2)),
+            Assign(Id(y), Num(3)),
+        ]
+    ),
+    Assign(Id(x), Add(Id(x), Id(y))),
+    Return(Id(z))
+]
+
+[LIR]
+let: x:int, y:int, z:int
+entry: 
+  x = $call_ext input()
+  y = $copy 0
+  z = $copy 0
+  _t1 = $cmp neq x 0
+  $branch _t1 tt ff
+
+tt: 
+  x = $copy 3
+  y = $copy 2
+  $jump if_end
+
+ff: 
+  x = $copy 2
+  y = $copy 3
+  $jump if_end
+
+if_end: 
+  z = $arith add x y
+  $ret z
+```
+
+- example 2 (draw graph) [see OneNote] FIXME:
+
+```
+[source]
+let x:int = input(), y:int = input(), z:int = input();
+while (z != 0) {
+  x = x + 1;
+  y = y + 2;
+  z = x / y;
+}
+return x;
+
+[AST]
+locals: [
+    (Decl(x, Int), Call(callee: Id(input), args: [])),
+    (Decl(y, Int), Call(callee: Id(input), args: [])),
+    (Decl(z, Int), Call(callee: Id(input), args: []))
+]
+stmts: [
+    While(
+        guard: BinOp(NotEq, Id(z), Num(0)),
+        body: [
+            Assign(Id(x), Add(Id(x), Num(1))),
+            Assign(Id(y), Add(Id(y), Num(2))),
+            Assign(Id(z), Div(Id(x), Id(y))),
+        ]
+    ),
+    Return(Id(x))
+]
+
+[LIR]
+entry:
+  x = $call_ext input()
+  y = $call_ext input()
+  z = $call_ext input()
+  $jump hdr
+
+hdr:
+  _t1 = $cmp neq z 0
+  $branch _t1 body exit
+
+body:
+  x = $arith add x 1
+  y = $arith add y 2
+  z = $arith div x y
+  $jump hdr
+
+exit:
+  $ret x
+```
+
+- EXERCISE [see OneNote] FIXME:
+
+```
+[source]
+let x:int = input(), y:int = input(), z:int = input();
+while (z != 0) {
+  while (y <= x) {
+    y = y + 2;
+    z = x / y;
+  }
+  x = x + 1;
+}
+return x;
+
+[AST]
+locals: [
+    (Decl(x, Int), Call(callee: Id(input), args: [])),
+    (Decl(y, Int), Call(callee: Id(input), args: [])),
+    (Decl(z, Int), Call(callee: Id(input), args: []))
+]
+stmts: [
+    While(
+        guard: BinOp(NotEq, Id(z), Num(0)),
+        body: [
+            While(
+                guard: BinOp(Lte, Id(y), Id(x)),
+                body: [
+                    Assign(Id(y), Add(Id(y), Num(2))),
+                    Assign(Id(z), Div(Id(x), Id(y))),
+                ]
+            )
+            Assign(Id(x), Add(Id(x), Num(1))),
+        ]
+    ),
+    Return(Id(x))
+]
+
+[LIR]
+entry:
+  x = $call_ext input()
+  y = $call_ext input()
+  z = $call_ext input()
+  $jump hdr1
+
+hdr1:
+  _t1 = $cmp neq z 0
+  $branch _t1 hdr2 exit1
+
+hdr2: 
+  _t2 = $cmp lte y x
+  $branch _t2 body2 exit2
+
+body2:
+  y = $arith add y 2
+  z = $arith div x y
+  $jump hdr2
+
+exit2:
+  x = $arith add x 1
+  $jump hdr1
+
+exit1:
+  $ret x
+```
+
+- our task is to translate valid programs from the AST data structure to the LIR data structure; this is called _lowering_
+
+- [go over lowering process] [see `docs/lowering.pdf`]
+
+    - [when translating Lvals, need to explain difference between Lval and Exp: Exp evaluates to a value, Lval evaluates to a location where a value will be stored]
+
+        - we need them because an `Assign` can be directly to a variable OR through a pointer, and LIR makes the difference explicit
+
+        - we also used Lvals for Call statements, but this was just to make the grammar LL(1)
+
+    - we don't need to worry about producing the best possible (most efficient) code; we can clean it up later using various optimizations on the LIR
+
+- TODO: example for lowering (an exercise would be nice, but how would they be able to see all the rules?)
 
 # codegen TODO:
 
@@ -4482,380 +4706,6 @@ many optimizations have similar considerations: just because we
 idea. we need to figure out in each case whether applying the
 optimization results in a net performance benefit or loss and act
 accordingly.
-
-IR: 3-address code
-------------------
-
-let\'s discuss the IR we\'ll use for the middle-end. it will be a
-classic example of \"three address code\", something similar to that
-used by many real compilers. the name \"three address code\" is a
-reference to the fact that no instruction will involve more than three
-\"addresses\" (think: variables). here is the syntactic definition of
-the IR:
-
-\[in1\] binop ::= + \| - \| \* \| \< \| \<= \| = \| AND \| OR operand
-::= variable \| constant instruction ::= variable \<- operand binop
-operand
-
-  ----------------------------
-  variable \<- NOT operand
-  variable \<- CALL function
-  variable \<- operand
-  arg operand
-  return operand
-  output operand
-  jump label
-  jump~if0~ operand label
-  ----------------------------
-
-### example {#example-8}
-
-let\'s look at an example. here is the original program:
-
-\[in2\] def bar(int a) : int { return a + (a - 12) \* 42; }
-
-def foo(int a) : int { int x; int y; x := bar(a); y := bar(a+1); return
-x\*y; }
-
-int x; while (x \< 2) { x := x + 1; } x := foo(x); output x+3;
-
-here is the IR version:
-
-\[in3\] def bar(int a) { ~tmp0~ \<- a - 12 ~tmp1~ \<- ~tmp0~ \* 42
-~tmp2~ \<- a + ~tmp1~ return ~tmp2~ }
-
-def foo(int a) { arg a x \<- CALL bar ~tmp0~ \<- a + 1 arg ~tmp0~ y \<-
-CALL bar ~tmp1~ \<- x \* y return ~tmp1~ }
-
-WHILE~START0~: ~tmp0~ \<- x \< 2 jump~if0~ ~tmp0~ WHILE~END0~
-
-x \<- x + 1 jump WHILE~START0~
-
-WHILE~END0~: arg x x \<- CALL foo ~tmp1~ \<- x + 3 output ~tmp1~
-
-\[note that i\'m writing the labels on separate lines like instructions
-for convenience, but they aren\'t actually instructions and don\'t take
-up a line of code.\]
-
-we see that the IR is a lot like assembly, except that it\'s
-higher-level (target agnostic, keeps the abstraction of functions and
-function calls, arbitrary number of variables). it does strip away the
-variable definitions, type annotations, etc because we assume that these
-are already in the symbol table.
-
-this IR is nicer to work with for optimizations because we don\'t have
-to deal with complex nested expressions and we can assume that every
-instruction is in one of a few kinds of formats and never has more than
-two operands.
-
-how do we generate the IR from the AST? it works exactly like the
-codegen we\'ve already examined, except emitting the IR instructions
-instead of assembly. other than that, we can use the same strategy and
-implementation. for clarity in this example i always created a new
-temporary, but we could also reuse them between instructions using the
-same strategy as we did for assembly codegen.
-
-### exercise {#exercise-16}
-
-\[in4\] translate the following program:
-
-def foo(int a, int b) : int { int x; int y;
-
-x := a + b \* (a - b);
-
-while (y \<= x + 3) { y := y + 10; }
-
-return y \* 2; }
-
-int t1; int t2;
-
-t1 := 42; t2 := foo(t1 + 2, t1 \* 2); if (t1 \< t2) { t1 := t2; } else {
-t1 := t1 + 2; }
-
-output t1 + 42;
-
-SOLUTION
-
-\[in5\] def foo(int a, int b) { ~tmp0~ \<- a - b ~tmp1~ \<- b \* ~tmp0~
-x \<- a + ~tmp1~
-
-WHILE~START0~: ~tmp2~ \<- x + 3 ~tmp3~ \<- y \<= ~tmp2~ jump~if0~ ~tmp3~
-WHILE~END0~
-
-y \<- y + 10 jump WHILE~START0~
-
-WHILE~END0~: ~tmp4~ \<- y \* 2 return ~tmp4~ }
-
-t1 \<- 42 ~tmp0~ \<- t1 + 2 ~tmp1~ \<- t1 \* 2 arg ~tmp0~ arg ~tmp1~ t2
-\<- CALL foo
-
-~tmp2~ \<- t1 \< t2 jump~if0~ ~tmp2~ IF~FALSE1~ t1 \<- t2 jump IF~END1~
-
-IF~FALSE1~: t1 \<- t1 + 2
-
-IF~END1~: ~tmp3~ \<- t1 + 42 output ~tmp3~
-
-control-flow graph
-------------------
-
-### definition
-
-unlike codegen, we don\'t output the IR as a linear list of
-instructions. instead, we use a data structure called the [control flow
-graph]{.underline}. confusingly, we abbreviate this as CFG, just like
-context-free grammars. so in the frontend CFG will mean context-free
-grammar and in the middle-end it will mean control flow graph; you just
-have to use the surrounding context to figure out which one is meant.
-
-a CFG models the control-flow of the program, i.e., which instructions
-can execute after which other instructions. it is a directed graph whose
-nodes are [basic blocks]{.underline} (a sequence of instructions, to be
-defined more precisely soon). an edge from basic block A to basic block
-B means that immediately after A executes, B may execute (not
-necessarily [must]{.underline} execute, just [may]{.underline} execute).
-
-a [basic~block~]{.underline} is a sequence of instructions with the
-following property: control must enter at the first instruction of the
-block and can only exit after the last instruction in the block, i.e.,
-the block has a single entry point and a single exit point. in other
-words, if program execution enters the basic block then every
-instruction in the basic block must be executed.
-
--- note: when i was talking about optimization scope and said that local
-optimizations operate on \"small fragments of code\", what i really
-meant was basic blocks.
-
-### examples
-
-the CFG is perhaps more easily understood by example.
-
-EXAMPLE 1
-
-\[cfg1\] program:
-
-x := foo(); if (x \< 10) { x := 3; y := 2; } else { x := 2; y := 3; } z
-:= x + y \* 2; output z;
-
-IR:
-
-\[A\] x \<- CALL foo ~tmp0~ \<- x \< 10 jump~if0~ ~tmp0~ IF~FALSE0~
-
-\[B\] x \<- 3 y \<- 2 jump IF~END0~
-
-\[C\] x \<- 2 y \<- 3
-
-\[D\] IF~END0~: ~tmp1~ \<- y \* 2 z \<- x + ~tmp1~ output z
-
-each separate block of instructions is a basic block. note that: -- a
-jump, return, or output always ends a basic block. -- a basic block
-doesn\'t have to end in a jump, return, or output (see false branch).
-
--   the block has to end there because the next instruction is the
-    target of a jump and we cannot allow basic blocks to be entered in
-    the middle. since the way we\'re generating the IR every jump target
-    has to be a label, it\'s fair to say that any labeled instruction
-    will automatically start a new basic block.
-
--- a call does not end a basic block. while it does transfer control
-somewhere else, eventually that control will always return to
-immediately after the call. that means we preserve the invariant that
-every instruction in the basic block must be executed.
-
-CFG:
-
-\[show CFG\]
-
-EXAMPLE 2:
-
-\[cfg2\] program:
-
-x := foo(); while (x \< 10) { x := x + 1; y := y + 1; z := x \* y; }
-output z;
-
-IR:
-
-\[A\] x \<- CALL foo
-
-\[B\] WHILE~START0~: ~tmp0~ \<- x \< 10 jump~if0~ ~tmp0~ WHILE~END0~
-
-\[C\] x \<- x + 1 y \<- y + 1 z \<- x \* y jump WHILE~START0~
-
-\[D\] WHILE~END0~: output z
-
-CFG:
-
-\[show CFG\]
-
-EXAMPLE 3:
-
-\[cfg3\] program:
-
-x := foo(); while (x \< 10) { x := x + 1; if (x \<= y) { while (x \< y)
-{ y := y - 2; } } } output y;
-
-IR:
-
-\[A\] x \<- CALL foo
-
-\[B\] WHILE~START0~: ~tmp0~ \<- x \< 10 jump~if0~ ~tmp0~ WHILE~END0~
-
-\[C\] x \<- x + 1 ~tmp1~ \<- x \<= y jump~if0~ ~tmp1~ IF~FALSE1~
-
-\[D\] WHILE~START2~: ~tmp2~ \<- x \< y jump~if0~ ~tmp2~ WHILE~END2~
-
-\[E\] y \<- y - 2 jump WHILE~START2~
-
-\[F\] WHILE~END2~: IF~FALSE1~: jump WHILE~START0~
-
-\[G\] WHILE~END0~: output y
-
-CFG:
-
-\[show CFG\]
-
-### algorithm
-
-the basic algorithm for building a CFG is simple, though various
-language features can complicate it a bit. let\'s assume that we start
-with a linear sequence of IR instructions (something like what we would
-get from our codegen algorithm, a vector of instructions, but IR
-instructions rather than assembly instructions). also, this is per
-function (including treating the \"global\" block of code ending in
-\'output\' as a function itself).
-
-\[cfg4\] we\'ll use the following example to illustrate the algorithm:
-
-1.  x \<- CALL foo
-2.  WHILE~START0~: ~tmp0~ \<- x \< 10
-3.  jump~if0~ ~tmp0~ WHILE~END0~
-4.  x \<- x + 1
-5.  ~tmp1~ \<- x \<= y
-6.  jump~if0~ ~tmp1~ IF~FALSE1~
-7.  WHILE~START2~: ~tmp2~ \<- x \< y
-8.  jump~if0~ ~tmp2~ WHILE~END2~
-9.  y \<- y - 2
-10. jump WHILE~START2~
-11. WHILE~END2~: IF~FALSE1~: jump WHILE~START0~
-12. WHILE~END0~: output y
-
-```{=html}
-<!-- -->
-```
-1.  identify all \"leader\" instructions (the instructions that start a
-    basic block). a leader is the first instruction in the function, any
-    labeled instruction (because it can be the target of a jump), and
-    any instruction immediately following a conditional jump (because it
-    is the fall-through instruction if the conditional jump is not
-    taken). remember to treat multiple consecutive labels as a single
-    label for these purposes. save the indices of these leader
-    instructions in a vector, in the order they appear in the
-    instruction sequence.
-
-==\> the leaders for the example are indices { 00, 01, 03, 06, 08, 10,
-11 }.
-
-1.  record the basic blocks as the sequences of instructions from each
-    leader up to, but not including, the next leader in sequence.
-
-    the basic blocks for the example are:
-
-    \[A\]
-
-    1.  x \<- CALL foo
-
-    \[B\]
-
-    1.  WHILE~START0~: ~tmp0~ \<- x \< 10
-    2.  jump~if0~ ~tmp0~ WHILE~END0~
-
-    \[C\]
-
-    1.  x \<- x + 1
-    2.  ~tmp1~ \<- x \<= y
-    3.  jump~if0~ ~tmp1~ IF~FALSE1~
-
-    \[D\]
-
-    1.  WHILE~START2~: ~tmp2~ \<- x \< y
-    2.  jump~if0~ ~tmp2~ WHILE~END2~
-
-    \[E\]
-
-    1.  y \<- y - 2
-    2.  jump WHILE~START2~
-
-    \[F\]
-
-    1.  WHILE~END2~: IF~FALSE1~: jump WHILE~START0~
-
-    \[G\]
-
-    1.  WHILE~END0~: output y
-
-2.  for each basic block, look at the last instruction:
-
-    A. if it is not a jump, add an edge from this basic block to the
-    basic block whose leader is immediately next in sequence.
-
-==\> basic block A has an edge to B; basic block G would have an edge
-but it ends the function so it doesn\'t.
-
-B. if it is an unconditional jump to label L, add an edge from this
-basic block to the basic block whose leader is labeled L.
-
-==\> for the example, basic block E has an edge to D; basic block F has
-an edge to B.
-
-C. if it is a conditional jump to label L:
-
-1.  add an edge from this basic block to the basic block whose leader is
-    immediately next in sequence.
-2.  add an edge from this basic block to the basic block whose leader is
-    labeled L.
-
-==\> for the example, basic block B has edges to C and G; basic block C
-has edges to D and F; basic block D has edges to E and F.
-
-### exercise {#exercise-17}
-
-\[cfg5\] create the CFG for the following program:
-
-def foo(int a, int b) { ~tmp0~ \<- a - b ~tmp1~ \<- b \* ~tmp0~ x \<- a
-+ ~tmp1~ WHILE~START0~: ~tmp2~ \<- x + 3 ~tmp3~ \<- y \<= ~tmp2~
-jump~if0~ ~tmp3~ WHILE~END0~ y \<- y + 10 jump WHILE~START0~
-WHILE~END0~: ~tmp4~ \<- y \* 2 return ~tmp4~ }
-
-t1 \<- 42 ~tmp0~ \<- t1 + 2 ~tmp1~ \<- t1 \* 2 arg ~tmp0~ arg ~tmp1~ t2
-\<- CALL foo ~tmp2~ \<- t1 \< t2 jump~if0~ ~tmp2~ IF~FALSE1~ t1 \<- t2
-jump IF~END1~ IF~FALSE1~: t1 \<- t1 + 2 IF~END1~: ~tmp3~ \<- t1 + 42
-output ~tmp3~
-
-SOLUTION
-
-\[cfg6\] basic blocks:
-
-def foo(int a, int b) { \[A\] ~tmp0~ \<- a - b ~tmp1~ \<- b \* ~tmp0~ x
-\<- a + ~tmp1~
-
-\[B\] WHILE~START0~: ~tmp2~ \<- x + 3 ~tmp3~ \<- y \<= ~tmp2~ jump~if0~
-~tmp3~ WHILE~END0~
-
-\[C\] y \<- y + 10 jump WHILE~START0~
-
-\[D\] WHILE~END0~: ~tmp4~ \<- y \* 2 return ~tmp4~ }
-
-\[E\] t1 \<- 42 ~tmp0~ \<- t1 + 2 ~tmp1~ \<- t1 \* 2 arg ~tmp0~ arg
-~tmp1~ t2 \<- CALL foo ~tmp2~ \<- t1 \< t2 jump~if0~ ~tmp2~ IF~FALSE1~
-
-\[F\] t1 \<- t2 jump IF~END1~
-
-\[G\] IF~FALSE1~: t1 \<- t1 + 2
-
-\[H\] IF~END1~: ~tmp3~ \<- t1 + 42 output ~tmp3~
-
-cfg:
-
-\[show CFG\]
 
 local optimizations
 -------------------
