@@ -2496,7 +2496,7 @@ Program(
 
     - instead of a deeply-nested tree of expressions, we end up with a flat sequence of simple instructions
 
-    - [see OneNote] FIXME:
+    - [see OneNote]
 
 ```
 [source]
@@ -2549,11 +2549,13 @@ $store x _t6
 
         - we always start executing the function at the entry block and leave the function after the exit block
 
-- [introduce LIR data structure] [see OneNote] FIXME:
+- [introduce LIR data structure] [see OneNote]
+
+    - [explain the LIR instructions]
 
     - i separate LirInst from Terminal to make clear that only certain things can go at the end of basic blocks; your implementation doesn't need to differentiate
 
-- example 1 (draw graph) [see OneNote] FIXME:
+- example 1 (draw graph) [see OneNote]
 
 ```
 [source]
@@ -2591,7 +2593,7 @@ stmts: [
 ]
 
 [LIR]
-let: x:int, y:int, z:int
+let x:int, y:int, z:int, _t1:int
 entry: 
   x = $call_ext input()
   y = $copy 0
@@ -2614,7 +2616,7 @@ if_end:
   $ret z
 ```
 
-- example 2 (draw graph) [see OneNote] FIXME:
+- example 2 (draw graph) [see OneNote]
 
 ```
 [source]
@@ -2645,6 +2647,7 @@ stmts: [
 ]
 
 [LIR]
+let x:int, y:int, z:int, _t1:int
 entry:
   x = $call_ext input()
   y = $call_ext input()
@@ -2665,11 +2668,23 @@ exit:
   $ret x
 ```
 
-- EXERCISE [see OneNote] FIXME:
+- our task is to translate valid programs from the AST data structure to the LIR data structure; this is called _lowering_
+
+- [go over lowering process] [see `docs/lowering.pdf`]
+
+    - [when translating Lvals, need to explain difference between Lval and Exp: Exp evaluates to a value, Lval evaluates to a location where a value will be stored]
+
+        - we need them because an `Assign` can be directly to a variable OR through a pointer, and LIR makes the difference explicit
+
+        - we also used Lvals for Call statements, but this was just to make the grammar LL(1)
+
+    - we don't need to worry about producing the best possible (most efficient) code; we can clean it up later using various optimizations on the LIR
+
+- example [see OneNote]
 
 ```
 [source]
-let x:int = input(), y:int = input(), z:int = input();
+let x:int = input(), y:int = 0, z:int = 42;
 while (z != 0) {
   while (y <= x) {
     y = y + 2;
@@ -2682,8 +2697,8 @@ return x;
 [AST]
 locals: [
     (Decl(x, Int), Call(callee: Id(input), args: [])),
-    (Decl(y, Int), Call(callee: Id(input), args: [])),
-    (Decl(z, Int), Call(callee: Id(input), args: []))
+    (Decl(y, Int), Num(0)),
+    (Decl(z, Int), Num(42))
 ]
 stmts: [
     While(
@@ -2701,48 +2716,123 @@ stmts: [
     ),
     Return(Id(x))
 ]
-
-[LIR]
-entry:
-  x = $call_ext input()
-  y = $call_ext input()
-  z = $call_ext input()
-  $jump hdr1
-
-hdr1:
-  _t1 = $cmp neq z 0
-  $branch _t1 hdr2 exit1
-
-hdr2: 
-  _t2 = $cmp lte y x
-  $branch _t2 body2 exit2
-
-body2:
-  y = $arith add y 2
-  z = $arith div x y
-  $jump hdr2
-
-exit2:
-  x = $arith add x 1
-  $jump hdr1
-
-exit1:
-  $ret x
 ```
 
-- our task is to translate valid programs from the AST data structure to the LIR data structure; this is called _lowering_
+- solution
 
-- [go over lowering process] [see `docs/lowering.pdf`]
+INITIAL TRANSLATION VECTOR
+```
+label:entry
+-----
+|-----
+| _t1 = $call_ext input()
+|-----
+x = $copy _t1
+-----
+y = $copy 0
+-----
+z = $copy 42
+-----
+$jump lbl1
+label:lbl1
+|-----
+| _t2 = $cmp neq z 0
+|-----
+$branch _t2 lbl2 lbl3
+label:lbl2
+|-----
+| $jump lbl4
+| label:lbl4
+||-----
+|| _t3 = $cmp lt y x
+||-----
+| $branch _t3 lbl5 lbl6
+| label:lbl5
+||-----
+|||-----
+||| _t4 = $arith add y 2
+|||-----
+|| y = $copy _t4
+|||-----
+||| _t5 = $arith div x y
+|||-----
+|| z = $copy _t5
+||-----
+| $jump lbl4
+| label:lbl6
+||-----
+|||-----
+||| _t6 = $arith add x 1
+|||-----
+|| x = $copy _t6
+||-----
+|-----
+$jump lbl1
+label:lbl3
+-----
+$ret x
+```
 
-    - [when translating Lvals, need to explain difference between Lval and Exp: Exp evaluates to a value, Lval evaluates to a location where a value will be stored]
+AFTER OPTIMIZATION
+```
+label:entry
+_t1 = $call_ext input()
+x = $copy _t1
+y = $copy 0
+z = $copy 42
+$jump lbl1
+label:lbl1
+_t2 = $cmp neq z 0
+$branch _t2 lbl4 lbl3
+label:lbl4
+_t3 = $cmp lt y x
+$branch _t3 lbl5 lbl6
+label:lbl5
+_t4 = $arith add y 2
+y = $copy _t4
+_t5 = $arith div x y
+z = $copy _t5
+$jump lbl4
+label:lbl6
+_t6 = $arith add x 1
+x = $copy _t6
+$jump lbl1
+label:lbl3
+$ret x
+```
 
-        - we need them because an `Assign` can be directly to a variable OR through a pointer, and LIR makes the difference explicit
+LIR
+```
+entry:
+  _t1 = $call_ext input()
+  x = $copy _t1
+  y = $copy 0
+  z = $copy 42
+  $jump lbl1
 
-        - we also used Lvals for Call statements, but this was just to make the grammar LL(1)
+lbl1:
+  _t2 = $cmp neq z 0
+  $branch _t2 lbl4 lbl3
 
-    - we don't need to worry about producing the best possible (most efficient) code; we can clean it up later using various optimizations on the LIR
+lbl4:
+  _t3 = $cmp lt y x
+  $branch _t3 lbl5 lbl6
 
-- TODO: example for lowering (an exercise would be nice, but how would they be able to see all the rules?)
+lbl5:
+  _t4 = $arith add y 2
+  y = $copy _t4
+  _t5 = $arith div x y
+  z = $copy _t5
+  $jump lbl4
+
+lbl6:
+  _t6 = $arith add x 1
+  x = $copy _t6
+  $jump lbl1
+
+lbl3:
+  $ret x
+```
 
 # codegen TODO:
 
