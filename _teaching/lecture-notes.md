@@ -94,7 +94,7 @@
 
     - a number of students are encountering an issue where copy-pasting the gradescope output for a failed test yields a test that they pass locally; this is because of special characters that don't get copied properly by the copy-paste.
 
-        - i think for testing `\r`, `\t`, etc there isn't a way around this, but it might help to avoid any other non-printable ascii characters (which currently can show up in comments, where i thought it wouldn't matter)
+        - i think for testing `\r`, `\t`, etc there isn't a way around this, but otherwise FIXED in 160-s24 branch; need to regenerate students tests for assign-1
 
 - assign-2:
 
@@ -103,6 +103,10 @@
         - we could give them a separate quiz about transforming grammars to LL(1), online and automatically graded
 
         - not this time, but think about it for next time (and maybe use those quizzes for other concepts as well, just to give students practice with automated feedback); the quizzes don't have to count as a grade either
+
+    - gradescope apparently truncates output that is too long, which is a problem because the students can't see the entire failed test in order to debug it. as a preliminary step i removed the diff from the failed test output to make more room, but think if there are other ways to fix this issue
+
+        - is it just number of lines? i could have the tokens separated by spaces instead of newlines, but i don't know if gradescope will treat it differently...i need to experiment a bit
 
 # logistics
 
