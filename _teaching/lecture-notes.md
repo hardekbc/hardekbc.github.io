@@ -33,7 +33,7 @@
 - week  2.2: through `parsing` -> `formalizing LL(1)`
 - week  3.1: through `parsing`
 - week  3.2: `validation` except the example and discussing design space
-- week  4.1: 
+- week  4.1: through `validation`
 - week  4.2: 
 - week  5.1: 
 - week  5.2: 
@@ -107,6 +107,8 @@
     - gradescope apparently truncates output that is too long, which is a problem because the students can't see the entire failed test in order to debug it. as a preliminary step i removed the diff from the failed test output to make more room, but think if there are other ways to fix this issue
 
         - is it just number of lines? i could have the tokens separated by spaces instead of newlines, but i don't know if gradescope will treat it differently...i need to experiment a bit
+
+    - since test cases are generated as ASTs and then printed out as source code, the test cases have more regular syntax than the grammar allows---for example, toplevel constructs will always be in the same order, every function will have at most one let, and arithmetic ops are all parenthesized to make precedence explicit; to allow for testing the student parsers more thoroughly it would be good to create a printer that randomizes these things
 
 # logistics
 
