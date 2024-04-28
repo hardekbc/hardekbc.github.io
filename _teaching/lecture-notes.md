@@ -2892,7 +2892,25 @@ echo $?
 
 - the compiler proper is the part that's emitting assembly; the assembler produces object files and the linker produces an executable
 
-#### static vs dynamic libraries TODO:
+#### static vs dynamic libraries
+
+- even after linking we still may not have all the code needed to execute a program; it depends on whether we're using _static linking_ or _dynamic linking_ for libraries
+
+    - static libraries have a `.a` extension (for "archive"); they are linked into the executable by the linker just like any other object file
+
+    - dynamic libraries have a `.so` extension (for "shared object"); they are _not_ linked into the executable during compilation---they are linked in as the executable is being loaded into memory when it is executed (each time it is executed)
+
+- there are pros and cons to each approach, and both are widely used
+
+    - static linking cons: larger executables; redundant copies in memory (across different executables)
+
+    - static linking pros: link-time optimizers can optimize the code; guaranteed to have the right version of the library when executing
+
+    - dynamic linking cons: invisible to compiler so can't be optimized; version available when executing may not match the version used when program was developed
+
+    - dynamic linking pros: smaller executable size; a single copy can be shared by multiple programs executing at once
+
+- we'll be using static linking for our compiler; you don't really need to know all this for writing the compiler but it's good to be aware of it in general
 
 #### process layout in memory TODO:
 
@@ -2917,31 +2935,6 @@ lectures i\'ll use a generic assembly language; the assignments will
 target 32-bit x86 assembly instructions.
 
 ### necessary context
-
-2.  static vs dynamic libraries
-
-    even after using the linker it\'s possible we still don\'t have all
-    the code. it depends on whether we\'re using [static
-    linking]{.underline} or [dynamic linking]{.underline} for libraries.
-
-    static libraries have a \'\*.a\' extension (\"archive\"). they are
-    linked in with the other code the same way.
-
-    dynamic libraries have a \'\*.so\' extension (\"shared object\").
-    they are not linked in at compilation time. instead, they are linked
-    in at load time when the code is being put into memory.
-
-    there are pros and cons to each approach, and both are widely used.
-
-    -   static: larger executable size, can be multiple copies in memory
-        at once for different executables, but guaranteed to have the
-        right version.
-    -   dynamic: smaller executable size, can be shared by multiple
-        executables, but if the library can get out of synch with the
-        executable.
-
-    you don\'t have to be aware of this for writing the compiler, but
-    you should know the difference in general.
 
 3.  process layout in memory
 
