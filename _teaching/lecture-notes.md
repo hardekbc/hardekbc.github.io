@@ -608,8 +608,8 @@ L2: MOV #10, tmp
 
 - [show example programs] [see OneNote]
 
-    - see `docs/linked_list.cb`
-    - see `docs/matrices.cb`
+    - see `examples/cflat/linked_list.cb`
+    - see `examples/cflat/matrices.cb`
 
 - [show ambiguous grammar] [see OneNote]
 
@@ -2840,7 +2840,65 @@ lbl3:
   $ret x
 ```
 
-# codegen TODO:
+# codegen
+### intro
+
+- once we have lowered to LIR, we're in the middle-end where we would perform optimizations; however for now we're going straight to the backend in order to get a working compiler as quickly as possible
+
+- going from LIR to a specific ISA is called _codegen_
+
+    - for us, the ISA will be x86-64
+
+    - for these lectures i'll use pseudocode rather than x86
+
+### necessary context
+#### linker
+
+- typically programs are divided into multiple _compilation units_ (e.g., for C/C++ a file is a compilation unit); each compilation unit results in a binary _object file_, then all the object files are linked together into an _executable_
+
+    - source -[parser]-> compiler -[codegen]-> assembly -[assembler]-> object file
+
+    - { object files... } -[linker]-> executable
+
+- [demo using the code in `examples/linking/`]
+
+```
+cat main.c
+cat foo.c
+
+gcc -c -S foo.c // emit assembly into foo.s
+ls
+cat foo.s
+
+gcc -c foo.c // call assembler to compile into object file
+ls
+objdump -d foo.o
+
+gcc -c -S main.c // emit assembly into main.s
+ls
+cat main.s
+
+gcc -c main.c // call assembler to compile into object file
+ls
+objdump -d main.o
+
+gcc main.o foo.o
+ls
+objdump -d a.out
+
+./a.out
+echo $?
+```
+
+- the compiler proper is the part that's emitting assembly; the assembler produces object files and the linker produces an executable
+
+#### static vs dynamic libraries TODO:
+
+#### process layout in memory TODO:
+
+#### alignment and padding TODO:
+
+### TODO:
 
 # register allocation TODO:
 
@@ -2859,26 +2917,6 @@ lectures i\'ll use a generic assembly language; the assignments will
 target 32-bit x86 assembly instructions.
 
 ### necessary context
-
-1.  linker
-
-    on paper show the stages: source1 --\[compiler\]-\> assembly
-    --\[assembler\]-\> object file 1 --- source2 --\[compiler\]-\>
-    assembly --\[assembler\]-\> object file 2 ---\\ ...
-    \|--\[linker\]-\> executable sourceN --\[compiler\]-\> assembly
-    --\[assembler\]-\> object file N .../
-
-    go through example in terminal showing compiling separate files into
-    object code, then linking them. use objdump to show the assembly for
-    each. point out (1) how calling gcc on them seperately causes an
-    error unless using the -c flag; (2) how the externally defined
-    functions are treated in the object files vs the linked file; (3)
-    the extra functions in the linked file that are run before main.
-    also discuss that gcc is actually just calling as and ld rather than
-    assembling and linking itself; we\'ll use the same strategy for our
-    compiler.
-
-    \[see examples/\]
 
 2.  static vs dynamic libraries
 
