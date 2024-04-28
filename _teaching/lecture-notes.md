@@ -3031,6 +3031,8 @@ char y = **((char**)&x + 1);
         - `DIVR` for division
         - TODO: ...
 
+- FIXME: maybe for all of these stages instead of giving exact instructions just say what needs to be accomplished---then they can use my solution on CSIL to see what that looks like for x86
+
 ### stage 1: no structs, globals, pointers, or functions other than main
 
 - an LIR::Program that contains only the `main` function, with no structs, globals, or externs; no variables have a pointer type
