@@ -2890,6 +2890,8 @@ objdump -d a.out
 echo $?
 ```
 
+- notice how the call to `foo` inside of `main` changed after linking
+
 - the compiler proper is the part that's emitting assembly; the assembler produces object files and the linker produces an executable
 
 #### static vs dynamic libraries
@@ -2912,9 +2914,107 @@ echo $?
 
 - we'll be using static linking for our compiler; you don't really need to know all this for writing the compiler but it's good to be aware of it in general
 
-#### process layout in memory TODO:
+#### process layout in memory
 
-#### alignment and padding TODO:
+- when a binary is executed, the OS first loads it into memory (calling the dynamic linker if necessary) and then actually starts executing it
+
+    - the thing that loads an executable into memory is called a `loader`
+
+- it will be useful to know how the process is laid out in memory while it's executing
+
+    - this is virtual memory, not physical memory; if you've taken OS then you know the difference
+
+    - if you haven't taken OS, the important thing is that for our purposes you can think of process memory as just one big array
+
+```
+(address 0) [ code segment | static segment | data segment ] (highest address)
+```
+
+- the `code segment` is where the program instructions are located
+
+    - there is an architectural register called `pc` for "program counter", whose contents are the location of the next instruction to be executed (which will be in the code segment)
+
+- the `static segment` is where globals and constant strings are located; it's "static" because their locations can be determined ahead of time during compilation
+
+    - whenever you have a string literal in your code, like "blah", the compiler puts it into the static segment
+
+    - a pointer to a global or constant string is a pointer into the static segment
+
+- the `data segment` is where all of the stack and heap data lives; it's laid out as:
+
+```
+(low address) [heap --> | <-- stack] (highest address)
+```
+
+- the heap is where memory is dynamically allocated from (e.g., `new` or `malloc`); it grows from low addresses to high addresses
+
+    - the actual mechanics of how the heap is managed are handled by the language runtime; e.g., for C it's handled by the standard C library (though you can override this if you want)
+
+- the stack is for function calls; each call will push a "stack frame" onto the stack (so each instance will have its own stack frame) and returning from a call will pop the top stack frame off the stack
+
+    - this is where a function's parameters and local variables are stored; they live inside the stack frame of a particular function instance
+
+    - note that the stack grows "downward", from high addresses to low addresses; this is often true but not always---there are examples where it grows upwards, and even where it goes in a circle
+
+    - there are two important values wrt to the stack:
+
+        - the `stack pointer` points to the current top of the stack
+
+        - the `frame pointer` points to the base of the current stack frame
+
+    - stack manipulation is handled by the compiler; we'll need to insert instructions to make this happen properly
+
+- this layout is where the terms `segmentation fault` and `stack overflow` come from
+
+    - a segmentation fault is where you're trying to access a pointer that is pointing into a segment you don't have permission to access
+
+    - a stack overflow is where you try to grow the stack too big (e.g., too many recursive function calls) and run out of room
+
+#### alignment and padding
+
+- `alignment` is talking about what addresses a piece of data in memory is allowed to start at; this is determined by the architecture we're compiling for
+
+    - e.g., a `word aligned` architecture means that all values must begin on a word boundary (for whatever size a word is in that architecture)
+
+- when the compiler assigns memory locations to variables, it needs to respect the requirements of whatever architecture it's targeting
+
+- this is particularly important for aggregate data like structs or arrays; we have to make sure that proper alignment is respected
+
+```
+struct foo { char a; int b; short c; long long int d; };
+
+assume:
+-      char:8
+-     short:16
+-       int:32
+- long long:64
+
+example alignment requirements:
+- chars are byte-aligned
+- shorts and ints are word-aligned (where a word == 32 bits)
+- long longs are double-word aligned
+```
+
+```
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+a  #  #  #  b  b  b  b  c  c  #  #  #  #  #  #  d  d  d  d  d  d  d  d
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+```
+
+- note that we had to insert padding between some of the fields to make alignment work; this is why it's bad practice when c/c++ programmers try to manually index into a struct like:
+
+```
+foo x{8,16,32,64}; 
+char y = **((char**)&x + 1);
+```
+
+- this code tries to read the first byte of `x.b`, but it's actually getting the padding between `x.a` and `x.b` that was inserted by the compiler, which is garbage
+
+- C/C++ require the layout of the fields of a struct to be in the same order as they were declared, but other languages allow them to be in any order (which can help with alignment)
+
+    - cflat will allow fields to be in a different order than they were declared
+
+- when i give out the codegen assignment i'll include the specific alignment restrictions for x86-64
 
 ### TODO:
 
@@ -2928,89 +3028,6 @@ echo $?
 
 naive codegen
 -------------
-
-given an AST, our job is to translate it into a sequence of assembly
-instructions for our target architecture. for the purposes of these
-lectures i\'ll use a generic assembly language; the assignments will
-target 32-bit x86 assembly instructions.
-
-### necessary context
-
-3.  process layout in memory
-
-    it will be useful to know how the process is laid out in memory
-    while executing (note: this is virtual memory, not physical memory;
-    maybe go into what that means a little bit but not too much):
-
-    (address 0) \[code segment \| static segment \| data segment\]
-
-    where the static segment also contains globals and constant strings,
-    and the data segment is laid out as:
-
-    (low address) \[heap \| stack\]
-
-    note that this is where the errors \"segmentation fault\" and
-    \"stack overflow\" come from.
-
-    the heap is where memory is allocated from (e.g., when you call
-    [new]{.underline} or [malloc]{.underline}); it is generally handled
-    by the language runtime.
-
-    the stack is for procedure calls; each call will push a \"stack
-    frame\" onto the stack, so each instance of a procedure will have
-    its own stack frame. stack manipulation is generally handled by the
-    compiler.
-
-    -- the stack frame is where a procedure\'s local variables are
-    stored, among other things; we\'ll get more into procedures and
-    stack frames later.
-
-    note that the stack grows downwards; this is typical for most
-    architectures, including x86, but not always true (there are some
-    where it grows up, and even some where it goes in a circle).
-
-    -- two important values wrt to the stack: the \"stack pointer\"
-    (points to the current top of the stack) and the \"frame pointer\",
-    aka base pointer (points to the bottom of the current stack frame).
-
-4.  alignment and padding
-
-    architectures generally have restrictions on alignment, i.e., how
-    values can match up to word boundaries. when assigning memory
-    locations to variables, we need to respect the alignment
-    restrictions.
-
-    -- example: 32-bit floating point and integer values should begin on
-    a full-word (32-bit) boundary.
-
-    scheme: place values with identical alignment restrictions next to
-    each other; assign offsets from most restrictive to least; if
-    needed, insert padding to match restrictions.
-
-    we won\'t have to worry about this for L1 because we only have one
-    type of thing: int32. but this is something that compiler writers
-    have to worry about in general. for example, consider the following
-    struct:
-
-    struct foo { char a; int b; short c; long long int d; };
-
-    we\'ll assume an architecture where char:8, short:16, int:32, and
-    long long int:64; chars are byte-aligned, shorts are word-aligned,
-    ints are word-aligned, and long long ints are double-word-aligned.
-    so we would have to lay this out in memory as:
-
-      --- -- -- -- --- --- --- --- --- --- -- -- -- -- -- -- --- --- --- --- --- --- --- ---
-      a            b   b   b   b   c   c                     d   d   d   d   d   d   d   d
-      --- -- -- -- --- --- --- --- --- --- -- -- -- -- -- -- --- --- --- --- --- --- --- ---
-
-    this is why it\'s bad practice when c/c++ programmers try to
-    manually index into a struct, like:
-
-    foo x{8,16,32,64}; char y = **((char**)&x + 1);
-
-    this code tries to read the first byte of x.b, but it\'s actually
-    getting the padding between x.a and x.b that was inserted by the
-    compiler, which is garbage.
 
 ### symbol table
 
@@ -4238,15 +4255,6 @@ target 32-bit x86 assembly instructions.
 
 new codegen
 -----------
-
-for codegen we need to handle the following:
-
--   struct allocation on the heap
--   struct field access in an expression
--   struct field access on the left-hand side of an assignment
-
-we also need to ensure that codegen makes runtime memory management
-possible.
 
 ### managing memory: heap vs stack
 
