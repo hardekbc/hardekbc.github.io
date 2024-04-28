@@ -2849,8 +2849,6 @@ lbl3:
 
     - for us, the ISA will be x86-64
 
-    - for these lectures i'll use pseudocode rather than x86
-
 ### necessary context
 #### linker
 
@@ -3016,7 +3014,282 @@ char y = **((char**)&x + 1);
 
 - when i give out the codegen assignment i'll include the specific alignment restrictions for x86-64
 
-### TODO:
+### x86-64 / pseudocode FIXME:
+
+- TODO: [registers, instructions, word size, alignment (including stack)]
+
+- FIXME: not sure if i should explain x86 and use it in lecture, or use pseudocode in lecture and give x86 info offline; leaning towards the latter
+
+- if using pseudocode:
+
+    - we'll use `R1`, `R2`, etc for general-purpose architectural registers
+
+    - there are also some architectural registers that are designated for special purposes:
+
+        - `SP` and `FP` for the stack
+        - `RETR` for holding return values
+        - `DIVR` for division
+        - TODO: ...
+
+### stage 1: no structs, globals, pointers, or functions other than main
+
+- an LIR::Program that contains only the `main` function, with no structs, globals, or externs; no variables have a pointer type
+
+- relevant LIR instructions: `$arith`, `$cmp`, `$copy`, `$branch`, `$jump`, `$ret`
+
+- example (LIR, x86):
+
+```
+fn main() -> int {
+  let x:int, y:int, z:int
+
+  entry:
+    x = $copy 2
+    y = $arith add x 3
+    z = $cmp lt x y
+    $branch z bb1 exit
+
+  bb1:
+    y = $copy x
+    $jump exit
+
+  exit:
+    $ret y
+}
+```
+
+```
+TODO: x86
+```
+
+- codegen steps:
+
+    0. FIXME: do i need a prologue for `main`?
+
+    1. allocate space on the stack for `main`'s local variables (there are no parameters to worry about)
+
+    2. in cflat all variables are automatically initialized to 0; zero out the newly allocated space
+
+        - this is _not_ like C/C++, which allow for uninitialized variables
+
+    3. map each local to an offset in the stack (they must be integer values, which are automatically word-aligned)
+
+    4. for each basic block, iterate through its instructions and translate to the corresponding ISA instructions (each LIR basic block will yield an ISA basic block with the same label)
+
+    5. output the ISA instructions (replacing label `entry` with `main`)
+
+- we start with `SP`, the _stack pointer_ that points to the current top of the stack, and `FP`, the _frame pointer_ that points to the bottom of the current stack frame
+
+    - each is located in a designated register, which we'll also refer to as `SP` and `FP`
+
+    - initially, `SP` = `FP`
+
+    - remember that the stack grows _down_: to add more space to the stack we subtract from the current `SP`
+
+- allocating space on the stack:
+
+    - let `N` be the number of locals
+
+    - grow the stack by `N * WORDSIZE`
+
+- zeroing out the stack:
+
+    - we could store a 0 into each location in the newly allocated space, but this would be inefficient
+
+    - instead we'll use `memcpy`, which we'll link in later as part of our language runtime library
+
+    - FIXME: does this require going into calling conventions, etc? if so maybe we should stick with the naive scheme, at least for now
+
+- mapping locals to stack offsets:
+
+    - for `i` in `[0..N)`, let local `i` map to offset `i * WORDSIZE`
+
+    - these are the offsets from `FP`, so the stack address of local `x` is `FP - offset(x)`
+
+- a LIR operand can be either a variable or a constant; `[op]` means the variable's stack address if `op` is a variable, or the constant value itself if `op` is a constant
+
+    - we'll use `move op -> R` to mean (1) load the value from `[op]` into register `R` if `op` is a variable; or (2) put `[op]` directly into register `R` if `op` is a constant
+
+- `$branch op bb1 bb2`:
+
+    - move `op` -> `R1`
+    - compare `R1` with 0 (sets flag)
+    - conditionally jump to `bb1` if result is not-equal
+    - unconditionally jump to `bb2` (fall-through instruction)
+
+- `$jump bb`:
+
+    - unconditionally jump to `bb`
+
+- `$ret op`:
+
+    - move `op` -> `RETR`
+    - set `SP` to `FP` (deallocating the current stack frame)
+    - FIXME: do i need an epilogue for `main`?
+
+- `x = $copy op`:
+
+    - move `op` -> `R1`
+    - store `R1` to `[x]`
+
+- `x = $cmp <rop> op1 op2`:
+
+    - move `op1` -> `R1`
+    - move `op2` -> `R2`
+    - compare `R1` with `R2` (sets flag)
+    - set `R1` to 0 or 1 based on flag and `<rop>`
+    - store `R1` to `[x]`
+
+- `x = $arith <aop> op1 op2`: [`<aop>` != div]
+
+    - move `op1` -> `R1`
+    - move `op2` -> `R2`
+    - add/sub/mul `R1` and `R2`, putting result in `R1` FIXME: ???
+    - store `R1` to `[x]`
+
+- `x = $arith div op1 op2`:
+
+    - move `[op1]` -> `DIVR`
+    - move `[op2]` -> `R1`
+    - divide by `R1` (automatically divides into `DIVR` and puts the result there)
+    - store `DIVR` to `[x]`
+
+- [revisit example]
+
+### stage 2: adding pointers 
+
+- now we can have memory allocation (including arrays)
+
+- additional LIR instructions: `$alloc`, `$load`, `$store`, `$gep`
+
+- example (LIR, x86):
+
+```
+fn main() -> int {
+  let x:&int, y:int, z:&int
+
+  entry:
+    x = $alloc 10
+    z = $gep x 5
+    y = $load z
+    y = $arith add y 1
+    $store z y
+    $ret y
+}
+```
+
+```
+TODO: x86
+```
+
+- TODO: [protecting against out-of-bounds array accesses]
+
+- FIXME: `alloc` requires calling into the runtime library; same question here as for `memset` above
+
+- [revisit example]
+
+### stage 3: adding globals 
+
+- now we can have global variables (int or pointer)
+
+- example (LIR, x86):
+
+```
+let g:int
+
+fn main() -> int {
+  let x:int
+
+  entry:
+    x = $copy 42
+    g = $copy x
+    $ret g
+}
+```
+
+```
+TODO: x86
+```
+
+- TODO: [mangled global names]
+
+- [revisit example]
+
+### stage 4: adding structs
+
+- now we can have user-defined structs
+
+- additional LIR instructions: `$gfp`
+
+- example (LIR, x86):
+
+```
+struct foo {
+  f1: int
+  f2: &int
+}
+
+fn main() -> int {
+  let x:&foo, y:&int, z:&&int
+
+  entry:
+    x = $alloc 1
+    y = $gfp x f1
+    z = $gfp x f2
+    $store z y
+    $ret 0
+}
+```
+
+```
+TODO: x86
+```
+
+- TODO: [field layout, interaction with arrays? max struct size?]
+
+- [revisit example]
+
+### stage 5: adding extern functions and calls
+
+- now we can have externs called from `main`
+
+- additional LIR instructions: `$call_ext`
+
+- example (LIR, x86):
+
+```
+extern print(int) -> _
+
+fn main() -> int {
+  entry:
+    $call_ext print(42)
+    $ret 0
+}
+```
+
+```
+TODO: x86
+```
+
+- TODO: [calling convention, caller/callee-save registers]
+
+- [revisit example]
+
+### stage 6: adding internal functions and calls
+
+- now we can have other internal functions besides `main`
+
+- additional LIR instructions: `$call_dir`, `$call_idr`
+
+- example (LIR, x86):
+
+```
+TODO:
+```
+
+- TODO: [redux: calling convention, caller/callee-save registers]
+
+- [revisit example]
 
 # register allocation TODO:
 
@@ -3029,789 +3302,7 @@ char y = **((char**)&x + 1);
 naive codegen
 -------------
 
-### symbol table
-
-1.  intro
-
-    during compilation it\'s generally useful to have a single
-    repository of information about symbols in the program, e.g.,
-    functions and variables. -- functions: number of parameters and
-    their types, ... -- variables: type, memory location, array
-    dimensions, ... -- structs and records: their fields, layout, and
-    size, ... -- etc
-
-    we can find this information out by traversing the code whenever we
-    need it, but it\'s more efficient to figure it out once and store
-    the info where we can look it up whenever we need it.
-
-    note that this information is used by the front-end, middle-end, and
-    back-end, and that it isn\'t all available at the same time; the
-    info gets filled in as it becomes available (e.g., variable memory
-    locations).
-
-    naively we might think to implement the symbol table as a global map
-    from symbol to info, but that doesn\'t quite work due to the issue
-    of [scope]{.underline}.
-
-2.  scope
-
-    most PLs have the concept of [scope]{.underline}, i.e., an area of
-    code for which a particular variable is defined. for example, every
-    function has its own scope, and its parameters and locals are
-    entirely independent of any other function\'s parameters and locals
-    even if they are named the same:
-
-    int foo(int a, int b) { int x = a + 1; int y = b + 2; return x \* y;
-    } double bar(double a, double b) { double x = a - 1; double y = b -
-    2; return x / y; }
-
-    clearly we need to keep the info about foo\'s variables separate
-    from the info about bar\'s variables. the first solution we might
-    try is just to keep a separate symbol table for each scope (i.e.,
-    each function):
-
-    foo --\> \[a -\> ..., b -\> ..., x -\> ..., y -\> ...\] bar --\> \[a
-    -\> ..., b -\> ..., x -\> ..., y -\> ...\]
-
-    this also has a problem, namely, [nested scope]{.underline}.
-
-3.  nested scope
-
-    scopes can be nested inside of each other, and variables in an inner
-    scope can shadow variables in an outer scope. consider the following
-    example:
-
-    // SCOPE LEVEL 0 static int w; int x;
-
-    void example(int a, int b) { // SCOPE LEVEL 1 int c; { // SCOPE
-    LEVEL 2a int b, z; } { // SCOPE LEVEL 2b int a, x; { // SCOPE LEVEL
-    3 int c, x; b = a + b + c + x + w; } } }
-
-    all modern PLs use [lexical scoping]{.underline}, which means that a
-    variable always refers to its syntactically nearest definition. in
-    other words, start from the scope the variable is being used in and
-    see if that scope defines that variable; if so then that\'s the
-    definition it refers to. otherwise look in the scope containing the
-    current scope and check there. keep going up the chain of enclosing
-    scopes until you find the nearest one that defines the variable;
-    that\'s the definition that variable use refers to.
-
-    level~0~ --\> level~1~ --\> level~2a~ \\-\> level~2b~ --\> level~3~
-
-    for the above example, if we subscript the variable with the scope
-    they are defined in we see that the assignment becomes:
-
-    b~1~ = a~2b~ + b~1~ + c~3~ + x~2b~ + w~0~;
-
-    note that there\'s no way that any variable used in scope 2b can
-    refer to scope 2a because 2a does not enclose 2b.
-
-    so how do we arrange the symbol table to make the resolution
-    possible? the basic idea is to create a new table for each scope and
-    chain them together in a way that mirrors the scoping tree we just
-    saw. we\'ll use the following data structure and API for symbol
-    table creation:
-
-    -   SymbolTable: \[parent: pointer to enclosing symbol table; table:
-        map from symbol to info\]
-    -   currScope: pointer to current symbol table, initialized to NULL
-    -   CreateScope():
-        -   creates a new symbol table
-        -   sets the table\'s parent to currScope
-        -   sets currScope to the new table
-    -   Insert(symbol, info): inserts symbol and its info in
-        currScope\'s table
-    -   Lookup(symbol): looks up symbol to get its info
-        -   starts in currScope and keeps looking for symbol until it\'s
-            found, walking up the parents.
-    -   EndScope():
-        -   sets currScope to currScope\'s parent
-
-    let\'s see it in action for the example above. \[go through
-    example\]
-
-    note that it looks like the table end up orphaned; in reality we
-    would either:
-
-    1.  keep a pointer at the start of each scope to the appropriate
-        table
-    2.  have each symbol point directly to its entry in the appropriate
-        table
-
-4.  our compiler for L1
-
-    L1 is very simple, and so is our compiler, so a full-fledged symbol
-    table is kind of overkill. all we really need to keep track of is
-    the memory location of each variable. note that we still do need to
-    worry about scope and nested scopes.
-
-    here\'s how we\'ll do it. we\'ll be doing code generation using a
-    recursive traversal of the AST as described below. as part of the
-    recursive traversal we\'ll pass a map from variable to memory
-    location (we\'ll describe how to compute the memory location in a
-    bit). each time we\'re making a recursive call to a new scope,
-    we\'ll pass a copy of the map; inside that new scope we\'ll insert
-    any declared variables and their memory locations.
-
-    -- this is essentially the scheme i talked about in an earlier
-    lecture on validating the AST by checking that all variables were
-    declared before being used.
-
-    we can get away with this scheme because we\'re not keeping around
-    any other information, and once we\'re done with code generation for
-    a given scope we don\'t need the memory location information, so we
-    can just get rid of the maps as we leave each scope.
-
-    also note that this isn\'t a very efficient scheme, because we\'re
-    constantly creating, copying, and destroying these maps. the rest of
-    our compiler isn\'t terribly efficient anyway so it doesn\'t matter,
-    but in a production compiler we would want to heavily optimize the
-    symbol table because it\'s accessed so often during compilation.
-
-    1.  specifics about L1 scope
-
-        \[show example code in L1-concrete-syntax.pdf\]
-
-        -   the global statement block is its own scope and not in scope
-            of the function bodies.
-        -   every function name is in scope for every function body.
-
-### code generation strategies
-
-1.  recursive AST traversal
-
-    a modern optimizing compiler will almost certainly translate the AST
-    to a simpler intermediate representation (IR) before doing code
-    generation. however, for our first compiler we\'ll translate
-    directly from the AST to assembly. the implementation of code
-    generation will be based on a recursive traversal of the AST; as we
-    traverse it we\'ll emit the appropriate assembly so that by the time
-    we\'ve traversed the entire tree we\'ve finished compilation.
-
-    our compiler is written in c++, and the idiomatic way to do
-    something like this in an object oriented language is called the
-    \"Visitor Design Pattern\". the class poll indicated that many of
-    you don\'t know what this is, so i\'ll prepare a separate lecture
-    just quickly going over how it works. but for the purposes of this
-    lecture, just think of it as a standard tree traversal algorithm.
-
-    also note that because we\'re directly generating code from the AST
-    rather than translating to an IR and then optimizing, the code we
-    generate will be very inefficient with lots of redundant loads and
-    stores; this is the price we pay for a simple, uniform code
-    generation strategy.
-
-    1.  visitor pattern
-
-        \[separate video lecture, using a Tree data structure and
-        TreeVisitor to discuss the concepts.\]
-
-2.  stack-based
-
-    often we can (or must) treat the target architecture as a stack
-    machine: there is a system stack (logically distinct from the
-    function stack) and when generating code, the operands and result
-    are always on the stack and don\'t need to be explicitly stated. for
-    those familiar with it, the code looks like reverse polish notation.
-
-    example source: x = (1 + 2) \* 3
-
-    would generate: push 1 push 2 add push 3 mul sto &x
-
-    the JVM is an example of a stack machine, as is the CLR. the x86
-    architecture isn\'t really a stack machine, but we could repurpose
-    the function stack and treat it as a stack machine if we wanted to.
-
-    advantages of stack machines: easy to generate code, no temporary
-    variables, no register allocation, smaller code. disadvantages of
-    stack machines: can be much slower than register-based.
-
-3.  register-based
-
-    a more common target architecture is a register-based machine: it
-    uses high-speed memory integrated directly into the CPU (i.e.,
-    registers) to hold operands and results and requires instructions to
-    explicitly state where the operands are and where the result should
-    be put.
-
-    example source: x = (1 + 2) \* 3
-
-    would generate: mov 1 R1 mov 2 R2 add R1 R2 mov 3 R3 mul R2 R3 sto
-    R3 \[memory location of x\]
-
-    \[i\'m using a somewhat generic assembly language modeled off of x86
-    but not exactly the same; when there are two operands, the operation
-    is applied and the result is put in the second one.\]
-
-    x86, ARM, MIPS, etc are all register-based machines (though most
-    can, as mentioned above, pretend to be stack-based machines by
-    repurposing the function stack).
-
-    the advantages are disadvantages of register-based machines are
-    basically the reverse of those for stack-based machines.
-
-    we\'ll be targeting x86 as a register-based machine for our
-    compiler.
-
 ### naive register-based generation
-
-1.  without functions or calls
-
-    we\'ll start by assuming a program without any function definitions
-    or calls; thus all we have is the single global block of statements.
-
-    1.  variable memory locations
-
-        we need to figure out where the variables declared in this block
-        will live and put that information into our symbol table. we\'ll
-        put all the variables on the function stack:
-
-        1.  note that the stack and frame pointers are initialized to
-            the base of the stack.
-        2.  compute how many variables are being declared; call this N.
-        3.  remember that each variable is a 4-byte integer, so we need
-            4\*N bytes of space.
-        4.  advance the stack pointer by 4\*N, giving us a stack frame
-            (from the frame pointer to the stack pointer).
-        5.  all variables are initialized to 0, so write 0 into each
-            word of the stack frame.
-        6.  in the symbol table map each declared variable to an offset
-            from the frame pointer.
-            -   remember that the stack grows downward, so the offset
-                will be non-positive.
-
-        we would have to worry about alignment and padding here except
-        that everything is a 4-byte integer so it all works out.
-
-        now whenever we need to know where a variable is stored in
-        memory, we just look up the offset stored in the symbol table.
-
-        EXAMPLE:
-
-        int x; int y; x := 1 + 2; y := x \* 3; output y;
-
-        -   2 variables == increase stack by 8 bytes.
-
-            emit instruction: sub 8 STACK~REG~
-
-        -   initialize them both to 0.
-
-            emit instructions: sto 0 \[FRAME~REG~-0\] sto 0
-            \[FRAME~REG~-4\]
-
-            note that \[FRAME~REGISTER~-n\] means take the value of
-            FRAME~REGISTER~, subtract n, and access that location in
-            memory.
-
-        -   add info to the symbol table:
-
-            x --\> 0 \[i.e., x is at a 0 offset from the frame pointer\]
-            y --\> -4 \[i.e., x is at a -4 offset from the frame
-            pointer\]
-
-        we\'ll do this each time we enter a new scope, and call this the
-        \"preamble code\" for that scope. in this example, the preamble
-        code we emit is:
-
-        sub 8 STACK~REG~ sto 0 \[FRAME~REG~-0\] sto 0 \[FRAME~REG~-4\]
-
-    2.  expressions
-
-        we\'re targeting a register-based machine, but we don\'t want to
-        do register allocation (at least, for now) so we need to
-        evaluate expressions assuming a very limited set of available
-        registers. to generate code for an expression we\'ll do a
-        recursive traversal in post-order (that is, visit the children
-        first, then the parent).
-
-        1.  arithmetic
-
-            let\'s start with a simple example expression: (1 + 2) \*
-            (3 - 4)
-
-            as a tree, this is \[\* \[+ 1 2\] \[- 3 4\]\]
-
-            here\'s a scheme we might attempt (that will turn out to be
-            broken): when processing the \*,+,- nodes we want the left
-            subtree\'s value to end in one register (let\'s call it
-            LEFT~REG~) and the right subtree\'s value to end in another
-            (call it RIGHT~REG~). to generate code for this example, we
-            might try the following:
-
-            call generate~aexp~(\* node, left): call generate~aexp~(+
-            node, left): call generate~aexp~(1 node, left): emit \"mov 1
-            LEFT~REG~\" call generate~aexp~(2 node, right): emit \"mov 2
-            RIGHT~REG~\" emit \"add RIGHT~REG~ LEFT~REG~\" call
-            generate~aexp~(- node, right): call generate~aexp~(3 node,
-            left): emit \"mov 3 LEFT~REG~\" call generate~aexp~(4 node,
-            right): emit \"mov 4 RIGHT~REG~\" emit \"sub RIGHT~REG~
-            LEFT~REG~\" \"mov LEFT~REG~ RIGHT~REG~\" emit \"mul
-            RIGHT~REG~ LEFT~REG~\"
-
-            the second parameter to generate~aexp~() tells it which
-            register the result should end up in (we can pick
-            arbitrarily for the root node of the expression). the final
-            emitted code is:
-
-            01: mov 1 LEFT~REG~ 02: mov 2 RIGHT~REG~ 03: add RIGHT~REG~
-            LEFT~REG~ 04: mov 3 LEFT~REG~ 05: mov 4 RIGHT~REG~ 06: sub
-            RIGHT~REG~ LEFT~REG~ 07: mov LEFT~REG~ RIGHT~REG~ 07: mul
-            RIGHT~REG~ LEFT~REG~
-
-            we see that there\'s a problem: line 03 puts the result of
-            the add in LEFT~REG~, but then line 04 immediately
-            overwrites it in order to set up computing the result of the
-            sub. if we were doing a stack machine this wouldn\'t matter
-            because we don\'t need registers; if we were doing register
-            allocation we could handle this by assuming that there are
-            an arbitrary number of registers available and then fix it
-            later. but we aren\'t doing either of those things, so how
-            do we handle it?
-
-            the only thing that can store an arbitrary number of values
-            is memory, so we\'re going to have to create some memory
-            locations to hold temporary values during expression
-            evaluation. in other words, we need to add a set of
-            temporary variables in addition to the other variables
-            declared in this scope. how do we know how many to add when
-            we enter a particular scope? we\'ll dynamically add them to
-            the symbol table as we generate code for an expression
-            (remembering to adjust the stack pointer in the preamble
-            code for this scope to allocate memory for them as well).
-
-            -- note that we can reuse temporary variables between
-            different expressions (e.g., for \"x := \<aexp~1~\>; y :=
-            \<aexp~2~\>;\" we only need max(\#tmp(\<aexp~1~\>),
-            \#tmp(\<aexp~2~\>)) temporary variables.
-
-            let\'s see how we can handle the above example now:
-
-            call generate~aexp~(\* node, tmp~num~ = 0): insert ~tmp0~
-            into symbol table call generate~aexp~(+ node, tmp~num~ = 1):
-            insert ~tmp1~ into symbol table call generate~aexp~(1 node,
-            tmp~num~ = 2): emit \"mov 1 RESULT~REG~\" emit \"sto
-            RESULT~REG~ \[~tmp1~\]\" call generate~aexp~(2 node,
-            tmp~num~ = 2): emit \"mov 2 RESULT~REG~\" emit \"ld
-            \[~tmp1~\] OTHER~REG~\" \"add OTHER~REG~ RESULT~REG~\" emit
-            \"sto RESULT~REG~ \[~tmp0~\]\" call generate~aexp~(- node,
-            tmp~num~ = 1): insert ~tmp1~ into symbol table // already
-            there, so no action taken call generate~aexp~(3 node,
-            tmp~num~ = 2): emit \"mov 3 RESULT~REG~\" emit \"sto
-            RESULT~REG~ \[~tmp1~\]\" call generate~aexp~(4 node,
-            tmp~num~ = 2): emit \"mov 4 RESULT~REG~\" emit \"ld
-            \[~tmp1~\] OTHER~REG~\" \"sub RESULT~REG~ OTHER~REG~\" \"mov
-            OTHER~REG~ RESULT~REG~\" emit \"ld \[~tmp0~\] OTHER~REG~\"
-            \"mul OTHER~REG~ RESULT~REG~\"
-
-            notice that each call to generate~aexp~ puts the result of
-            that call into RESULT~REG~, and because we\'re storing the
-            intermediate results in temporary variables we\'re never
-            overwriting anything important. also notice that we can
-            reuse temporary variables once we\'re done with them (as we
-            do above with ~tmp1~). the final emitted code is:
-
-            01: mov 1 RESULT~REG~ 02: sto RESULT~REG~ \[~tmp1~\] 03: mov
-            2 RESULT~REG~ 04: ld \[~tmp1~\] OTHER~REG~ 05: add
-            OTHER~REG~ RESULT~REG~ 06: sto RESULT~REG~ \[~tmp0~\] 07:
-            mov 3 RESULT~REG~ 08: sto RESULT~REG~ \[~tmp1~\] 09: mov 4
-            RESULT~REG~ 10: ld \[~tmp1~\] OTHER~REG~ 11: sub RESULT~REG~
-            OTHER~REG~ 12: mov OTHER~REG~ RESULT~REG~ 13: ld \[~tmp0~\]
-            OTHER~REG~ 14: mul OTHER~REG~ RESULT~REG~
-
-            in total we needed two temporary variables (~tmp0~ and
-            ~tmp1~) and so needed to add two entries to the symbol table
-            and increase the stack pointer by 8 bytes (remember that the
-            stack pointer addition happens at the beginning of the
-            scope, so we need to go back to that code and update it).
-            note that we used the names \"~tmp~\<n\>\", which are not
-            valid variable names in our syntax, thus avoiding name
-            clashes and making it easy to tell which variables were
-            created by the compiler vs the user.
-
-            so now we have it working on an example; let\'s generalize
-            the algorithm for arbitrary arithmetic expressions:
-
-            generate~aexp~(AST\* node, int tmp~num~ = 0) { if (node is a
-            constant number \<n\>) { emit \"mov \<n\> RESULT~REG~\";
-            return; } if (node is a variable \<x\>) { emit \"ld \[x\]
-            RESULT~REG~\"; return; }
-
-            // node must be one of +,-,\* insert ~tmp~\<tmp~num~\> into
-            symbol table; generate~aexp~(node-\>left, tmp~num~+1); emit
-            \"sto RESULT~REG~ \[~tmp~\<tmp~num~\>\]\";
-            generate~aexp~(node-\>right, tmp~num~+1); emit \"ld
-            \[~tmp~\<tmp~num~\>\] OTHER~REG~\";
-
-            // left-hand value is in OTHER~REG~, right-hand value is in
-            RESULT~REG~ if (node is +) { emit \"add OTHER~REG~
-            RESULT~REG~\"; return; } if (node is -) { emit \"sub
-            RESULT~REG~ OTHER~REG~\"; emit \"mov OTHER~REG~
-            RESULT~REG~\"; return; } emit \"mul OTHER~REG~
-            RESULT~REG~\"; }
-
-            remember, it\'s important that inserting a [new]{.underline}
-            temporary variable in the symbol table [also]{.underline}
-            adjusts the amount by which the preamble code for the
-            enclosing scope adds to the stack pointer to create the
-            stack frame. however, we don\'t have to initialize the new
-            memory locations to 0 because we\'re guaranteed to always
-            store a value to them before reading them.
-
-            1.  exercise
-
-                generate code for the following expression:
-
-                ((1 - 2) \* (3 \* 4)) + (5 - (6 + 7))
-
-                tree:
-
-                \[+ \[\* \[- 1 2\] \[\* 3 4\]\] \[- 5 \[+ 6 7\]\]
-
-                solution:
-
-                01: mov 1 RR 02: sto RR \[~tmp2~\] 03: mov 2 RR 04: ld
-                \[~tmp2~\] OR 05: sub RR OR 06: mov OR RR 07: sto RR
-                \[~tmp1~\] 08: mov 3 RR 09: sto RR \[~tmp2~\] 10: mov 4
-                RR 11: ld \[~tmp2~\] OR 12: mul OR RR 13: ld \[~tmp1~\]
-                OR 14: mul OR RR 15: sto RR \[~tmp0~\] 16: mov 5 RR 17:
-                sto RR \[~tmp1~\] 18: mov 6 RR 19: sto RR \[~tmp2~\] 20:
-                mov 7 RR 21: ld \[~tmp2~\] OR 22: add OR RR 23: ld
-                \[~tmp1~\] OR 24: sub RR OR 25: mov OR RR 26: ld
-                \[~tmp0~\] OR 27: add OR RR
-
-        2.  relational / logical
-
-            now that we\'ve handled arithmetic expressions, the
-            relational expressions are easy. the main thing we need to
-            do is decide how to represent the results of a relational
-            expression (i.e., how do we represent a boolean). we\'ll use
-            the same method as c/c++: a 0 is interpreted as false, a
-            non-0 is interpreted as true.
-
-            often assembly instructions that compare values store the
-            results as a flag rather than in a register, so we need to
-            compensate for that. let\'s look at an example:
-
-            (1 \< 2) && ((3 \<= 4) \|\| (5 = 6))
-
-            as a tree this is:
-
-            \[&& \[\< 1 2\] \[\|\| \[\<= 3 4\] \[= 5 6\]\]\]
-
-            so the process we want the code generator to go through is:
-
-            call generate~rexp~(&& node, tmp~num~ = 0): insert ~tmp0~
-            into symbol table call generate~rexp~(\< node, tmp~num~ =
-            1): insert ~tmp1~ into symbol table call generate~aexp~(1
-            node, tmp~num~ = 2) emit \"sto RESULT~REG~ \[~tmp1~\]\" call
-            generate~aexp~(2 node, tmp~num~ = 2) emit \"ld \[~tmp1~\]
-            OTHER~REG~\" \"cmp RESULT~REG~ OTHER~REG~\" \"setlt
-            RESULT~REG~\" emit \"sto RESULT~REG~ \[~tmp0~\]\" call
-            generate~rexp~(\|\| node, tmp~num~ = 1): insert ~tmp1~ into
-            symbol table // does nothing call generate~rexp~(\<= node,
-            tmp~num~ = 2): insert ~tmp2~ into symbol table call
-            generate~aexp~(3, tmp~num~ = 3) emit \"sto RESULT~REG~
-            \[~tmp2~\]\" call generate~aexp~(4, tmp~num~ = 3) emit \"ld
-            \[~tmp2~\] OTHER~REG~\" \"cmp RESULT~REG~ OTHER~REG~\"
-            \"setle RESULT~REG~\" emit \"sto RESULT~REG~ \[~tmp1~\]\"
-            call generate~rexp~(= node, tmp~num~ = 2): insert ~tmp2~
-            into symbol table // does nothing call generate~aexp~(5,
-            tmp~num~ = 3) emit \"sto RESULT~REG~ \[~tmp2~\]\" call
-            generate~aexp~(6, tmp~num~ = 3) emit \"ld \[~tmp2~\]
-            OTHER~REG~\" \"cmp RESULT~REG~ OTHER~REG~\" \"sete
-            RESULT~REG~\" emit \"ld \[~tmp1~\] OTHER~REG~\" \"or
-            OTHER~REG~ RESULT~REG~\" emit \"ld \[~tmp0~\] OTHER~REG~\"
-            \"and OTHER~REG~ RESULT~REG~\"
-
-            and the final generated code is:
-
-            01: \[code from generate~aexp~\] 02: sto RESULT~REG~
-            \[~tmp1~\] 03: \[code from generate~aexp~\] 04: ld
-            \[~tmp1~\] OTHER~REG~ 05: cmp RESULT~REG~ OTHER~REG~ 06:
-            setlt RESULT~REG~ 07: sto RESULT~REG~ \[~tmp0~\] 08: \[code
-            from generate~aexp~\] 09: sto RESULT~REG~ \[~tmp2~\] 10:
-            \[code from generate~aexp~\] 11: ld \[~tmp2~\] OTHER~REG~
-            12: cmp RESULT~REG~ OTHER~REG~ 13: setle RESULT~REG~ 14: sto
-            RESULT~REG~ \[~tmp1~\] 15: \[code from generate~aexp~\] 16:
-            sto RESULT~REG~ \[~tmp2~\] 17: \[code from generate~aexp~\]
-            18: ld \[~tmp2~\] OTHER~REG~ 19: cmp RESULT~REG~ OTHER~REG~
-            20: sete RESULT~REG~ 21: ld \[~tmp1~\] OTHER~REG~ 22: or
-            OTHER~REG~ RESULT~REG~ 23: ld \[~tmp0~\] OTHER~REG~ 24: and
-            OTHER~REG~ RESULT~REG~
-
-            it\'s basically like the arithmetic expressions except that
-            the comparison instructions set a condition flag, which we
-            then need to read in order to set a register. so the
-            generate~rexp~ code is:
-
-            generate~rexp~(AST\* node, int tmp~num~ = 0) { insert
-            ~tmp~\<tmp~num~\> into symbol table; if (node is a
-            comparison) { generate~aexp~(node-\>left, tmp~num~+1); emit
-            \"sto RESULT~REG~ \[~tmp~\<tmp~num~\>\]\";
-            generate~aexp~(node-\>right, tmp~num~+1); emit \"ld
-            \[~tmp~\<tmp~num~\>\] OTHER~REG~\"; emit \"cmp RESULT~REG~
-            OTHER~REG~\"; emit \"set\<op\> RESULT~REG~\" // \<op\> is
-            {e,lt,le} depending on the comparison being made } else {
-            generate~rexp~(node-\>left, tmp~num~+1); emit \"sto
-            RESULT~REG~ \[~tmp~\<tmp~num~\>\]\";
-            generate~rexp~(node-\>right, tmp~num~+1); emit \"ld
-            \[~tmp~\<tmp~num~\>\] OTHER~REG~\"; emit \"\<op\> OTHER~REG~
-            RESULT~REG~\" // \<op\> is {and,or} depending on the node }
-            }
-
-            1.  exercise
-
-                generate code for the following expression:
-
-                ((1 = 2) \|\| ((3 \< 4) && (5 \<= 6))) && ((7 \< 8) \|\|
-                (9 = 9))
-
-                tree:
-
-                \[&& \[\|\| \[= 1 2\] \[&& \[\< 3 4\] \[\<= 5 6\]\]\]
-                \[\|\| \[\< 7 8\] \[= 9 9\]\]
-
-                solution:
-
-                01: mov 1 RR 02: sto RR \[~tmp2~\] 03: mov 2 RR 04: ld
-                \[~tmp2~\] OR 05: cmp RR OR 06: sete RR 07: sto RR
-                \[~tmp1~\] 08: mov 3 RR 09: sto RR \[~tmp3~\] 10: mov 4
-                RR 11: ld \[~tmp3~\] OR 12: cmp RR OR 13: setlt RR 14:
-                sto RR \[~tmp2~\] 15: mov 5 RR 16: sto RR \[~tmp3~\] 17:
-                mov 6 RR 18: ld \[~tmp3~\] OR 19: cmp RR OR 20: setle RR
-                21: ld \[~tmp2~\] OR 22: and OR RR 23: ld \[~tmp1~\] OR
-                24: or OR RR 25: sto RR \[~tmp0~\] 26: mov 7 RR 27: sto
-                RR \[~tmp2~\] 28: mov 8 RR 29: ld \[~tmp2~\] OR 30: cmp
-                RR OR 31: setlt RR 32: sto RR \[~tmp1~\] 33: mov 9 RR
-                34: sto RR \[~tmp2~\] 35: mov 9 RR 36: ld \[~tmp2~\] OR
-                37: cmp RR OR 38: sete RR 39: ld OR \[~tmp1~\] 40: or OR
-                RR 41: ld \[~tmp0~\] OR 42: and OR RR
-
-        3.  short-circuiting evaluation
-
-            it can be wasteful to evaluate an entire logical expression
-            if we already know the answer part-way through (and even
-            harmful if the remainder of the expression has
-            side-effects). consider the following C expression:
-
-            if (ptr != NULL && \*ptr == 42) { ... }
-
-            clearly if ptr [is]{.underline} NULL we don\'t want to
-            dereference it. this is called \"short-circuited\"
-            evaluation: -- given \"\<lhs\> && \<rhs\>\", if \<lhs\> is
-            false then we don\'t need to evaluate \<rhs\>. -- given
-            \"\<lhs\> \|\| \<rhs\>\", if \<lhs\> is true then we don\'t
-            need to evaluate \<rhs\>.
-
-            our L1 language doesn\'t allow these kinds of expressions
-            currently, but we should understand how to implement it. the
-            basic idea is simple: we have to insert a conditional into
-            the middle of the expression evaluation. when evaluating a
-            && (or \|\|) node, after evaluating the left-hand side we
-            emit instructions to check whether the result is false (or
-            true) and if so then jump past the evaluation of the
-            right-hand side. we\'ll save the details for when we discuss
-            generating code for conditionals.
-
-    3.  assignments
-
-        assignment is trivial: we evaluate the right-hand side using
-        generate~aexp~, which puts the result in RESULT~REG~, then store
-        the result to the memory location for the left-hand side
-        variable.
-
-        generate~assign~(lhs, rhs) { generate~aexp~(rhs); emit \"sto RR
-        \[lhs\]\"; }
-
-    4.  conditionals
-
-        1.  no nested scope
-
-            let\'s look at an example:
-
-            if (x \< 2) { x := 1; } else { x := 2; }
-
-            depending on the outcome of the comparison, we want to
-            execute either the true branch or the false branch. we
-            don\'t necessarily know the outcome of the comparison at
-            compile time, so we need to emit code for both branches and
-            choose between them at runtime.
-
-            for the above example we would get:
-
-            01: ld \[x\] RR 02: sto RR \[~tmp0~\] 03: mov 2 RR 04: ld
-            \[~tmp0~\] OR 05: cmp RR OR 06: setlt RR 07: cmp 0 RR 08:
-            jmpe IF~FALSE0~ 09: mov 1 RR 10: sto RR \[x\] 11: jmp
-            IF~END0~ 12: IF~FALSE0~: 13: mov 2 RR 14: sto RR \[x\] 15:
-            IF~END0~:
-
-            \[note again the inefficiency of the codegen. we could be a
-            bit more clever and do things like check whether our left
-            and/or right operands are leafs and if so avoid some stores
-            and loads, which would be better code. but we\'re keeping
-            things simple so that the code generator only has to look at
-            the current AST node and nothing else.\]
-
-            generalizing:
-
-            generate~if~(node) { \<n\> = fresh index;
-            generate~rexp~(node-\>guard); emit \"cmp 0 RESULT~REG~\";
-            emit \"jmpe IF~FALSE~\_\<n\>\";
-            generate~block~(node-\>true~branch~); emit \"jmp
-            IF~END~\_\<n\>\"; emit \"IF~FALSE~\_\<n\>:\";
-            generate~block~(node-\>false~branch~); emit
-            \"IF~END~\_\<n\>:\"; }
-
-        2.  nested scope
-
-            remember that each branch of a conditional introduces a new
-            scope which can declare its own variables. that means that
-            we need to emit the preamble code again when the code
-            generator enters that new scope:
-
-            1.  see how many declared variables there are
-            2.  adjust the stack pointer accordingly
-            3.  initialize the new memory locations to 0
-            4.  update symbol table to map the newly declared variables
-                to their offsets
-
-            and when we leave the new scope we need to adjust things
-            back the way they were:
-
-            1.  reset the stack pointer to its old position
-            2.  restore the symbol table to its old value
-
-            so the code generator for the blocks of code inside the
-            true/false branches would look something like:
-
-            generate~block~(node) { old~symboltable~ = symbol~table~;
-            stack~size~ = node-\>num~declaredvariables~ \* 4; // because
-            4-byte integers emit \"sub \<stack~size~\> STACK~REG~\";
-            insert~insymboltable~(symbol~table~,
-            node-\>declared~variables~); for each var in
-            node-\>declared~variables~ { emit \"sto 0 \[var\]\"; } . . .
-            emit \"add \<stack~size~\> STACK~REG~\"; symbol~table~ =
-            old~symboltable~; }
-
-            remember that you can\'t just take the existing symbol table
-            and add the declared variables to it and then remove them
-            when the block is over, because some of them could shadow
-            existing variables in the enclosing scope. you can get
-            around that problem in various ways (e.g., making the symbol
-            table a stack instead of a map, where lookup scans the stack
-            top-down looking for the nearest declared variable with the
-            given name). for the purposes of this pseudocode i just
-            always pass a copy of the symbol table to each branch.
-
-            another consideration is that an expression inside a nested
-            scope may require more temporary variables than any
-            expression in an enclosing block. if so, then we need to
-            backpatch the preamble code for the nested scope to allocate
-            more space for those temporary variables.
-
-            EXAMPLE:
-
-            if (y \< 2) { int x; x := x + (1 + 2); y := x; }
-
-            assume this \'if\' is the only statement. then the generated
-            code would be:
-
-            01: ld \[y\] RR 02: sto RR \[~tmp0~\] // note that this
-            ~tmp0~ is outside the nested scope 03: mov 2 RR 04: ld
-            \[~tmp0~\] OR 05: cmp RR OR 06: setlt RR 07: cmp 0 RR 08:
-            jmpe IF~FALSE0~ 09: sub 8 SR // space for \'x\' and
-            \'~tmp1~\' ??: sto 0 \[x\] // I FORGOT THIS ORIGINALLY 10:
-            ld \[x\] RR 11: sto RR \[~tmp0~\] // reuse ~tmp0~ from
-            enclosing scope 12: mov 1 RR 13: sto RR \[~tmp1~\] 14: mov 2
-            RR 15: ld \[~tmp1~\] OR 16: add OR RR 17: ld \[~tmp0~\] OR
-            18: add OR RR 19: sto RR \[x\] 20: ld \[x\] RR 21: sto RR
-            \[y\] 22: add 8 SR // remove space for nested declarations
-            23: jmp IF~END0~ 24: IF~FALSE0~: 25: IF~END0~:
-
-        3.  exercise 1
-
-            generate code for the following program (fully, including
-            preamble code and all expressions and statements):
-
-            if (1 \< 2) { int y; x := y; } else { x := 2; }
-
-            solution:
-
-            01: mov 1 RR 02: sto RR \[~tmp0~\] 03: mov 2 RR 04: ld
-            \[~tmp0~\] OR 05: cmp RR OR 06: setlt RR 07: cmp 0 RR 08:
-            jmpe IF~FALSE0~ 09: sub 4 SR 10: sto 0 \[y\] 11: ld \[y\] RR
-            12: sto RR \[x\] 13: add 4 SR 14: jmp IF~END0~ 15:
-            IF~FALSE0~: 16: mov 2 RR 17: sto RR \[x\] 18: IF~END0~:
-
-        4.  exercise 2 (short-circuited evaluation)
-
-            generate code for the following relational expression using
-            short-circuiting:
-
-            (1 \< 1) && (2 \< 3)
-
-            tree:
-
-            \[&& \[\< 1 1\] \[\< 2 3\]\]
-
-            solution:
-
-            01: mov 1 RR 02: sto RR \[~tmp1~\] 03: mov 1 RR 04: ld
-            \[~tmp1~\] OR 05: cmp RR OR 06: setlt RR 07: cmp 0 RR 08:
-            jmpe REXP~END0~ 09: sto RR \[~tmp0~\] 10: mov 2 RR 11: sto
-            RR \[~tmp1~\] 12: mov 3 RR 13: ld \[~tmp1~\] OR 14: cmp RR
-            OR 15: setlt RR 16: ld \[~tmp0~\] OR 17: and OR RR 18:
-            REXP~END0~:
-
-    5.  loops
-
-        loops are a lot like conditionals except the \"true branch\" is
-        the body of the loop and the \"false branch\" is the end of the
-        loop. let\'s see an example:
-
-        while (x \< 3) { x := x + 1; }
-
-        so for the above example we would get:
-
-        01: WHILE~START0~: 02: ld \[x\] RR 03: sto RR \[~tmp0~\] 04: mov
-        3 RR 05: ld \[x\] OR 06: cmp RR OR 07: setlt RR 08: cmp 0 RR 09:
-        jmpe WHILE~END0~ 10: ld \[x\] RR 11: sto RR \[~tmp0~\] 12: mov 1
-        RR 13: ld \[~tmp0~\] OR 14: add OR RR 15: sto RR \[x\] 16: jmp
-        WHILE~START0~ 17: WHILE~END0~:
-
-        generalizing:
-
-        generate~while~(node) { \<n\> = fresh index; emit
-        \"WHILE~START~\_\<n\>:\"; generate~rexp~(node-\>guard); emit
-        \"cmp 0 RESULT~REG~\"; emit \"jmpe WHILE~END~\_\<n\>\";
-        generate~block~(node-\>body); emit \"jmp WHILE~START~\_\<n\>\";
-        emit \"WHILE~END~\_\<n\>:\"; }
-
-        1.  nested scope
-
-            we have the same issue here with nested scope as for
-            conditionals, though there\'s only one new scope: the body
-            of the loop. we handle it exactly the same way. note that
-            for loops the body can be entered many times; the preamble
-            and cleanup code for the new scope will be executed each
-            time.
-
-        2.  exercise
-
-            generate code for the following program (fully, including
-            all preamble code, expressions, and statements):
-
-            while (x \<= 10) { int y; y := 2; x := x + y; }
-
-            solution:
-
-            01: WHILE~START0~: 02: ld \[x\] RR 03: sto RR \[~tmp0~\] 04:
-            mov 10 RR 05: ld \[~tmp0~\] OR 06: cmp RR OR 07: setle RR
-            08: cmp 0 RR 09: jmpe WHILE~END0~ 10: sub 4 SR 11: sto 0
-            \[y\] 11: mov 2 RR 12: sto RR \[y\] 13: ld \[x\] RR 14: sto
-            RR \[~tmp0~\] 15: ld \[y\] RR 16: ld \[~tmp0~\] OR 17: add
-            OR RR 18: sto RR \[x\] 19: add 4 SR 20: jmp WHILE~START0~
-            21: WHILE~END0~:
 
 2.  with functions and calls
 
@@ -4255,29 +3746,6 @@ naive codegen
 
 new codegen
 -----------
-
-### managing memory: heap vs stack
-
-for L1 we didn\'t worry about memory management because the stack took
-care of it for us. when we enter a new scope the declared variables are
-allocated space by pushing them on the stack; when we leave that scope
-the space is deallocated by popping them off the stack. however, this
-means that the lifetimes of the variables are dictated by the scope they
-are declared in; once we leave that scope the variables disappear.
-
-if we want objects that will live beyond the scope they are created in,
-we need the heap. that\'s the main difference between the stack and the
-heap: heap lifetimes are not bound by scope. but if we don\'t deallocate
-heap objects when we leave the scope, when do we do it? that is the
-subject of memory management, and there are a number of different
-possible answers with their own tradeoffs. we will discuss the subject
-thoroughly in a later lecture.
-
-for L2 specifically we\'ll rely on garbage collection to automatically
-deallocate structs when it\'s safe, but to do that we\'ll need to change
-the codegen in our compiler to make it feasible to perform GC at
-runtime. i\'ll discuss the requirements as they become relevant during
-codegen.
 
 ### symbol table
 
