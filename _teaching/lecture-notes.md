@@ -2892,6 +2892,8 @@ echo $?
 
 - the compiler proper is the part that's emitting assembly; the assembler produces object files and the linker produces an executable
 
+- note that `main` is not actually the starting point for execution, just the starting point for user code---really we begin in `_start` which does setup and then calls into `main`
+
 #### static vs dynamic libraries
 
 - even after linking we still may not have all the code needed to execute a program; it depends on whether we're using _static linking_ or _dynamic linking_ for libraries
@@ -3014,280 +3016,240 @@ char y = **((char**)&x + 1);
 
 - when i give out the codegen assignment i'll include the specific alignment restrictions for x86-64
 
-### x86-64 / pseudocode FIXME:
-
-- TODO: [registers, instructions, word size, alignment (including stack)]
-
-- FIXME: not sure if i should explain x86 and use it in lecture, or use pseudocode in lecture and give x86 info offline; leaning towards the latter
-
-- if using pseudocode:
-
-    - we'll use `R1`, `R2`, etc for general-purpose architectural registers
-
-    - there are also some architectural registers that are designated for special purposes:
-
-        - `SP` and `FP` for the stack
-        - `RETR` for holding return values
-        - `DIVR` for division
-        - TODO: ...
-
-- FIXME: maybe for all of these stages instead of giving exact instructions just say what needs to be accomplished---then they can use my solution on CSIL to see what that looks like for x86
-
 ### stage 1: no structs, globals, pointers, or functions other than main
 
-- an LIR::Program that contains only the `main` function, with no structs, globals, or externs; no variables have a pointer type
+- a LIR::Program that contains only the `main` function, with no structs, globals, or externs; no variables have a pointer type
 
 - relevant LIR instructions: `$arith`, `$cmp`, `$copy`, `$branch`, `$jump`, `$ret`
 
-- example (LIR, x86):
-
-```
-fn main() -> int {
-  let x:int, y:int, z:int
-
-  entry:
-    x = $copy 2
-    y = $arith add x 3
-    z = $cmp lt x y
-    $branch z bb1 exit
-
-  bb1:
-    y = $copy x
-    $jump exit
-
-  exit:
-    $ret y
-}
-```
-
-```
-TODO: x86
-```
+- example (LIR, x86): [see `examples/codegen/stage-1.{lir, s}`] [see OneNote] FIXME:
 
 - codegen steps:
 
-    0. FIXME: do i need a prologue for `main`?
+    0. initialize the stack and frame pointers
 
     1. allocate space on the stack for `main`'s local variables (there are no parameters to worry about)
 
-    2. in cflat all variables are automatically initialized to 0; zero out the newly allocated space
+    2. in cflat all local variables are automatically initialized to 0; zero out the newly allocated space
 
         - this is _not_ like C/C++, which allow for uninitialized variables
 
-    3. map each local to an offset in the stack (they must be integer values, which are automatically word-aligned)
+    3. map each local to an offset in the stack
 
-    4. for each basic block, iterate through its instructions and translate to the corresponding ISA instructions (each LIR basic block will yield an ISA basic block with the same label)
+    4. for each basic block, iterate through its instructions and translate to the corresponding ISA instructions (each LIR basic block will yield an ISA block)
 
-    5. output the ISA instructions (replacing label `entry` with `main`)
+        - to keep labels unique we will prepend the function name to them, e.g., `entry` becomes `main_entry`
 
-- we start with `SP`, the _stack pointer_ that points to the current top of the stack, and `FP`, the _frame pointer_ that points to the bottom of the current stack frame
+    5. output the ISA instructions
 
-    - each is located in a designated register, which we'll also refer to as `SP` and `FP`
+- create an ISA block labeled `main`; this is where we'll start emitting instructions
 
-    - initially, `SP` = `FP`
+- we have the _stack pointer_ that points to the current top of the stack, and the _frame pointer_ that points to the bottom of the current stack frame
+
+    - each is located in a designated register, which we'll refer to as `SP` and `FP`
+
+    - at entry to `main`, `SP` and `FP` are for the _caller_ function; we need to set them for `main` (and then restore them when leaving `main`)
 
     - remember that the stack grows _down_: to add more space to the stack we subtract from the current `SP`
+
+- initialize the stack and frame pointers
+
+    - push `FP` onto the stack (to restore it when we leave `main`)
+
+    - copy `SP` to `FP`: the top of the stack for the caller function is the bottom of the stack for `main`
+
+    - now, `SP` = `FP` (note that `FP` never changes, so we've now saved the old value of `SP` as `FP`)
 
 - allocating space on the stack:
 
     - let `N` be the number of locals
 
-    - grow the stack by `N * WORDSIZE`
+    - grow the stack by `N * WORDSIZE` bytes
+
+    - for x86-64 the stack pointer must be double-word aligned, so we have to make sure this is true
+
+        - we can assume that `SP` was correctly aligned before `main` was called
+
+        - the call pushed the return location on the stack, then _we_ pushed `FP` on the stack; this left `SP` still correctly aligned
+
+        - if `N` is odd then we're now out of alignment, so we need to fix it: `SP` -= `WORDSIZE`
 
 - zeroing out the stack:
 
-    - we could store a 0 into each location in the newly allocated space, but this would be inefficient
+    - we could store a 0 into each location in the newly allocated space, but this would be inefficient; instead we'll use `_cflat_zero`, which we'll link in later as part of our cflat runtime library
 
-    - instead we'll use `memcpy`, which we'll link in later as part of our language runtime library
-
-    - FIXME: does this require going into calling conventions, etc? if so maybe we should stick with the naive scheme, at least for now
+    - call `_cflat_zero` with the arguments (1) the address to start, which is `SP`; and (2) the number of words to set, which is `N` (obviously we only do this if `N` > 0)
 
 - mapping locals to stack offsets:
 
-    - for `i` in `[0..N)`, let local `i` map to offset `i * WORDSIZE`
+    - for `i` in `[0..N)`, let local `i` map to offset `i * WORDSIZE` (we'll process them in alphabetic order)
 
     - these are the offsets from `FP`, so the stack address of local `x` is `FP - offset(x)`
 
-- a LIR operand can be either a variable or a constant; `[op]` means the variable's stack address if `op` is a variable, or the constant value itself if `op` is a constant
+    - for a variable `x` we'll use notation `[x]` to mean the stack address of `x`
 
-    - we'll use `move op -> R` to mean (1) load the value from `[op]` into register `R` if `op` is a variable; or (2) put `[op]` directly into register `R` if `op` is a constant
+- once this "prologue" is done, we want execution to start at the user-defined entry block
+
+    - jump to `main_entry`
+
+    - this completes the ISA block labeled `main`
+
+- as a convenient shorthand, we'll say "move `op` into a register" to mean:
+
+    - if `op` is a constant, put that constant directly into the register
+
+    - if `op` is a variable, load the value located at `[op]` into the register
 
 - `$branch op bb1 bb2`:
 
-    - move `op` -> `R1`
-    - compare `R1` with 0 (sets flag)
-    - conditionally jump to `bb1` if result is not-equal
-    - unconditionally jump to `bb2` (fall-through instruction)
+    - move `op` (the branch guard) into a register
+    - compare it with 0 (sets a flag)
+    - if result is `not equal` then jump to `bb1`
+    - otherwise jump to `bb2`
 
 - `$jump bb`:
 
-    - unconditionally jump to `bb`
+    - jump to `bb`
 
 - `$ret op`:
 
-    - move `op` -> `RETR`
-    - set `SP` to `FP` (deallocating the current stack frame)
-    - FIXME: do i need an epilogue for `main`?
+    - move `op` into a special register for returned values
+    - set `SP` to `FP` (deallocating the current stack frame and restoring the old `SP`)
+    - pop previous `FP` from stack
+    - `ret` (automatically pops return location from stack and jumps there)
 
 - `x = $copy op`:
 
-    - move `op` -> `R1`
-    - store `R1` to `[x]`
+    - move `op` (the operand value) into a register
+    - store the operand value to `[x]`
 
 - `x = $cmp <rop> op1 op2`:
 
-    - move `op1` -> `R1`
-    - move `op2` -> `R2`
-    - compare `R1` with `R2` (sets flag)
-    - set `R1` to 0 or 1 based on flag and `<rop>`
-    - store `R1` to `[x]`
+    - move `op1` and `op2` into registers
+    - compare the two registers (sets a flag)
+    - set the result register to 0 or 1 based on `<rop>` and flag
+    - store the value in the result register to `[x]`
 
-- `x = $arith <aop> op1 op2`: [`<aop>` != div]
+- `x = $arith <aop> op1 op2`:
 
-    - move `op1` -> `R1`
-    - move `op2` -> `R2`
-    - add/sub/mul `R1` and `R2`, putting result in `R1` FIXME: ???
-    - store `R1` to `[x]`
-
-- `x = $arith div op1 op2`:
-
-    - move `[op1]` -> `DIVR`
-    - move `[op2]` -> `R1`
-    - divide by `R1` (automatically divides into `DIVR` and puts the result there)
-    - store `DIVR` to `[x]`
+    - move `op1` and `op2` into registers (uses a special register for division)
+    - apply the appropriate operation to the two registers
+    - store the value in the result register to `[x]`
 
 - [revisit example]
 
-### stage 2: adding pointers 
+### stage 2: adding pointers
 
 - now we can have memory allocation (including arrays)
 
-- additional LIR instructions: `$alloc`, `$load`, `$store`, `$gep`
+- additional LIR instructions: `$alloc`, `$gep`, `$load`, `$store`
 
-- example (LIR, x86):
+- example (LIR, x86): [see `examples/codegen/stage-2.{lir, s}`] [see OneNote] FIXME:
 
-```
-fn main() -> int {
-  let x:&int, y:int, z:&int
+- now that we have arrays and array indexing, we have to worry about out-of-bounds accesses
 
-  entry:
-    x = $alloc 10
-    z = $gep x 5
-    y = $load z
-    y = $arith add y 1
-    $store z y
-    $ret y
-}
-```
+    - C/C++ just let them happen, with undefined behavior
 
-```
-TODO: x86
-```
+    - in cflat, we'll detect them and raise an error
 
-- TODO: [protecting against out-of-bounds array accesses]
+- strategy:
 
-- FIXME: `alloc` requires calling into the runtime library; same question here as for `memset` above
+    - when something is allocated on the heap, we'll allocate an additional word (the `header`) that contains the size of the allocated object; we'll put this at the beginning of the object and return a pointer to the word immediately after the header (so the address of the header is at `-WORDSIZE` offset from the returned pointer)
+
+    - when we do pointer arithmetic using `$gep`, we'll check against the size of the object stored in its header and make sure that the result is in-bounds
+
+- setup
+
+    - we'll add some boilerplate ISA blocks to handle when there's a problem with allocation or indexing; they'll print an error message and immediately abort execution
+
+    - `.invalid_alloc_length` is used when we try to allocate a non-positive number of elements
+    
+    - `.out_of_bounds` is used when we try to index an array out of bounds
+
+- `x = $alloc op`
+
+    - we only have integers and pointers so far and they're both size `WORDSIZE`, so we're allocating `op` words _plus_ one word for the header; we'll need to calculate the value of `op` + 1
+
+        - the resulting value must be greater than 1 (one element plus the header); if this check fails we'll have the executable abort by jumping to the `.invalid_alloc_length` block
+
+    - in order to actually allocate the memory we'll call into the cflat runtime library, which has a function `_cflat_alloc` that takes a number of words to allocate and returns a pointer to the allocated memory
+
+    - move `op` (the number of words to allocate) into a register
+    - add 1 to it (include the header word)
+    - compare it against 1 (sets flag)
+    - if result is not `greater` then jump to `.invalid_alloc_length`
+    - call `_cflat_alloc` passing `op` + 1, getting result in `R` (the special register for returned values)
+    - store `op` into the location in `R` (the header) -- note we're _not_ storing `op` + 1
+    - store `R` + `WORDSIZE` into `[x]` (the pointer to the first element)
+
+- `x = $gep y op`
+
+    - load `[y]` (the source pointer) into a register
+    - move `op` (the index) into a register
+    - compare the index with 0 (sets a flag)
+    - if result is not `greater` then jump to `.out_of_bounds`
+    - load value at location 'source pointer - `WORDSIZE`' (the header) into a register (the number of elements)
+    - compare the index and the number of elements (sets a flag)
+    - if result is not `less than` then jump to `.out_of_bounds`
+    - store the source pointer + (the index * `WORDSIZE`) into `[x]` (the pointer to the requested element)
+
+- `x = $load y`
+
+    - load the value at `[y]` (the source pointer) into a register
+    - load the value from the location given by the source pointer into the result register
+    - store the value in the result register to `[x]`
+
+- `$store x op`
+
+    - load the value at `[x]` (the destination pointer) into a register
+    - move `[op]` (the operand value) into a register
+    - store the operand value to the location given by the destination pointer
 
 - [revisit example]
 
-### stage 3: adding globals 
+### stage 3: adding globals TODO:
 
 - now we can have global variables (int or pointer)
 
-- example (LIR, x86):
+- example (LIR, x86): [see `examples/codegen/stage-3.{lir, s}`] [see OneNote] FIXME:
 
-```
-let g:int
-
-fn main() -> int {
-  let x:int
-
-  entry:
-    x = $copy 42
-    g = $copy x
-    $ret g
-}
-```
-
-```
-TODO: x86
-```
-
-- TODO: [mangled global names]
+- TODO: [mangled global names] // only really need to mangle function pointers, but easier to mangle everything
 
 - [revisit example]
 
-### stage 4: adding structs
+### stage 4: adding structs TODO:
 
 - now we can have user-defined structs
 
 - additional LIR instructions: `$gfp`
 
-- example (LIR, x86):
+- example (LIR, x86): [see `examples/codegen/stage-4.{lir, s}`] [see OneNote] FIXME:
 
-```
-struct foo {
-  f1: int
-  f2: &int
-}
-
-fn main() -> int {
-  let x:&foo, y:&int, z:&&int
-
-  entry:
-    x = $alloc 1
-    y = $gfp x f1
-    z = $gfp x f2
-    $store z y
-    $ret 0
-}
-```
-
-```
-TODO: x86
-```
-
-- TODO: [field layout, interaction with arrays? max struct size?]
+- TODO: [field layout, interaction with alloc (include size of struct in calculations); forget about max struct size (for GC)]
 
 - [revisit example]
 
-### stage 5: adding extern functions and calls
+### stage 5: adding extern functions and calls TODO:
 
 - now we can have externs called from `main`
 
+    - NOTE: don't need to declare externs in assembly
+
 - additional LIR instructions: `$call_ext`
 
-- example (LIR, x86):
-
-```
-extern print(int) -> _
-
-fn main() -> int {
-  entry:
-    $call_ext print(42)
-    $ret 0
-}
-```
-
-```
-TODO: x86
-```
+- example (LIR, x86): [see `examples/codegen/stage-5.{lir, s}`] [see OneNote] FIXME:
 
 - TODO: [calling convention, caller/callee-save registers]
 
 - [revisit example]
 
-### stage 6: adding internal functions and calls
+### stage 6: adding internal functions and calls TODO:
 
 - now we can have other internal functions besides `main`
 
 - additional LIR instructions: `$call_dir`, `$call_idr`
 
-- example (LIR, x86):
-
-```
-TODO:
-```
+- example (LIR, x86): [see `examples/codegen/stage-6.{lir, s}`] [see OneNote] FIXME:
 
 - TODO: [redux: calling convention, caller/callee-save registers]
 
