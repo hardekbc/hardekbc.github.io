@@ -2767,67 +2767,6 @@ label:lbl3
 $ret x
 ```
 
-AFTER OPTIMIZATION
-```
-label:entry
-_t1 = $call_ext input()
-x = $copy _t1
-y = $copy 0
-z = $copy 42
-$jump lbl1
-label:lbl1
-_t2 = $cmp neq z 0
-$branch _t2 lbl4 lbl3
-label:lbl4
-_t3 = $cmp lt y x
-$branch _t3 lbl5 lbl6
-label:lbl5
-_t4 = $arith add y 2
-y = $copy _t4
-_t5 = $arith div x y
-z = $copy _t5
-$jump lbl4
-label:lbl6
-_t6 = $arith add x 1
-x = $copy _t6
-$jump lbl1
-label:lbl3
-$ret x
-```
-
-LIR
-```
-entry:
-  _t1 = $call_ext input()
-  x = $copy _t1
-  y = $copy 0
-  z = $copy 42
-  $jump lbl1
-
-lbl1:
-  _t2 = $cmp neq z 0
-  $branch _t2 lbl4 lbl3
-
-lbl4:
-  _t3 = $cmp lt y x
-  $branch _t3 lbl5 lbl6
-
-lbl5:
-  _t4 = $arith add y 2
-  y = $copy _t4
-  _t5 = $arith div x y
-  z = $copy _t5
-  $jump lbl4
-
-lbl6:
-  _t6 = $arith add x 1
-  x = $copy _t6
-  $jump lbl1
-
-lbl3:
-  $ret x
-```
-
 # codegen
 ### intro
 
