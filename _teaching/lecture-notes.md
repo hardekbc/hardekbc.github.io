@@ -7,18 +7,6 @@
 
 - need to create test suites and autograder for lowering assignment
 
-    - this should be easy, just need to decide what the test suites will be and generate valid programs for them
-
-    - the students need to read in an AST; by default i can just give them the AST as a text file but then they need to parse it; optionally i can make it easier for them by:
-
-        - also giving them the tokens so they can use their solution to assign-2 to construct the AST
-
-        - give them the AST on JSON format so they can read it in using a JSON library and then translate to their data structure
-
-            - i would need to define a suitable AST and convert the actual AST to that format so i can use serde to serialize it
-
-            - i would need to think about how to allow the JSON library in the autograder; maybe just pick one that's header-only and have them use that?
-
 - need to create test suites and autograder for codegen assignment
 
 - need to create test suites and autograder for register allocation assignment
