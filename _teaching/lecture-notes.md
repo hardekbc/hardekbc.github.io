@@ -3,10 +3,6 @@
 
 - remember to run plagiarism detection on all assignments after the deadline (and after late assignments are turned in); just use the built-in gradescope detector
 
-- need to reimplement lowering for 160 version of cflat
-
-- need to create test suites and autograder for lowering assignment
-
 - need to create test suites and autograder for codegen assignment
 
 - need to create test suites and autograder for register allocation assignment
@@ -22,8 +18,8 @@
 - week  3.1: through `parsing`
 - week  3.2: `validation` except the example and discussing design space
 - week  4.1: through `validation`
-- week  4.2: 
-- week  5.1: 
+- week  4.2: partway through `lowering.pdf` (the setup, but not function bodies or building CFG)
+- week  5.1: through `lowering` _except_ final example
 - week  5.2: 
 - week  6.1: 
 - week  6.2: 
@@ -37,6 +33,18 @@
 - week 10.2: 
 
 ## assignment timing
+
+[NEW SCHEDULE AFTER EXTENDING ASSIGN-2 BY 3 DAYS]
+
+- week 2T assign-1 (lexer) [10 days]
+- week 3F assign-2 (parser/validation) [14 days]
+- week 5F assign-3 (lowering) [11 days]
+- week 7T assign-4 (codegen) [10 days]
+- week 8F assign-5 (register allocation) [11 days]
+- week 10T assign-6 (optimization) [10 days]
+- finals [due Friday]
+
+[OLD SCHEDULE]
 
 - week 2T assign-1 (lexer) [10 days]
 - week 3F assign-2 (parser/validation) [11 days] [could move validation to assign-3]
@@ -86,17 +94,21 @@
 
 - assign-2:
 
+    - modify the grader to give the cflat source as the output on an failed test; students can use the `lex` solution executable to turn that into tokens and it's easier for the students to understand and debug
+
     - we give the students the cflat LL(1) grammar instead of making them derive it, mostly because they already need to figure out how to produce an AST and also implement the typing rules so deriving the grammar seemed too much; still this means they never actually have to transform a grammar
 
         - we could give them a separate quiz about transforming grammars to LL(1), online and automatically graded
 
         - not this time, but think about it for next time (and maybe use those quizzes for other concepts as well, just to give students practice with automated feedback); the quizzes don't have to count as a grade either
 
-    - gradescope apparently truncates output that is too long, which is a problem because the students can't see the entire failed test in order to debug it. as a preliminary step i removed the diff from the failed test output to make more room, but think if there are other ways to fix this issue
-
-        - is it just number of lines? i could have the tokens separated by spaces instead of newlines, but i don't know if gradescope will treat it differently...i need to experiment a bit
-
     - since test cases are generated as ASTs and then printed out as source code, the test cases have more regular syntax than the grammar allows---for example, toplevel constructs will always be in the same order, every function will have at most one let, and arithmetic ops are all parenthesized to make precedence explicit; to allow for testing the student parsers more thoroughly it would be good to create a printer that randomizes these things
+
+    - doing parsing _and_ validation may be too much...possibly it would be easier to do validation + lowering for assign-3? it all depends which of parsing and lowering are easier; maybe ask the students (once they've done assign-3)
+
+        - i had to extend the deadline for assign-2 by three days; doing parsing + validation is definitely too much for a regular assignment
+
+    - the test suites aren't very good because they don't break things up in a way that allows for incremental implementation by the students---each test suite requires everything to have been implemented; next time break it up by language feature like the other assignments
 
 # logistics
 
