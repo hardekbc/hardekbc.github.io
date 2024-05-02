@@ -2790,6 +2790,8 @@ $ret x
 
     - for us, the ISA will be x86-64
 
+    - i am not going to teach you x86-64; i'll explain what the code needs to do and, for the assignment, i'll give a list of ueful x86-64 instructions, a pointer to some online resources, and my own solution that you can use to figure out what to emit
+
 ### necessary context
 #### linker
 
@@ -2963,7 +2965,71 @@ char y = **((char**)&x + 1);
 
 - relevant LIR instructions: `$arith`, `$cmp`, `$copy`, `$branch`, `$jump`, `$ret`
 
-- example (LIR, x86): [see `examples/codegen/stage-1.{lir, s}`] [see OneNote] FIXME:
+- example (LIR, x86): [see `examples/codegen/stage-1.{lir, s}`] [see OneNote]
+
+```
+fn main() -> int {
+  let x:int, y:int, z:int
+
+  entry:
+    x = $copy 2
+    y = $arith add x 3
+    z = $cmp lt x y
+    $branch z bb1 exit
+
+  bb1:
+    y = $copy x
+    $jump exit
+
+  exit:
+    $ret y
+}
+```
+
+```
+.data
+
+.text
+.globl main
+
+main:
+    push %rbp            // push old frame pointer value
+    mov %rsp, %rbp       // set new frame pointer value
+    sub $48, %rsp        // allocate stack space for locals
+    lea -24(%rbp), %r10  // start setting up call to memset
+    movq %r10, -32(%rbp) 
+    movq -32(%rbp), %rdi 
+    movq $0, %rsi
+    movq $24, %rdx
+    call memset          // finish calling memset
+    jmp main_entry
+
+main_entry:
+    movq $2, -8(%rbp)    // set x to 2
+    movq -8(%rbp), %r9   // get value of x
+    movq %r9, -16(%rbp)  // put in y
+    addq $3, -16(%rbp)   // add 3 to y
+    movq $0, %r10        // start comparing x and y
+    movq -8(%rbp), %r9
+    cmpq -16(%rbp), %r9
+    movq %r9, -8(%rbp)
+    setl %r10b           // finish comparing x and y
+    movq %r10, -24(%rbp) // put result in z
+    cmpq $0, -24(%rbp)   // compare z to 0 for branch
+    jne main_bb1
+    jmp main_exit
+
+main_bb1:
+    movq -8(%rbp), %r9   // read x from memory
+    movq %r9, -16(%rbp)  // set y to x's value
+    jmp main_exit
+
+main_exit:
+    movq -16(%rbp), %rax // put y in special return register
+    add $48, %rsp        // deallocate stack frame
+    pop %rbp             // restore old frame pointer value
+    ret                  // return from main
+```
 
 - codegen steps:
 
@@ -3085,7 +3151,111 @@ char y = **((char**)&x + 1);
 
 - additional LIR instructions: `$alloc`, `$gep`, `$load`, `$store`
 
-- example (LIR, x86): [see `examples/codegen/stage-2.{lir, s}`] [see OneNote] FIXME:
+- example (LIR, x86): [see `examples/codegen/stage-2.{lir, s}`] [see OneNote]
+
+```
+fn main() -> int {
+  let x:&int, y:int, z:&int
+
+  entry:
+    x = $alloc 10
+    z = $gep x 5
+    y = $load z
+    y = $arith add y 1
+    $store z y
+    $ret y
+}
+```
+
+```
+.data
+
+out_of_bounds_msg:
+    .string "Out-of-bounds array access."
+
+invalid_array_length_msg:
+    .string "Array length requested for allocation is invalid (either too large or negative)."
+
+.text
+.globl main
+
+main:
+    push %rbp                  // push old frame pointer value
+    mov %rsp, %rbp             // set new frame pointer value
+    sub $96, %rsp              // allocate stack space for locals
+    lea -24(%rbp), %r10        // start setting up call to memset
+    movq %r10, -32(%rbp)
+    movq -32(%rbp), %rdi
+    movq $0, %rsi
+    movq $24, %rdx
+    call memset                // finish calling memset
+    jmp main_entry
+
+main_entry:
+    movq $10, -40(%rbp)        // start checking allocation amount
+    cmpq $0, -40(%rbp)
+    jle .invalid_array_length  // if not valid, panic
+    movq $8, -40(%rbp)         // start calling _cflat_alloc
+    movq -40(%rbp), %r9
+    imulq $10, %r9
+    movq %r9, -40(%rbp)
+    addq $8, -40(%rbp)
+    movq -40(%rbp), %rdi
+    call _cflat_alloc          // finish calling _cflat_alloc
+    movq %rax, -8(%rbp)        // store resulting address
+    movq -8(%rbp), %r9
+    movq %r9, -48(%rbp)
+    movq -48(%rbp), %r10
+    movq $10, 0(%r10)          // put allocation size in header
+    addq $8, -8(%rbp)          // make x point to 1 word after header
+    movq -8(%rbp), %r9         // start comparing index with bound
+    movq %r9, -56(%rbp)
+    movq -56(%rbp), %r11
+    movq -8(%r11), %r9
+    movq %r9, -64(%rbp)
+    cmpq $5, -64(%rbp)
+    jle .out_of_bounds         // panic of out of bounds
+    movq $0, -64(%rbp)         // compare index with 0
+    cmpq $5, -64(%rbp)
+    jg .out_of_bounds          // panic of out of bounds
+    movq $5, -64(%rbp)         // index into array and store into z
+    movq -64(%rbp), %r9
+    imulq $8, %r9
+    movq %r9, -64(%rbp)
+    movq -8(%rbp), %r9
+    movq %r9, -24(%rbp)
+    movq -64(%rbp), %r9
+    addq %r9, -24(%rbp)
+    movq -24(%rbp), %r9
+    movq %r9, -72(%rbp)
+    movq -72(%rbp), %r11
+    movq 0(%r11), %r9
+    movq %r9, -16(%rbp)        // finish loading z into y
+    movq -16(%rbp), %r9        // start y = y + 1
+    movq %r9, -16(%rbp)
+    addq $1, -16(%rbp)         // finish y = y + 1
+    movq -24(%rbp), %r9        // start storing y into z
+    movq %r9, -80(%rbp)
+    movq -80(%rbp), %r10
+    movq -16(%rbp), %r9
+    movq %r9, 0(%r10)          // finish storing y into z
+    movq -16(%rbp), %rax       // put y in special return register
+    add $96, %rsp              // deallocate stack frame
+    pop %rbp                   // restore old frame pointer value
+    ret                        // return from main
+
+.out_of_bounds:
+    push %rdi
+    add $-8, %rsp
+    lea out_of_bounds_msg(%rip), %rdi
+    call _cflat_panic
+
+.invalid_array_length:
+    push %rdi
+    add $-8, %rsp
+    lea invalid_array_length_msg(%rip), %rdi
+    call _cflat_panic
+```
 
 - now that we have arrays and array indexing, we have to worry about out-of-bounds accesses
 
@@ -3103,7 +3273,7 @@ char y = **((char**)&x + 1);
 
     - we'll add some boilerplate ISA blocks to handle when there's a problem with allocation or indexing; they'll print an error message and immediately abort execution
 
-    - `.invalid_alloc_length` is used when we try to allocate a non-positive number of elements
+    - `.invalid_array_length` is used when we try to allocate a non-positive number of elements
     
     - `.out_of_bounds` is used when we try to index an array out of bounds
 
@@ -3111,14 +3281,13 @@ char y = **((char**)&x + 1);
 
     - we only have integers and pointers so far and they're both size `WORDSIZE`, so we're allocating `op` words _plus_ one word for the header; we'll need to calculate the value of `op` + 1
 
-        - the resulting value must be greater than 1 (one element plus the header); if this check fails we'll have the executable abort by jumping to the `.invalid_alloc_length` block
+        - the resulting value must be greater than 1 (one element plus the header); if this check fails we'll have the executable abort by jumping to the `.invalid_array_length` block
 
     - in order to actually allocate the memory we'll call into the cflat runtime library, which has a function `_cflat_alloc` that takes a number of words to allocate and returns a pointer to the allocated memory
 
     - move `op` (the number of words to allocate) into a register
-    - add 1 to it (include the header word)
-    - compare it against 1 (sets flag)
-    - if result is not `greater` then jump to `.invalid_alloc_length`
+    - compare it against 0 (sets flag)
+    - if result is not `greater` then jump to `.invalid_array_length`
     - call `_cflat_alloc` passing `op` + 1, getting result in `R` (the special register for returned values)
     - store `op` into the location in `R` (the header) -- note we're _not_ storing `op` + 1
     - store `R` + `WORDSIZE` into `[x]` (the pointer to the first element)
