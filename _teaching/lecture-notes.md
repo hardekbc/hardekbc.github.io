@@ -94,7 +94,9 @@
 
 - assign-2:
 
-    - modify the grader to give the cflat source as the output on an failed test; students can use the `lex` solution executable to turn that into tokens and it's easier for the students to understand and debug
+    - for the "syntactically incorrect" test suite (suite-3) there is no source file to give them due to the way we generate the input, which means we output a list of tokens on test failure; however apparently gradescope truncates output that is too long---either fix this somehow (maybe gradescope is counting number of lines and we can use spaces to separate tokens instead?) or figure out how to map the invalid token list back to source-level so we can output that
+
+    - a more minor issue is that the output ASTs are compared by eliminating whitespace (because diff can't ignore newlines) and saying whether the resulting strings are different, but this makes it difficult to pinpoint where the student output is different from the solution when students are debugging---is there a better way to do this? maybe don't ignore newlines (and thus enable using diff), and just be very regular about where the newlines are so the students can follow easily
 
     - we give the students the cflat LL(1) grammar instead of making them derive it, mostly because they already need to figure out how to produce an AST and also implement the typing rules so deriving the grammar seemed too much; still this means they never actually have to transform a grammar
 
