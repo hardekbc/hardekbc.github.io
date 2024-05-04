@@ -78,6 +78,12 @@
 
 ## notes
 
+- autograder `grader.py`: for some reason when student code segfaults it doesn't register as an abnormal exit and so the message the students get is "wrong output" instead of "abnormal exit" (see function `Run`)
+
+    - this is may be because of the way we wrap the command in `RunAsStudent` to make it ran as the student user instead of root; however when we change the command to add `echo $? > status;` immediately after running the student program, the output status is `0` even though a coredump file is produced
+
+- students get confused by the output on a failure: we give the total number of tests passed out of the total number of tests, and they think it gives the actual test number (even though we give them the name of the test in the same message)---this is only a problem because that's how they identify the test in their communications to us which is confusing; maybe we can tweak the failure message to make it more clear?
+
 - assign-1:
 
     - `lex_gen.rs` doesn't generate any numbers larger than an i32 can hold, and so the student tests don't test that they can match arbitrarily long digits; also it generates random ids that could potentially include keywords (but probably won't, and so is missing testing that case for maximal munch) and could possibly _be_ a keyword (which would result in an incorrect expected result---not a problem for the student test cases because i used my own lex result instead, but an issue nonetheless)
