@@ -78,6 +78,10 @@
 
 ## notes
 
+- tell the students to use AddressSanitizer when compiling their code, it will help catch memory errors (especially useful when their code seems to work fine locally but segfaults on gradescope)
+
+    - https://github.com/google/sanitizers/wiki/AddressSanitizer (the give flags for clang, but they're the same for gcc)
+
 - autograder `grader.py`: for some reason when student code segfaults it doesn't register as an abnormal exit and so the message the students get is "wrong output" instead of "abnormal exit" (see function `Run`)
 
     - this is may be because of the way we wrap the command in `RunAsStudent` to make it ran as the student user instead of root; however when we change the command to add `echo $? > status;` immediately after running the student program, the output status is `0` even though a coredump file is produced
@@ -2995,48 +2999,7 @@ fn main() -> int {
 ```
 
 ```
-.data
-
-.text
-.globl main
-
-main:
-    push %rbp            // push old frame pointer value
-    mov %rsp, %rbp       // set new frame pointer value
-    sub $48, %rsp        // allocate stack space for locals
-    lea -24(%rbp), %r10  // start setting up call to memset
-    movq %r10, -32(%rbp) 
-    movq -32(%rbp), %rdi 
-    movq $0, %rsi
-    movq $24, %rdx
-    call memset          // finish calling memset
-    jmp main_entry
-
-main_entry:
-    movq $2, -8(%rbp)    // set x to 2
-    movq -8(%rbp), %r9   // get value of x
-    movq %r9, -16(%rbp)  // put in y
-    addq $3, -16(%rbp)   // add 3 to y
-    movq $0, %r10        // start comparing x and y
-    movq -8(%rbp), %r9
-    cmpq -16(%rbp), %r9
-    movq %r9, -8(%rbp)
-    setl %r10b           // finish comparing x and y
-    movq %r10, -24(%rbp) // put result in z
-    cmpq $0, -24(%rbp)   // compare z to 0 for branch
-    jne main_bb1
-    jmp main_exit
-
-main_bb1:
-    movq -8(%rbp), %r9   // read x from memory
-    movq %r9, -16(%rbp)  // set y to x's value
-    jmp main_exit
-
-main_exit:
-    movq -16(%rbp), %rax // put y in special return register
-    add $48, %rsp        // deallocate stack frame
-    pop %rbp             // restore old frame pointer value
-    ret                  // return from main
+TODO: (and update OneNote)
 ```
 
 - codegen steps:
@@ -3176,93 +3139,7 @@ fn main() -> int {
 ```
 
 ```
-.data
-
-out_of_bounds_msg:
-    .string "Out-of-bounds array access."
-
-invalid_array_length_msg:
-    .string "Array length requested for allocation is invalid (either too large or negative)."
-
-.text
-.globl main
-
-main:
-    push %rbp                  // push old frame pointer value
-    mov %rsp, %rbp             // set new frame pointer value
-    sub $96, %rsp              // allocate stack space for locals
-    lea -24(%rbp), %r10        // start setting up call to memset
-    movq %r10, -32(%rbp)
-    movq -32(%rbp), %rdi
-    movq $0, %rsi
-    movq $24, %rdx
-    call memset                // finish calling memset
-    jmp main_entry
-
-main_entry:
-    movq $10, -40(%rbp)        // start checking allocation amount
-    cmpq $0, -40(%rbp)
-    jle .invalid_array_length  // if not valid, panic
-    movq $8, -40(%rbp)         // start calling _cflat_alloc
-    movq -40(%rbp), %r9
-    imulq $10, %r9
-    movq %r9, -40(%rbp)
-    addq $8, -40(%rbp)
-    movq -40(%rbp), %rdi
-    call _cflat_alloc          // finish calling _cflat_alloc
-    movq %rax, -8(%rbp)        // store resulting address
-    movq -8(%rbp), %r9
-    movq %r9, -48(%rbp)
-    movq -48(%rbp), %r10
-    movq $10, 0(%r10)          // put allocation size in header
-    addq $8, -8(%rbp)          // make x point to 1 word after header
-    movq -8(%rbp), %r9         // start comparing index with bound
-    movq %r9, -56(%rbp)
-    movq -56(%rbp), %r11
-    movq -8(%r11), %r9
-    movq %r9, -64(%rbp)
-    cmpq $5, -64(%rbp)
-    jle .out_of_bounds         // panic of out of bounds
-    movq $0, -64(%rbp)         // compare index with 0
-    cmpq $5, -64(%rbp)
-    jg .out_of_bounds          // panic of out of bounds
-    movq $5, -64(%rbp)         // index into array and store into z
-    movq -64(%rbp), %r9
-    imulq $8, %r9
-    movq %r9, -64(%rbp)
-    movq -8(%rbp), %r9
-    movq %r9, -24(%rbp)
-    movq -64(%rbp), %r9
-    addq %r9, -24(%rbp)
-    movq -24(%rbp), %r9
-    movq %r9, -72(%rbp)
-    movq -72(%rbp), %r11
-    movq 0(%r11), %r9
-    movq %r9, -16(%rbp)        // finish loading z into y
-    movq -16(%rbp), %r9        // start y = y + 1
-    movq %r9, -16(%rbp)
-    addq $1, -16(%rbp)         // finish y = y + 1
-    movq -24(%rbp), %r9        // start storing y into z
-    movq %r9, -80(%rbp)
-    movq -80(%rbp), %r10
-    movq -16(%rbp), %r9
-    movq %r9, 0(%r10)          // finish storing y into z
-    movq -16(%rbp), %rax       // put y in special return register
-    add $96, %rsp              // deallocate stack frame
-    pop %rbp                   // restore old frame pointer value
-    ret                        // return from main
-
-.out_of_bounds:
-    push %rdi
-    add $-8, %rsp
-    lea out_of_bounds_msg(%rip), %rdi
-    call _cflat_panic
-
-.invalid_array_length:
-    push %rdi
-    add $-8, %rsp
-    lea invalid_array_length_msg(%rip), %rdi
-    call _cflat_panic
+TODO: (and update OneNote)
 ```
 
 - now that we have arrays and array indexing, we have to worry about out-of-bounds accesses
