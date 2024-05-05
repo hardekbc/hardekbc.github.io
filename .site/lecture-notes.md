@@ -3006,7 +3006,7 @@ TODO: (and update OneNote)
 
 - codegen steps summary:
 
-    0. initialize the stack and frame pointers
+    0. initialize the frame pointer
 
     1. allocate space on the stack for `main`'s local variables
 
@@ -3032,7 +3032,7 @@ TODO: (and update OneNote)
 
     - remember that the stack grows _down_: to add more space to the stack we subtract from the current `SP`
 
-- initialize the stack and frame pointers
+- initialize the frame pointer
 
     - push `FP` onto the stack (to restore it when we leave `main`)
 
@@ -3050,19 +3050,17 @@ TODO: (and update OneNote)
 
         - we can assume that `SP` was correctly aligned before `main` was called
 
-        - the call pushed the return location on the stack, then _we_ pushed `FP` on the stack; this left `SP` still correctly aligned
+        - the call pushed the return location on the stack, then _we_ pushed `FP` on the stack; this left `SP` still correctly aligned (`main` doesn't have parameters so we don't need to worry about those)
 
         - if `N` is odd then we're now out of alignment, so we need to fix it: `SP` -= `WORDSIZE`
 
 - zeroing out the stack:
 
-    - we could store a 0 into each location in the newly allocated space, but this would be inefficient; instead we'll use `_cflat_zero`, which we'll link in later as part of our cflat runtime library
-
-    - call `_cflat_zero` with the arguments (1) the address to start, which is `SP`; and (2) the number of words to set, which is `N` (obviously we only do this if `N` > 0)
+    - we'll do this naively and just explicitly store 0 in each stack location (we could also use something like `memset` which would be more efficient, but this is good enough to get working code)
 
 - mapping locals to stack offsets:
 
-    - for `i` in `[0..N)`, let local `i` map to offset `i * WORDSIZE` (we'll process them in alphabetic order)
+    - for `i` in `[0..N)`, let local `i` map to offset `i * -WORDSIZE` (we'll process them in alphabetic order)
 
     - these are the offsets from `FP`, so the stack address of local `x` is `FP - offset(x)`
 
