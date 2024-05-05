@@ -86,6 +86,8 @@
 
     - this is may be because of the way we wrap the command in `RunAsStudent` to make it ran as the student user instead of root; however when we change the command to add `echo $? > status;` immediately after running the student program, the output status is `0` even though a coredump file is produced
 
+    - i've introduced a potential fix (adding `set -e` to the command used by RunAsStudent), but i'm not sure if it works
+
 - students get confused by the output on a failure: we give the total number of tests passed out of the total number of tests, and they think it gives the actual test number (even though we give them the name of the test in the same message)---this is only a problem because that's how they identify the test in their communications to us which is confusing; maybe we can tweak the failure message to make it more clear?
 
 - assign-1:
@@ -3002,11 +3004,11 @@ fn main() -> int {
 TODO: (and update OneNote)
 ```
 
-- codegen steps:
+- codegen steps summary:
 
     0. initialize the stack and frame pointers
 
-    1. allocate space on the stack for `main`'s local variables (there are no parameters to worry about)
+    1. allocate space on the stack for `main`'s local variables
 
     2. in cflat all local variables are automatically initialized to 0; zero out the newly allocated space
 
