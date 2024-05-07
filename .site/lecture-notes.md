@@ -3814,7 +3814,7 @@ main_epilogue:
   call _cflat_panic
 ```
 
-## stage 6: adding structs TODO:
+## stage 6: adding structs
 ### intro
 
 - now we can have user-defined structs
@@ -3825,13 +3825,83 @@ main_epilogue:
 
     - which also means we need to worry about field layout
 
-### translating instructions TODO:
+### translating instructions
 
-### tweaking allocation and indexing TODO:
+- in order to construct a pointer to a particular field of a struct, we have to know the offset of each field
 
-### example TODO:
+    - alignment is a factor, but since all fields are one word in cflat we don't need to worry about that
 
-- example: [see `examples/codegen/stage-6.{lir, s}`] [see OneNote] FIXME:
+    - C/C++ require that fields are laid out in the declared order, but cflat doesn't
+
+    - we'll order the fields alphabetically
+
+- `x = $gfp y fld`
+
+    - let `&st` be the type of `y` and `off` be the offset of `fld` in `st`
+
+    - add `off` to the value of `y` and store it in `x`
+
+### tweaking allocation and indexing
+
+- `x = $alloc op`
+
+    - if type of `x` is `&st` then we're allocating `(op * sizeof(st)) + 1` words
+
+    - the invalod array length check and the value in the header (number of elements) remains the same
+
+- `x = $gep y op`
+
+    - the checks on the index remain the same
+
+    - if type of `y` is `&st` then we store `y + (op * WORDSIZE * sizeof(st))` into `x`
+
+### example
+
+- example 1: [see `examples/codegen/stage-6_1.{lir, s}`] [see OneNote] FIXME:
+
+```
+struct foo {
+  f1: int
+  f2: int
+}
+
+fn main() -> int {
+  let x:&foo, y:&int, z:&int
+
+  entry:
+    x = $alloc 1
+    y = $gfp x f1
+    z = $gfp x f2
+    $ret 0
+}
+```
+
+```
+TODO:
+```
+
+- example 2: [see `examples/codegen/stage-6_2.{lir, s}`] [see OneNote] FIXME:
+
+```
+struct foo {
+  f1: int
+  f2: int
+}
+
+fn main() -> int {
+  let x:&foo, y:&foo, z:&int
+
+  entry:
+    x = $alloc 10
+    y = $gep x 5
+    z = $gfp y f2
+    $ret 0
+}
+```
+
+```
+TODO:
+```
 
 ## x86-64 info TODO:
 
