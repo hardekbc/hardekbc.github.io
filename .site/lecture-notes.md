@@ -3030,8 +3030,8 @@ main:
 main_entry:
   movq $2, -8(%rbp)
   movq -8(%rbp), %r8
+  addq $3, %r8
   movq %r8, -16(%rbp)
-  addq $3, -16(%rbp)
   movq -8(%rbp), %r8
   cmpq -16(%rbp), %r8
   movq $0, %r8
@@ -3555,9 +3555,8 @@ foo:
 
 foo_entry:
   movq 16(%rbp), %r8
+  addq 24(%rbp), %r8
   movq %r8, -8(%rbp)
-  movq 24(%rbp), %r8
-  addq %r8, -8(%rbp)
   movq -8(%rbp), %rax
   jmp foo_epilogue
 
@@ -3786,14 +3785,15 @@ main_entry:
   movq -8(%r9), %r10
   cmpq %r10, %r8
   jge .out_of_bounds
-  leaq (%r9,%r8,8), %r10
-  movq %r10, -24(%rbp)
+  imulq $8, %r8
+  addq %r9, %r8
+  movq %r8, -24(%rbp)
   movq -24(%rbp), %r8
   movq 0(%r8), %r9
   movq %r9, -16(%rbp)
   movq -16(%rbp), %r8
+  addq $1, %r8
   movq %r8, -16(%rbp)
-  addq $1, -16(%rbp)
   movq -16(%rbp), %r8
   movq -24(%rbp), %r9
   movq %r8, 0(%r9)
@@ -3837,7 +3837,7 @@ main_epilogue:
 
 - `x = $gfp y fld`
 
-    - let `&st` be the type of `y` and `off` be the offset of `fld` in `st`
+    - let `&st` be the type of `y` and `off` be the offset of `fld` in `st` in bytes
 
     - add `off` to the value of `y` and store it in `x`
 
@@ -3847,7 +3847,7 @@ main_epilogue:
 
     - if type of `x` is `&st` then we're allocating `(op * sizeof(st)) + 1` words
 
-    - the invalod array length check and the value in the header (number of elements) remains the same
+    - the invalid array length check and the value in the header (number of elements) remains the same
 
 - `x = $gep y op`
 
@@ -3857,7 +3857,7 @@ main_epilogue:
 
 ### example
 
-- example 1: [see `examples/codegen/stage-6_1.{lir, s}`] [see OneNote] FIXME:
+- example 1: [see `examples/codegen/stage-6_1.{lir, s}`] [see OneNote]
 
 ```
 struct foo {
@@ -3877,10 +3877,59 @@ fn main() -> int {
 ```
 
 ```
-TODO:
+.data
+
+out_of_bounds_msg: .string "out-of-bounds array access"
+invalid_alloc_msg: .string "invalid allocation amount"
+        
+.text
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $32, %rsp
+  movq $0, -8(%rbp)
+  movq $0, -16(%rbp)
+  movq $0, -24(%rbp)
+  jmp main_entry
+
+main_entry:
+  movq $1, %r8
+  cmpq $0, %r8
+  jle .invalid_alloc_length
+  movq $2, %rdi
+  imulq %r8, %rdi
+  incq %rdi
+  call _cflat_alloc
+  movq %r8, %r8
+  movq %r8, 0(%rax)
+  addq $8, %rax
+  movq %rax, -8(%rbp)
+  movq -8(%rbp), %r8
+  leaq 0(%r8), %r9
+  movq %r9, -16(%rbp)
+  movq -8(%rbp), %r8
+  leaq 8(%r8), %r9
+  movq %r9, -24(%rbp)
+  movq $0, %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+
+.out_of_bounds:
+  lea out_of_bounds_msg(%rip), %rdi
+  call _cflat_panic
+
+.invalid_alloc_length:
+  lea invalid_alloc_msg(%rip), %rdi
+  call _cflat_panic
 ```
 
-- example 2: [see `examples/codegen/stage-6_2.{lir, s}`] [see OneNote] FIXME:
+- example 2: [see `examples/codegen/stage-6_2.{lir, s}`] [see OneNote]
 
 ```
 struct foo {
@@ -3900,7 +3949,63 @@ fn main() -> int {
 ```
 
 ```
-TODO:
+.data
+
+out_of_bounds_msg: .string "out-of-bounds array access"
+invalid_alloc_msg: .string "invalid allocation amount"
+        
+.text
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $32, %rsp
+  movq $0, -8(%rbp)
+  movq $0, -16(%rbp)
+  movq $0, -24(%rbp)
+  jmp main_entry
+
+main_entry:
+  movq $10, %r8
+  cmpq $0, %r8
+  jle .invalid_alloc_length
+  movq $2, %rdi
+  imulq %r8, %rdi
+  incq %rdi
+  call _cflat_alloc
+  movq %r8, %r8
+  movq %r8, 0(%rax)
+  addq $8, %rax
+  movq %rax, -8(%rbp)
+  movq $5, %r8
+  cmpq $0, %r8
+  jl .out_of_bounds
+  movq -8(%rbp), %r9
+  movq -8(%r9), %r9
+  cmpq %r9, %r8
+  jge .out_of_bounds
+  imulq $16, %r8
+  addq %r9, %r8
+  movq %r8, -16(%rbp)
+  movq -16(%rbp), %r8
+  leaq 8(%r8), %r9
+  movq %r9, -24(%rbp)
+  movq $0, %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+
+.out_of_bounds:
+  lea out_of_bounds_msg(%rip), %rdi
+  call _cflat_panic
+
+.invalid_alloc_length:
+  lea invalid_alloc_msg(%rip), %rdi
+  call _cflat_panic
 ```
 
 ## x86-64 info TODO:
