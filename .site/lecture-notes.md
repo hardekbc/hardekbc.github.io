@@ -2796,7 +2796,7 @@ $ret x
 ```
 
 # codegen
-### intro
+## intro
 
 - once we have lowered to LIR, we're in the middle-end where we would perform optimizations; however for now we're going straight to the backend in order to get a working compiler as quickly as possible
 
@@ -2804,10 +2804,10 @@ $ret x
 
     - for us, the ISA will be x86-64
 
-    - i am not going to teach you x86-64; i'll explain what the code needs to do and, for the assignment, i'll give a list of ueful x86-64 instructions, a pointer to some online resources, and my own solution that you can use to figure out what to emit
+    - i am not going to teach you x86-64; i'll explain what the code needs to do and, for the assignment, i'll give a list of ueful x86-64 instructions, a pointer to some online resources, and my own binary solution that you can use to figure out what to emit
 
-### necessary context
-#### linker
+## necessary context
+### linker
 
 - typically programs are divided into multiple _compilation units_ (e.g., for C/C++ a file is a compilation unit); each compilation unit results in a binary _object file_, then all the object files are linked together into an _executable_
 
@@ -2851,7 +2851,7 @@ echo $?
 
 - note that `main` is not actually the starting point for execution, just the starting point for user code---really we begin in `_start` which does setup and then calls into `main`
 
-#### static vs dynamic libraries
+### static vs dynamic libraries
 
 - even after linking we still may not have all the code needed to execute a program; it depends on whether we're using _static linking_ or _dynamic linking_ for libraries
 
@@ -2871,7 +2871,7 @@ echo $?
 
 - we'll be using static linking for our compiler; you don't really need to know all this for writing the compiler but it's good to be aware of it in general
 
-#### process layout in memory
+### process layout in memory
 
 - when a binary is executed, the OS first loads it into memory (calling the dynamic linker if necessary) and then actually starts executing it
 
@@ -2927,7 +2927,7 @@ echo $?
 
     - a stack overflow is where you try to grow the stack too big (e.g., too many recursive function calls) and run out of room
 
-#### alignment and padding
+### alignment and padding
 
 - `alignment` is talking about what addresses a piece of data in memory is allowed to start at; this is determined by the architecture we're compiling for
 
@@ -2973,13 +2973,26 @@ char y = **((char**)&x + 1);
 
 - when i give out the codegen assignment i'll include the specific alignment restrictions for x86-64
 
-### stage 1: no structs, globals, pointers, or functions other than main
+## stage 1: no structs, globals, pointers, or functions other than main
+### intro
 
 - a LIR::Program that contains only the `main` function, with no structs, globals, or externs; no variables have a pointer type
 
 - relevant LIR instructions: `$arith`, `$cmp`, `$copy`, `$branch`, `$jump`, `$ret`
 
-- example (LIR, x86): [see `examples/codegen/stage-1.{lir, s}`] [see OneNote]
+- we'll see at this stage that variables are only an illusion of the programming language---they don't exist in machine code
+
+    - a program has variables, machine code has registers and memory locations
+
+- remember that i'm not going to give you an exact set of instructions for emitting x86-64 assembly; i'll explain what the code needs to do and then you'll have to do some exploration to figure out the exact x86-64 details
+
+    - i will give you some useful information, some online pointers, and my own binary solution, so as long as you understand what the code is _supposed_ to do, it shouldn't be hard to figure out how to do it from those
+
+    - [maybe spend some time showing how to use my solution to figure out what to generate, once i've shown the example]
+
+### example
+
+- example: [see `examples/codegen/stage-1.{lir, s}`] [see OneNote]
 
 ```
 fn main() -> int {
@@ -2989,140 +3002,739 @@ fn main() -> int {
     x = $copy 2
     y = $arith add x 3
     z = $cmp lt x y
-    $branch z bb1 exit
+    $branch z lbl1 lbl2
 
-  bb1:
+  lbl1:
     y = $copy x
-    $jump exit
+    $jump lbl2
 
-  exit:
+  lbl2:
     $ret y
 }
 ```
 
 ```
-TODO: (and update OneNote)
+.data
+.text
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $32, %rsp
+  movq $0, -8(%rbp)
+  movq $0, -16(%rbp)
+  movq $0, -24(%rbp)
+  jmp main_entry
+
+main_entry:
+  movq $2, -8(%rbp)
+  movq -8(%rbp), %r8
+  movq %r8, -16(%rbp)
+  addq $3, -16(%rbp)
+  movq -8(%rbp), %r8
+  cmpq -16(%rbp), %r8
+  movq $0, %r8
+  setl %r8b
+  movq %r8, -24(%rbp)
+  cmpq $0, -24(%rbp)
+  jne main_lbl1
+  jmp main_lbl2
+
+main_lbl1:
+  movq -8(%rbp), %r8
+  movq %r8, -16(%rbp)
+  jmp main_lbl2
+
+main_lbl2:
+  movq -16(%rbp), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
 ```
 
-- codegen steps summary:
+### codegen summary
 
-    0. initialize the frame pointer
+1. create standard assembly program template (everything except `main` itself) 
 
-    1. allocate space on the stack for `main`'s local variables
+    - for programs in stage 1 it will always be the same
 
-    2. in cflat all local variables are automatically initialized to 0; zero out the newly allocated space
+    - [point it out in the example above]
 
-        - this is _not_ like C/C++, which allow for uninitialized variables
+2. create the prologue for `main`: setting things up as we enter the function
 
-    3. map each local to an offset in the stack
+    - this version is specifically for `main`, we'll tweak it a bit when we add other functions later
 
-    4. for each basic block, iterate through its instructions and translate to the corresponding ISA instructions (each LIR basic block will yield an ISA block)
+3. output the ISA instructions for each LIR basic block
 
-        - to keep labels unique we will prepend the function name to them, e.g., `entry` becomes `main_entry`
+4. create the epilogue for `main`: tearing things down as we leave the function
 
-    5. output the ISA instructions
+### context
 
-- create an ISA block labeled `main`; this is where we'll start emitting instructions
+- `main` was called from `_start`, which called it by pushing the return address on the stack and then jumping to the `main` label
 
-- we have the _stack pointer_ that points to the current top of the stack, and the _frame pointer_ that points to the bottom of the current stack frame
+- `main` has no parameters and returns an `int`
 
-    - each is located in a designated register, which we'll refer to as `SP` and `FP`
+- 2 important registers:
 
-    - at entry to `main`, `SP` and `FP` are for the _caller_ function; we need to set them for `main` (and then restore them when leaving `main`)
+    - `FP` holds the _frame pointer_ value, which points to the bottom of the current function's stack frame (the return address for the caller, just below the first local)
 
-    - remember that the stack grows _down_: to add more space to the stack we subtract from the current `SP`
+    - `SP` holds the _stack pointer_ value, which points to the current top of the stack (that is, whatever the topmost value on the stack is; `SP + 1` is undefined memory)
 
-- initialize the frame pointer
+- we (the compiler writers) are responsible for managing `FP` and `SP` appropriately
 
-    - push `FP` onto the stack (to restore it when we leave `main`)
+### the function prologue
 
-    - copy `SP` to `FP`: the top of the stack for the caller function is the bottom of the stack for `main`
+- `FP` is still pointing to the bottom of the stack frame for `_start`, but we're creating a new stack frame and need to set `FP` accordingly
 
-    - now, `SP` = `FP` (note that `FP` never changes, so we've now saved the old value of `SP` as `FP`)
+- `SP` is the current top of the stack, and so will be the bottom of the new stack frame we're creating
 
-- allocating space on the stack:
+- our new stack frame needs space for any local variables that `main` has declared, this is where the values of those locals will live
 
-    - let `N` be the number of locals
+- but remember that when `main` returns we need to restore the stack back to what it was for its caller
 
-    - grow the stack by `N * WORDSIZE` bytes
+- so when creating the prologue we should:
 
-    - for x86-64 the stack pointer must be double-word aligned, so we have to make sure this is true
+    1. emit the `main` label so `_start` has somewhere to jump
 
-        - we can assume that `SP` was correctly aligned before `main` was called
+    2. emit instructions to:
+    
+        - push `FP` onto the stack to save its old value
 
-        - the call pushed the return location on the stack, then _we_ pushed `FP` on the stack; this left `SP` still correctly aligned (`main` doesn't have parameters so we don't need to worry about those)
+        - set `FP` to the current value of `SP` (note that `FP` is now saving the old value of `SP`)
 
-        - if `N` is odd then we're now out of alignment, so we need to fix it: `SP` -= `WORDSIZE`
+        - decrement `SP` to add space for the locals (remember the stack grows _down_)
 
-- zeroing out the stack:
+        - zero initialize the local variable values (unlike C/C++, cflat defines all variable to start as 0)
 
-    - we'll do this naively and just explicitly store 0 in each stack location (we could also use something like `memset` which would be more efficient, but this is good enough to get working code)
+            - emit instructions that store 0 in each stack location; this isn't the most efficient method (which would be using something like `memset`) but it works
 
-- mapping locals to stack offsets:
+        - jump to `main_entry` (to keep labels globally unique, we'll always prepend the function's name)
 
-    - for `i` in `[0..N)`, let local `i` map to offset `i * -WORDSIZE` (we'll process them in alphabetic order)
+    3. also, for use while emitting instructions in `main`'s body, record a mapping from each local to its offset in the stack from the frame pointer
 
-    - these are the offsets from `FP`, so the stack address of local `x` is `FP - offset(x)`
+        - remember that the stack grows _down_: the offset will be negative
 
-    - for a variable `x` we'll use notation `[x]` to mean the stack address of `x`
+        - anytime a LIR instruction mentions a variable, the mapping will tell us where in memory that variable's value is relative to `FP` (with the stack location at `FP - <wordsize>` being the first local)
 
-- once this "prologue" is done, we want execution to start at the user-defined entry block
+        - for variable `x`, we'll use `[x]` to mean its memory location
 
-    - jump to `main_entry`
+- there's one bit of complexity with allocating stack space: for x86-64 the stack pointer _must_ be double-word aligned (i.e., always pointing to a multiple of 16 bytes)
 
-    - this completes the ISA block labeled `main`
+    - we can assume that before `main` was called the stack was correctly aligned
 
-- as a convenient shorthand, we'll say "move `op` into a register" to mean:
+    - the caller pushed the return address and we pushed `FP`, keeping it aligned properly
 
-    - if `op` is a constant, put that constant directly into the register
+    - then we added space for locals, which are all 1 word
 
-    - if `op` is a variable, load the value located at `[op]` into the register
+    - if there were an odd number of locals then `SP` is no longer correctly aligned
 
-- `$branch op bb1 bb2`:
+    - FIX: when adding space for locals, if there are an odd number pretend there's one extra (it will just be space on the stack we'll never use)
 
-    - move `op` (the branch guard) into a register
-    - compare it with 0 (sets a flag)
-    - if result is `not equal` then jump to `bb1`
-    - otherwise jump to `bb2`
+### the function epilogue
 
-- `$jump bb`:
+- we need to reset the stack to the way it was before entering this function (this will be the same for all functions)
+
+- emit the `main_epilogue` label
+
+- emit instructions to:
+
+    1. restore the previous value of `SP` by setting it to `FP` (which the prologue set to the old value of `SP`)
+
+    2. restore the previous value of `FP` by popping it off the stack (where the prologue stored it)
+
+    3. pop the return address from the stack (put there by the caller) and jump to it
+
+### translating LIR basic blocks to ISA basic blocks
+
+- for each basic block, we should emit the block's label (prepended with `main_`) and then emit ISA instructions for each LIR instruction
+
+- `x = $copy op`
+
+    - if `op` is a constant, store it in `[x]`
+
+    - if `op` is `y`, retrieve its value from `[y]` and store it in `[x]`
+
+- `x = $arith <aop> op1 op2`
+
+    - apply `<aop>` to the values of `op1` and `op2`, storing the result in `[x]`
+
+    - how this is done exactly will depend on `<aop>`; different operations have different methods for x86-64
+
+- `x = $cmp <rop> op1 op2`
+
+    - compare the values of `op1` and `op2`, setting a condition code
+
+    - store 0 or 1 to `[x]` depending on `<rop>` and the condition code that was set
+
+- `$jump lbl`
+
+    - jump to `main_<lbl>`
+
+- `$branch op lbl1 lbl2`
+
+    - compare the value of `op` to 0
+
+    - if not equal, jump to `main_<lbl1>`
+
+    - else, jump to `main_<lbl2>`
+
+- `$ret op`
+
+    - by convention, the return value goes in a special register (`%rax` for x86-64)
+
+        - the caller will know to look for the return value there
+
+    - put the value of `op` in `%rax`
+
+    - jump to `main_epilogue`
+
+### review previous example
+
+## stage 2: globals
+
+- we're not including the implicit global function pointers in this stage, those will come when we add other functions besides `main`
+
+- we need to add a location for the globals, but they can't be on the stack because they live through the entire program and are accessible from all functions
+
+- we put them in the static segment, which in x86 assembly is specified in the `.data` section
+
+    - previously we emitted `.data` as part of our assembly program template but didn't put anything in it
+
+    - we also need to initialize them to 0, just like function locals
+
+    - we use the `.globl` directive to declare and initialize globals
+
+- global variable locations are computed as an offset from the instruction pointer, which in x86-64 is `%rip` (this is not a pointer you manipulate directly, this is the program counter)
+
+    - for global `g`, `g(%rip)` is the memory location of `g`'s value
+
+- example: [see `examples/codegen/stage-2.{lir, s}`] [see OneNote]
+
+```
+g:int
+
+fn main() -> int {
+  let x:int
+
+  entry:
+    x = $copy 42
+    g = $copy x
+    $ret g
+}
+```
+
+```
+.data
+
+.globl g
+g: .zero 8
+
+.text
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $16, %rsp
+  movq $0, -8(%rbp)
+  jmp main_entry
+
+main_entry:
+  movq $42, -8(%rbp)
+  movq -8(%rbp), %r8
+  movq %r8, g(%rip)
+  movq g(%rip), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+## stage 3: extern calls
+
+- additional LIR instruction: `$call_ext`
+
+- how do we call a function? we're actually going to do it differently depending on whether it's an extern or an internal function
+
+    - we'll assume that extern calls are to functions defined in object files generated from C code (like our cflat runtime library)
+
+    - for extern functions we need to use the standard x86-64 calling convention (though it's still simpler than the full convention because (1) we know all values are 1 word, and (2) we're being naive in how we're using registers)
+
+    - for internal functions we can use a simpler convention that makes things easier
+
+    - i'll talk more about the difference later, i'll just describe the convention here
+
+- `x = $call_ext foo(op1, ...)`
+
+    - place the first 6 arguments in the registers `%rdi, %rsi, %rdx, %rcx, %r8, %r9`, in that order
+
+    - if there are more than 6 arguments, push the rest onto the stack (first arg topmost, i.e., push starting with last arg)
+
+    - `call foo`
+
+    - if any arguments were pushed to the stack, restore the stack pointer
+
+    - the callee's return value (if any) is in `%rax`, store it to `x` if relevant
+
+- there's one more bit of complexity: we have to maintain the stack alignment
+
+    - remember that the stack must be double-word aligned immediately before a `call`
+
+    - we may have pushed some arguments to the stack; if we pushed an odd number then the alignment is off
+
+    - if that happens, we need to add one more word to the stack (and remember to remove it after the call returns, along with the pushed args)
+
+- extern functions don't need to be declared in the assembly file, the assumption is that the linker will figure things out later
+
+    - but having them means we can't compile the resulting assembly as an executable, only as an object file
+
+- example 1: [see `examples/codegen/stage-3_1.{lir, s}`] [see OneNote]
+
+```
+extern foo(int) -> int
+
+fn main() -> int {
+  let x:int
+
+  entry:
+    x = $call_ext foo(42)
+    $ret x
+}
+```
+
+```
+.data
+.text
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $16, %rsp
+  movq $0, -8(%rbp)
+  jmp main_entry
+
+main_entry:
+  movq $42, %rdi
+  call foo
+  movq %rax, -8(%rbp)
+  movq -8(%rbp), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+- example 2: [see `examples/codegen/stage-3_2.{lir, s}`] [see OneNote]
+
+```
+extern foo(int, int, int, int, int, int, int) -> int
+
+fn main() -> int {
+  let x:int
+
+  entry:
+    x = $call_ext foo(1, 2, 3, 4, 5, 6, 7)
+    $ret x
+}
+```
+
+```
+.data
+.text
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $16, %rsp
+  movq $0, -8(%rbp)
+  jmp main_entry
+
+main_entry:
+  movq $1, %rdi
+  movq $2, %rsi
+  movq $3, %rdx
+  movq $4, %rcx
+  movq $5, %r8
+  movq $6, %r9
+  pushq $7
+  subq $8, %rsp
+  call foo
+  movq %rax, -8(%rbp)
+  addq $16, %rsp
+  movq -8(%rbp), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+## stage 4: internal calls
+### intro
+
+- we handle internal functions and calls differently from calls to extern functions in order to make implementing functions easier
+
+    - otherwise when generating ISA for an instruction we have to constantly worry about where a parameter is (register vs memory) and, if it's in a register, whether we need to worry about overwriting it and thus should save it or not (e.g., if making our own call to another function)
+
+    - there isn't anything technically hard about using the standard method, it's just more complicated (and more efficient for the resulting executable, which is why they use it)
+
+- additional lir instructions: `$call_dir`, `$call_idr`
+
+- we'll see in this stage that, like variables, functions are an illusion of the programming language---they don't exist in machine code
+
+### calling conventions in general
+
+- for externs i just gave a procedure for calling another function and getting the result, but since the callee was extern we didn't see how the callee function behaved
+
+- now that we're dealing with internal functions where we implement both the call and the function being called let's dig in deeper
+
+- functions are an abstraction, in order to get "function-like" behavior we need to implement it
+
+    - a _calling convention_ specifies how "functions" (i.e., the code blocks that implement function behavior) interact
+
+    - the caller and callee need to agree to a protocol; the caller needs to know how to set up a function call so that the callee gets its arguments, knows where to return, and knows how to return a value
+
+    - there are various calling conventions; as the name implies it's just an agreement that both parties adhere to
+
+- we split the calling convention into the following pieces:
+
+    - _pre-call_: setting things up in the caller to pass info to the callee
+
+    - _function prologue_: setting things up in the callee to accept the info
+
+    - _function epilogue_: tearing down the callee and getting back to the caller
+
+    - _post-return_: tearing things down back in the caller and getting the return value
+
+- since there is no such thing as "function local variable", all functions use the same set of registers; part of the convention is about what to do so that functions don't overwrite each other's data
+
+    - _caller-save_ registers: the caller is responsible for saving the values in these registers (if it still needs them) before making a call; the callee can use them freely
+
+    - _callee-save_ registers: the caller is free to assume that any values in these registers will remain untouched by the callee; the callee can use them but only if it saves their values and then restores them before returning
+
+- first i'll talk about the general x86-64 calling convention, which is a bit complicated; then i'll go over our simplified version
+
+- caller: pre-call
+
+    - save any caller-save registers currently being used
+
+    - place the first 6 one-word arguments in a specific set of registers (designated by the convention as "argument passing registers")
+
+    - place any arguments greater than one word or past the first 6 one-word arguments onto the stack in a specific order (so the callee knows which value maps to which parameter)
+
+    - push the return address (the instruction immediately past this call) into the stack
+
+    - jump to the callee label
+
+- callee: function prologue
+
+    - if we're using any callee-save registers, push them onto the stack
+
+    - set the callee's frame pointer and allocate space on the stack for any locals
+
+- callee: function epilogue
+
+    - place the return value in a specific register (designated by the convention as the "return register")
+
+    - deallocate the stack frame
+
+    - restore the callee-save registers, including the frame pointer
+
+    - pop the return address from the stacl
+
+    - jump to the return address
+
+- caller: post-return
+
+    - pop any arguments placed onto the stack
+
+    - restore any caller-save registers
+
+- notice that we're using the pre-call and post-return convention for extern calls, except we're guaranteed that all arguments are only one word and we don't need to worry about caller/callee-save registers
+
+### our calling convention for internal calls
+
+- we're going to use our own calling convention that is simpler than the standard one for several reasons:
+
+    - we'll always push all arguments on the stack, never pass them in registers
+
+    - all arguments and return values are integers or pointers, i.e., 1 word
+
+    - since we're doing naive codegen, we don't need to worry about caller/callee-save registers because we never store information in a register past the end of a LIR instruction
+
+- `x = $call_dir foo(op1, ..., opN) then bb`
+
+    - push `op1` though `opN` to the stack, starting with `opN` and ending with `op1` (so it's the topmost value on the stack)
+
+    - fix stack alignment as necessary
+
+    - `call foo`
+
+    - if any arguments were pushed to the stack, restore the stack pointer
+
+    - the callee's return value (if any) is in `%rax`, store it to `x` if relevant
 
     - jump to `bb`
 
-- `$ret op`:
+- `x = $call_idr fp(op1, ...) then bb`
 
-    - move `op` into a special register for returned values
-    - set `SP` to `FP` (deallocating the current stack frame and restoring the old `SP`)
-    - pop previous `FP` from stack
-    - `ret` (automatically pops return location from stack and jumps there)
+    - just like a direct call except use `call *op` where `op` is an operand denoting the value of the function pointer
 
-- `x = $copy op`:
+### revisiting the function prologue
 
-    - move `op` (the operand value) into a register
-    - store the operand value to `[x]`
+- `main` didn't have any parameters, so we didn't need to worry about them
 
-- `x = $cmp <rop> op1 op2`:
+- for functions with parameters, we see that the caller pushes the corresponding arguments on the stack _before_ calling the callee; this means that all parameter values are at a _positive_ offset from the callee's frame pointer
 
-    - move `op1` and `op2` into registers
-    - compare the two registers (sets a flag)
-    - set the result register to 0 or 1 based on `<rop>` and flag
-    - store the value in the result register to `[x]`
+    - remember to account for the saved frame pointer: the first argument on the stack is at `FP + <wordsize>`
 
-- `x = $arith <aop> op1 op2`:
+    - remember that the args were pushed left-to-right, so the first parameter's value is the one closest to the frame pointer
 
-    - move `op1` and `op2` into registers (uses a special register for division)
-    - apply the appropriate operation to the two registers
-    - store the value in the result register to `[x]`
+- when emitting a function's prologue and recording offsets for locals, we can record offsets for parameters at the same time
 
-- [revisit example]
+    - remember that locals can shadow parameters, so if a local and a parameter have the same name then any reference to that name means the local
 
-### stage 2: adding pointers
+- other than the offsets being positive, we can treat parameters just like locals
+
+- note that this is why we're using the simpler calling convention, otherwise some parameters would be in registers and some in the stack (and we would also have to worry about overwriting those registers if we aren't careful)
+
+### implicit function pointers
+
+- if we have functions other than `main`, then we also have global variables with the same name that are intended to be function pointers to those functions 
+
+- when emitting declarations for global variables, if the global has the same name as a function then we handle it differently:
+
+    - we need to mangle the name to avoid conflicting with the label used for the function itself; append `_` to the global's name (this means that when translating LIR instructions that use this global, we need to add the `_` as well)
+
+    - we need to initialize the value of the variable to the corresponding function's address (again using assembly directives)
+
+### examples
+
+- example 1: [see `examples/codegen/stage-4_1.{lir, s}`] [see OneNote]
+
+```
+fn main() -> int {
+  let x:int
+  entry:
+    x = $call_dir foo(40, 2) then exit
+
+  exit:
+    $ret x
+}
+
+fn foo(p: int, q: int) -> int {
+  let x:int
+  entry:
+    x = $arith add p q
+    $ret x
+}
+```
+
+```
+.data
+.text
+
+.globl foo
+foo:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $16, %rsp
+  movq $0, -8(%rbp)
+  jmp foo_entry
+
+foo_entry:
+  movq 16(%rbp), %r8
+  movq %r8, -8(%rbp)
+  movq 24(%rbp), %r8
+  addq %r8, -8(%rbp)
+  movq -8(%rbp), %rax
+  jmp foo_epilogue
+
+foo_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $16, %rsp
+  movq $0, -8(%rbp)
+  jmp main_entry
+
+main_entry:
+  pushq $2
+  pushq $40
+  call foo
+  movq %rax, -8(%rbp)
+  addq $16, %rsp
+  jmp main_exit
+
+main_exit:
+  movq -8(%rbp), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+- example 2: [see `examples/codegen/stage-4_2.{lir, s}`] [see OneNote]
+
+```
+foo: &(int) -> int
+
+fn main() -> int {
+  let x:int, fp:&(int) -> int
+
+  entry:
+    fp = $copy foo
+    x = $call_idr fp(42) then exit
+
+  exit:
+    $ret x
+}
+
+fn foo(p: int) -> int {
+  entry:
+    $ret p
+}
+```
+
+```
+.data
+
+.globl foo_
+foo_: .quad "foo"
+
+.text
+
+.globl foo
+foo:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $0, %rsp
+  jmp foo_entry
+
+foo_entry:
+  movq 16(%rbp), %rax
+  jmp foo_epilogue
+
+foo_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $16, %rsp
+  movq $0, -8(%rbp)
+  movq $0, -16(%rbp)
+  jmp main_entry
+
+main_entry:
+  movq foo_(%rip), %r8
+  movq %r8, -8(%rbp)
+  subq $8, %rsp
+  pushq $42
+  call *-8(%rbp)
+  movq %rax, -16(%rbp)
+  addq $16, %rsp
+  jmp main_exit
+
+main_exit:
+  movq -16(%rbp), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+## stage 5: adding pointers
+### intro
 
 - now we can have memory allocation (including arrays)
 
-- additional LIR instructions: `$alloc`, `$gep`, `$load`, `$store`
+    - unlike C/C++, cflat is a safe language; this means that we need to detect any array accesses that are out-of-bounds (and also allocations for a non-positive amount of memory)
 
-- example (LIR, x86): [see `examples/codegen/stage-2.{lir, s}`] [see OneNote]
+- additional LIR instructions: `$load`, `$store`, `$alloc`, `$gep`
+
+- strategy for arrays (any allocation can be treated as an array):
+
+    - when something is allocated on the heap, we'll check that the size is positive and then we'll allocate an additional word (the `header`) that contains the number of allocated objects; we'll put this at the beginning of the object and return a pointer to the word immediately after the header (so the address of the header is at `-WORDSIZE` offset from the returned pointer)
+
+    - when we do pointer arithmetic using `$gep`, we'll check against the number that's stored in its header and make sure that the result is in-bounds
+
+- what if the check fails?
+
+    - we'll add some boilerplate ISA blocks to handle when there's a problem with allocation or indexing; they'll print an error message and immediately abort execution
+
+    - `.invalid_alloc_length` is used when we try to allocate a non-positive number of elements
+    
+    - `.out_of_bounds` is used when we try to index an array out of bounds
+
+### translating instructions
+
+- `x = $load y`
+
+    - the value of `y` is an address in memory; the value at _that_ address is what we need to store to `x`
+
+    - read the value of `y` from its location on the stack, then read the value at that address, then store it to `x`
+
+- `$store x op`
+
+    - the value of `x` is an address in memory; we want to update the value at _that_ address with the value of `op`
+
+    - get the value of `op`, then read the value of `x`, then store the value of `op` at that address
+
+- `x = $alloc op`
+
+    - we only have integers and pointers so far and they're both size `WORDSIZE`, so we're allocating `op` words _plus_ one word for the header
+
+        - the original value must be greater than 0; if this check fails we'll have the executable abort by jumping to the `.invalid_alloc_length` block
+
+    - in order to actually allocate the memory we'll call into the cflat runtime library, which has a function `_cflat_alloc` that takes a number of words to allocate and returns a pointer to the allocated memory
+
+    - so in total:
+
+        - compare `op` with 0, if not greater-than then jump to `.invalid_alloc_length`
+
+        - compute `op + 1`, then call `_cflat_alloc` passing the result as an argument (this counts as an extern call, even though it isn't declared as such); let `ptr` be the return value of the call
+    
+        - store `op` into the location whose address is in `ptr`
+
+        - store `ptr + WORDSIZE` into `x` (i.e., the address of the first element past the header word)
+
+- `x = $gep y op`
+
+    - compare `op` with 0; if less-than then jump to `.out_of_bounds`
+
+    - load value at `y - WORDSIZE` (the header word); call it `hdr`
+
+    - compare `op` with `hdr`; if not less-than then jump to `.out_of_bounds`
+
+    - store `y + (op * WORDSIZE)` into `x` (i.e., the pointer to the requested element)
+
+### example
+
+- example: [see `examples/codegen/stage-5.{lir, s}`] [see OneNote]
 
 ```
 fn main() -> int {
@@ -3139,116 +3751,91 @@ fn main() -> int {
 ```
 
 ```
-TODO: (and update OneNote)
+.data
+
+out_of_bounds_msg: .string "out-of-bounds array access"
+invalid_alloc_msg: .string "invalid allocation amount"
+        
+.text
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $32, %rsp
+  movq $0, -8(%rbp)
+  movq $0, -16(%rbp)
+  movq $0, -24(%rbp)
+  jmp main_entry
+
+main_entry:
+  movq $10, %r8
+  cmpq $0, %r8
+  jle .invalid_alloc_length
+  movq %r8, %rdi
+  incq %rdi
+  call _cflat_alloc
+  movq %r8, %r8
+  movq %r8, 0(%rax)
+  addq $8, %rax
+  movq %rax, -8(%rbp)
+  movq $5, %r8
+  cmpq $0, %r8
+  jl .out_of_bounds
+  movq -8(%rbp), %r9
+  movq -8(%r9), %r10
+  cmpq %r10, %r8
+  jge .out_of_bounds
+  leaq (%r9,%r8,8), %r10
+  movq %r10, -24(%rbp)
+  movq -24(%rbp), %r8
+  movq 0(%r8), %r9
+  movq %r9, -16(%rbp)
+  movq -16(%rbp), %r8
+  movq %r8, -16(%rbp)
+  addq $1, -16(%rbp)
+  movq -16(%rbp), %r8
+  movq -24(%rbp), %r9
+  movq %r8, 0(%r9)
+  movq -16(%rbp), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+
+.out_of_bounds:
+  lea out_of_bounds_msg(%rip), %rdi
+  call _cflat_panic
+
+.invalid_alloc_length:
+  lea invalid_alloc_msg(%rip), %rdi
+  call _cflat_panic
 ```
 
-- now that we have arrays and array indexing, we have to worry about out-of-bounds accesses
-
-    - C/C++ just let them happen, with undefined behavior
-
-    - in cflat, we'll detect them and raise an error
-
-- strategy:
-
-    - when something is allocated on the heap, we'll allocate an additional word (the `header`) that contains the size of the allocated object; we'll put this at the beginning of the object and return a pointer to the word immediately after the header (so the address of the header is at `-WORDSIZE` offset from the returned pointer)
-
-    - when we do pointer arithmetic using `$gep`, we'll check against the size of the object stored in its header and make sure that the result is in-bounds
-
-- setup
-
-    - we'll add some boilerplate ISA blocks to handle when there's a problem with allocation or indexing; they'll print an error message and immediately abort execution
-
-    - `.invalid_array_length` is used when we try to allocate a non-positive number of elements
-    
-    - `.out_of_bounds` is used when we try to index an array out of bounds
-
-- `x = $alloc op`
-
-    - we only have integers and pointers so far and they're both size `WORDSIZE`, so we're allocating `op` words _plus_ one word for the header; we'll need to calculate the value of `op` + 1
-
-        - the resulting value must be greater than 1 (one element plus the header); if this check fails we'll have the executable abort by jumping to the `.invalid_array_length` block
-
-    - in order to actually allocate the memory we'll call into the cflat runtime library, which has a function `_cflat_alloc` that takes a number of words to allocate and returns a pointer to the allocated memory
-
-    - move `op` (the number of words to allocate) into a register
-    - compare it against 0 (sets flag)
-    - if result is not `greater` then jump to `.invalid_array_length`
-    - call `_cflat_alloc` passing `op` + 1, getting result in `R` (the special register for returned values)
-    - store `op` into the location in `R` (the header) -- note we're _not_ storing `op` + 1
-    - store `R` + `WORDSIZE` into `[x]` (the pointer to the first element)
-
-- `x = $gep y op`
-
-    - load `[y]` (the source pointer) into a register
-    - move `op` (the index) into a register
-    - compare the index with 0 (sets a flag)
-    - if result is not `greater` then jump to `.out_of_bounds`
-    - load value at location 'source pointer - `WORDSIZE`' (the header) into a register (the number of elements)
-    - compare the index and the number of elements (sets a flag)
-    - if result is not `less than` then jump to `.out_of_bounds`
-    - store the source pointer + (the index * `WORDSIZE`) into `[x]` (the pointer to the requested element)
-
-- `x = $load y`
-
-    - load the value at `[y]` (the source pointer) into a register
-    - load the value from the location given by the source pointer into the result register
-    - store the value in the result register to `[x]`
-
-- `$store x op`
-
-    - load the value at `[x]` (the destination pointer) into a register
-    - move `[op]` (the operand value) into a register
-    - store the operand value to the location given by the destination pointer
-
-- [revisit example]
-
-### stage 3: adding globals TODO:
-
-- now we can have global variables (int or pointer)
-
-- example (LIR, x86): [see `examples/codegen/stage-3.{lir, s}`] [see OneNote] FIXME:
-
-- TODO: [mangled global names] // only really need to mangle function pointers, but easier to mangle everything
-
-- [revisit example]
-
-### stage 4: adding structs TODO:
+## stage 6: adding structs TODO:
+### intro
 
 - now we can have user-defined structs
 
 - additional LIR instructions: `$gfp`
 
-- example (LIR, x86): [see `examples/codegen/stage-4.{lir, s}`] [see OneNote] FIXME:
+- we also need to tweak allocations and indexing because now we may be allocating more than one word per object
 
-- TODO: [field layout, interaction with alloc (include size of struct in calculations); forget about max struct size (for GC)]
+    - which also means we need to worry about field layout
 
-- [revisit example]
+### translating instructions TODO:
 
-### stage 5: adding extern functions and calls TODO:
+### tweaking allocation and indexing TODO:
 
-- now we can have externs called from `main`
+### example TODO:
 
-    - NOTE: don't need to declare externs in assembly
+- example: [see `examples/codegen/stage-6.{lir, s}`] [see OneNote] FIXME:
 
-- additional LIR instructions: `$call_ext`
+## x86-64 info TODO:
 
-- example (LIR, x86): [see `examples/codegen/stage-5.{lir, s}`] [see OneNote] FIXME:
-
-- TODO: [calling convention, caller/callee-save registers]
-
-- [revisit example]
-
-### stage 6: adding internal functions and calls TODO:
-
-- now we can have other internal functions besides `main`
-
-- additional LIR instructions: `$call_dir`, `$call_idr`
-
-- example (LIR, x86): [see `examples/codegen/stage-6.{lir, s}`] [see OneNote] FIXME:
-
-- TODO: [redux: calling convention, caller/callee-save registers]
-
-- [revisit example]
+- TODO: ???
 
 # register allocation TODO:
 
@@ -3257,746 +3844,6 @@ TODO: (and update OneNote)
 # memory management TODO:
 
 # ==== OLD ===================================================================
-
-naive codegen
--------------
-
-### naive register-based generation
-
-2.  with functions and calls
-
-    1.  what are functions and what are they for?
-
-        functions are an illusion: they exist as a programming language
-        abstraction, but the actual machine has no notion of a function.
-        they are an extremely valuable illusion for programmers:
-
-        1.  they allow code to be abstracted over the data the code is
-            run on. for example:
-
-            // imagine that these are complicated expressions (1 + 2) \*
-            2 (3 + 4) \* 4
-
-            // procedural abstraction: int proc(int a, int b) { return
-            (a + b) \* b; }
-
-        2.  if the language has higher-order functions, they also allow
-            code to be abstracted over control-flow. for example:
-
-            list = \[4, 2, 6, 1, 5, 3\]; sort(list, (a, b) =\> { return
-            a \< b; }) : \[1, 2, 3, 4, 5, 6\] sort(list, (a, b) =\> {
-            return a \> b; }) : \[6, 5, 4, 3, 2, 1\]
-
-        3.  they provide modularity: code can be written and compiled
-            independently but still linked together and run correctly.
-            procedure bodies are isolated from each other by different
-            scopes.
-
-        the compiler\'s job is to take this abstraction and turn it into
-        assembly code that preserves the intended meaning of the
-        procedure abstraction. what is that intended meaning? in a PL,
-        what happens when a function is called?
-
-        1.  the callee gets fresh instances of its parameters and local
-            variables (local scope, even in the presence of recursion).
-
-        2.  the argument values are copied to the parameters.
-
-        3.  control jumps to the beginning of the callee.
-
-        4.  the callee is executed.
-
-        5.  control jumps back to the caller site.
-
-        6.  if the function returns something, the return value is
-            provided as the result of the function call expression.
-
-        the basic tools we use to achieve this are:
-
-        1.  the stack frame (or activation record)
-        2.  calling conventions
-
-    2.  stack frame (activation record)
-
-        we\'ve talked about the process stack before. as a reminder:
-
-        1.  part of the process memory is set aside for the stack.
-        2.  stack register: holds a pointer to the current top of the
-            stack.
-
-        \[this means that SR holds the location of the top valid word on
-        the stack, rather than the next available word---if we read the
-        memory location contained in SR, we get the value of the word
-        that\'s currently on top of the stack\]
-
-        to make space on the stack, decrement the stack pointer; to
-        reclaim that space increment the stack pointer.
-
-        low high \[ xx\] \^ sp
-
-        we\'ll use the stack to implement a function\'s functionality.
-        the key data structure is called a [stack frame]{.underline} (or
-        sometimes, [activation record]{.underline}). a stack frame will
-        hold all the information a function needs to operate correctly:
-        -- memory for the local variables -- where to return to when its
-        done executing -- saved values for registers the function may
-        overwrite
-
-        how will the function know where to access this information,
-        since it can appear anywhere on the stack? we\'ll use the [frame
-        pointer]{.underline} (which lives in a register just like the
-        stack pointer). the frame pointer points to the bottom of the
-        current stack frame; the currently executing function can access
-        all of its info in terms of offsets from the frame pointer.
-
-        the basic idea is that when a function is called:
-
-        1.  the old frame pointer is saved
-        2.  the frame pointer is set to the current stack pointer
-        3.  the stack pointer is incremented to allocate space for the
-            activation record
-        4.  the activation record is filled in appropriately
-        5.  control jumps to the function
-        6.  when the function is done, the stack pointer is set to the
-            frame pointer and the frame pointer is restored to its old
-            value
-
-        \[go through high-level example of how the stack and frame
-        pointers change for a function call.\]
-
-        note that this is kind of like nested scope, except that we
-        adjust the frame pointer to preserve scope (in contrast the
-        nested scope which still has access to variables from the
-        enclosing scope).
-
-    3.  calling conventions
-
-        in order to make all of this work even when functions have been
-        compiled separately (perhaps even by different compilers) there
-        must be a convention that says exactly how a call will work and
-        who is responsible for what between the caller and the callee.
-
-        every function has a prologue and epilogue every function call
-        has a pre-call sequence and a post-return sequence
-
-        \[show quick diagram to make this clear\]
-
-        there is an agreed-upon protocol for the language to enforce who
-        (caller, callee) does what to make function calls work; this is
-        the [calling convention]{.underline}.
-
-        anatomy of a function call (this is a \"typical\" example
-        similar to that used by C on the x86; the details can vary from
-        language to language and machine to machine):
-
-        PRE-CALL:
-
-        -   save any caller-save registers by pushing them onto the
-            stack
-        -   push the call arguments onto the stack (in reverse)
-        -   push the return address onto the stack
-        -   jump to address of callee\'s prologue code
-
-        PROLOGUE CODE:
-
-        -   push the frame pointer onto the stack
-        -   copy the stack pointer into the frame pointer register
-            (frame reg always points to old frame reg)
-        -   make space on the stack for local variables (decrement stack
-            pointer)
-        -   save any callee-save registers by pushing them onto the
-            stack
-
-        EPILOGUE CODE:
-
-        -   put return value in known register
-        -   restore callee-save registers by popping from stack
-        -   deallocate local variables by moving frame pointer to stack
-            pointer
-        -   restore caller\'s frame pointer by popping it from the stack
-        -   pop call site\'s return address from stack and jump to it
-
-        POST-RETURN CODE:
-
-        -   discard call arguments from stack
-        -   restore caller-save registers by popping from stack
-        -   write return value to left-hand side of call
-        -   continue execution
-
-        note that the caller-save registers only need to be pushed if
-        they are holding values needed after the function call, and
-        callee-save registers only need to be pushed if they may be
-        overwritten by the callee function.
-
-    4.  example
-
-        the program:
-
-        def foo(int a, int b) : int { int c; c := a+b; return c+1; } int
-        x; x := foo(2, 3); output x;
-
-        offsets, scope 0: x : -4
-
-        offsets, scope foo: a : 8 b : 12 c : -4 ~tmp0~ : -8
-
-        we\'ll assume the existence of a few handy instructions: --
-        \'push\' decrements the stack pointer and stores its argument to
-        the newly allocated space on the stack. -- \'pop\' increments
-        the stack pointer and loads the contents of the newly
-        deallocated space into its argument -- \'call\' pushes the
-        current instruction address onto the stack and jumps to the
-        given label -- \'ret\' pops an instruction address off the stack
-        and jumps to it
-
-        we haven\'t targeted a specific architecture yet, so we\'ll also
-        assume the existence of CALLER~SAVEREG1~, CALLER~SAVEREG2~,
-        CALLEE~SAVEREG1~, and CALLEE~SAVEREG2~, with the obvious
-        meanings.
-
-        ENTRY: // entry point for entire program // ENTRY PROLOGUE push
-        FR // save current frame pointer mov SR FR // replace old frame
-        pointer with current stack pointer sub 4 SR // allocate space
-        for \'x\' sto 0 \[FR-4\] // initialize \'x\' to 0 push
-        CALLEE~SAVEREG1~ // save callee-save registers push
-        CALLEE~SAVEREG2~
-
-        // PRE-CALL for x := foo(2, 3) push CALLER~SAVEREG1~ // save
-        caller-save registers push CALLER~SAVEREG2~ push 3 // push
-        arguments onto stack in reverse push 2 call FOO
-
-        // POST-RETURN for x := foo(2, 3) add 8 SR // discard arguments
-        from stack pop CALLER~SAVEREG2~ // restore caller-save registers
-        pop CALLER~SAVEREG1~ sto RR \[FR-4\] // store return value to
-        memory location of \'x\'
-
-        // output x ld \[FR-4\] RR
-
-        // ENTRY EPILOGUE pop CALLEE~SAVEREG2~ // restore callee-save
-        registers pop CALLEE~SAVEREG1~ mov FR SR // restore old stack
-        pointer, deallocating stack frame pop FR // restore old frame
-        pointer ret // pop return address and jump to it, exiting
-        program
-
-        FOO: // FOO PROLOGUE push FR // save current frame pointer mov
-        SR FR // replace old frame pointer with current stack pointer
-        sub 8 SR // allocate space for local variables (c and ~tmp0~)
-        sto 0 \[FR-4\] // initialize \'c\' to 0 push CALLEE~SAVEREG1~ //
-        save callee-save registers push CALLEE~SAVEREG2~
-
-        // c := a+b ld \[FR+8\] RR sto RR \[FR-8\] ld \[FR+12\] RR ld
-        \[FR-8\] OR add OR RR sto RR \[FR-4\]
-
-        // return c+1 ld \[FR-4\] RR sto RR \[FR-8\] mov 1 RR ld
-        \[FR-8\] OR add OR RR
-
-        // FOO EPILOGUE pop CALLEE~SAVEREG2~ // restore callee-save
-        registers pop CALLEE~SAVEREG1~ mov FR SR // restore old stack
-        pointer, deallocating stack frame pop FR // restore old frame
-        pointer ret // pop return address and jump to it
-
-        \[show the stack as we walk through the code\]
-
-        how did the code generator know the offsets of the arguments to
-        the callee function when they were pushed onto the stack by the
-        caller function? because of the calling convention, the callee
-        always knows that the first argument is at a positive 8 offset
-        from the current frame pointer (to pass over the saved frame
-        pointer and return address) and subsequent arguments are at
-        4-byte offsets from that.
-
-    5.  exercise
-
-        translate the following program into assembly under the same
-        assumptions as the above exercise:
-
-        def bar(int a) : int { return a+42; } def foo(int a) : int { int
-        x; int y; x := bar(a); y := bar(a+1); return x\*y; } int x; x :=
-        2; x := foo(x); output x+3;
-
-        SOLUTION
-
-        offsets, scope 0: x : -4 ~tmp0~ : -8
-
-        offsets, scope foo: a : 8 x : -4 y : -8 ~tmp0~ : -12
-
-        offsets, scope bar: a : 8 ~tmp0~ : -4
-
-        ENTRY: // ENTRY PROLOGUE push FR mov SR FR sub 8 SR sto 0
-        \[FR-4\] push CALLEE~SAVEREG1~ push CALLEE~SAVEREG2~
-
-        // x := 2 mov 2 RR sto RR \[FR-4\]
-
-        // PRE-CALL for x := foo(x) push CALLER~SAVEREG1~ push
-        CALLER~SAVEREG2~ ld \[FR-4\] RR push RR call FOO
-
-        // POST-RETURN for x := foo(x) add 4 SR pop CALLER~SAVEREG2~ pop
-        CALLER~SAVEREG1~ sto RR \[FR-4\]
-
-        // output x+3 ld \[FR-4\] RR sto RR \[FR-8\] mov 3 RR ld
-        \[FR-8\] OR add OR RR
-
-        // ENTRY EPILOGUE pop CALLEE~SAVEREG2~ pop CALLEE~SAVEREG1~ mov
-        FR SR pop FR ret
-
-        FOO: // FOO PROLOGUE push FR mov SR FR sub 12 SR sto 0 \[FR-4\]
-        sto 0 \[FR-8\] push CALLEE~SAVEREG1~ push CALLEE~SAVEREG2~
-
-        // PRE-CALL for x := bar(a) push CALLER~SAVEREG1~ push
-        CALLER~SAVEREG2~ ld \[FR+8\] RR push RR call BAR
-
-        // POST-RETURN for x := bar(a) add 4 SR pop CALLER~SAVEREG2~ pop
-        CALLER~SAVEREG1~ sto RR \[FR-4\]
-
-        // PRE-CALL for y := bar(a+1) push CALLER~SAVEREG1~ push
-        CALLER~SAVEREG2~ ld \[FR+8\] RR sto RR \[FR-12\] mov 1 RR ld
-        \[FR-12\] OR add OR RR push RR call BAR
-
-        // POST-RETURN for y := bar(a+1) add 4 SR pop CALLER~SAVEREG2~
-        pop CALLER~SAVEREG1~ sto RR \[FR-8\]
-
-        // return x\*y ld \[FR-4\] RR sto RR \[FR-12\] ld \[FR-8\] RR ld
-        \[FR-12\] OR mul OR RR
-
-        // FOO EPILOGUE pop CALLEE~SAVEREG2~ pop CALLEE~SAVEREG1~ mov FR
-        SR pop FR ret
-
-        BAR: // BAR PROLOGUE push FR mov SR FR sub 4 SR push
-        CALLEE~SAVEREG1~ push CALLEE~SAVEREG2~
-
-        // return a+42 ld \[FR+8\] RR sto RR \[FR-4\] mov 42 RR ld
-        \[FR-4\] OR add OR RR
-
-        // BAR EPILOGUE pop CALLEE~SAVEREG2~ pop CALLEE~SAVEREG1~ mov FR
-        SR pop FR ret
-
-### notes on x86 assembly
-
-1.  some basic x86
-
-    we\'re not going to teach x86, but we\'ll give some pointers. an
-    excellent resource for you to look at is
-    <https://en.wikibooks.org/wiki/X86_Assembly>. when looking here,
-    keep in mind:
-
-    -   we\'re using 32-bit x86
-    -   we\'re using the gnu assembler, which uses AT&T syntax
-
-    \[there are lots of other places to look, but remember we\'re using
-    GAS/AT&T syntax!\]
-
-    wiki page \'x86 Register and Architecture Description\':
-
-    -   we\'re using the 32-bit registers, so \$eax, %ebx, %ecx, %edx,
-        %esp, %ebp, etc
-    -   %esp is the stack pointer, %ebp is the frame pointer, %eax is
-        the return value register
-
-    wiki page \'GAS Syntax\':
-
-    -   use the \'l\' suffix to indicate we\'re operating on 32-bit
-        integers
-    -   we\'re using the gnu assembler, which uses AT&T syntax. when
-        looking at x86 resources be sure you\'re looking at the right
-        ones.
-
-    operands:
-
-    -   \$k for constant k
-    -   %reg for register value
-    -   (%reg) for memory location whose address is in reg
-    -   k(%reg) for memory location at address (%reg + k)
-
-    can only use indirection in at most one operand to the same
-    instruction.
-
-    examples:
-
-    -   \"mov 2 RR\" == \"movl \$2, %eax\"
-    -   \"sub 8 SR\" == \"subl \$8, %esp\"
-    -   \"ld \[FR-4\] RR\" == \"movl -4(%ebp), %eax\"
-    -   \"sto RR \[FR-12\]\" == \"movl %eax, -12(%ebp)\"
-
-    when looking at disassembled code, don\'t worry about the header
-    information contained in sections like \".file\", \".text\", etc.
-    we\'ll add the necessary scaffolding in the infrastructure we give
-    you for your assignments.
-
-    wiki pages have lots of x86 instructions; here is a small cheat
-    sheet i\'ll post to the class slack \[show x86-cheat-sheet.pdf\]
-
-    some other useful instructions:
-
-    -   pushl \<reg\>
-    -   popl \<reg\>
-
-    x86 has some instructions that abbreviate the instructions for
-    pre-calls and epilogues:
-
-    -   call \<label\>: push current code location onto stack then jump
-        to label (the last part of the pre-call instruction sequence).
-    -   leave: copies %ebp to %esp then restores %ebp by popping from
-        the stack (the middle part of the epilogue instruction
-        sequence).
-    -   ret: pop a code location from the stack and jump to it (the last
-        part of the epilogue instruction sequence)
-
-    \[we used analogues of \'call\' and \'ret\' in our examples and
-    exercises\]
-
-    x86 has a specific set of caller-save and callee-save registers.
-    however, we only need to save them if we\'re actually using them and
-    because of our naive codegen we don\'t actually need to worry about
-    them.
-
-    -   use %eax for RR and %edx for OR
-    -   use %esp and %ebp for the stack and frame pointers
-    -   leave all other registers alone
-    -   don\'t need to do any caller or callee saves (except for %esp
-        and %ebp which we\'ve already covered)
-
-    \[this works because no callee function will write on the
-    callee-save registers (and so they don\'t need to save them) and no
-    caller function needs a register to be preserved over function calls
-    (and so they don\'t need to save them).\]
-
-2.  getting 32-bit x86 assembly for C code
-
-    commands: gcc -O0 -m32 -c \<file\>.c objdump -d \<file\>.o
-
-    -O0 says to turn off optimizations, -m32 forces 32-bit mode, -c says
-    to compile but don\'t link (without -c you will get an error message
-    unless \<file\>.c contains a main() function).
-
-    == OR ==
-
-    use Compiler Explorer: gcc.godbolt.org
-
-    -   in the left panel, put c++ code
-    -   in the right panel:
-        -   choose compiler and version (gcc or clang for x86-64)
-        -   set compiler options to \"-O0 -m32\"
-        -   under the Output menu, make sure \"Intel asm syntax\" is
-            deselected
-
-    1.  example
-
-        code.c: int foo(int x, int y) { int a = x \* y; int b = a + 2;
-        return b; }
-
-        \[instead of the below which is using objdump, show them
-        Compiler Explorer in action\]
-
-        output: 00000000 \<foo\>: 0: 55 push %ebp 1: 89 e5 mov %esp,%ebp
-        3: 83 ec 10 sub \$0x10,%esp 6: 8b 45 08 mov 0x8(%ebp),%eax 9: 0f
-        af 45 0c imul 0xc(%ebp),%eax d: 89 45 fc mov %eax,-0x4(%ebp) 10:
-        8b 45 fc mov -0x4(%ebp),%eax 13: 83 c0 02 add \$0x2,%eax 16: 89
-        45 f8 mov %eax,-0x8(%ebp) 19: 8b 45 f8 mov -0x8(%ebp),%eax 1c:
-        c9 leave 1d: c3 ret
-
-        0: put old frame pointer in stack frame 1: set current frame
-        pointer to current stack pointer 3: add space to stack for
-        locals 6: load x from memory 9: multiply by y d: store to a 10:
-        load a 13: add 2 16: store to b 19: load b 1c: tear down current
-        stack frame 1d: pop return address from stack and jump to it
-
-        note that the memory offsets to x and y are positive (meaning
-        below the current stack pointer) while those for a and b are
-        negative (meaning above the stack pointer).
-
-new codegen
------------
-
-### symbol table
-
-we need to extend the symbol table in two ways:
-
--   map typename to struct info (field names, types, and offsets)
--   variable info needs to include type info
-
-other than adding the struct info first thing, we can handle the symbol
-table the same way we did before (just remembering to add the type info
-from the variable declarations alongside the memory locations).
-
-### struct allocation
-
-let\'s examine a concrete example from the handout:
-
-x := new %tree;
-
-where %tree is defined as:
-
-struct %tree { int value; %tree left; %tree right; };
-
-the runtime memory manager is going to handle the heap, so we\'ll
-delegate memory allocation to it by making a call to a predefined
-function \"allocate\" using the calling convention we discussed for L1.
-the allocate function will need to know how many words to allocate,
-which we can determine by looking up \<typename\> in the symbol table to
-get the corresponding struct info. our contract is that when we call
-allocate with a number of words (one per field), it will allocate
-sufficient space on the heap to hold those words and return the
-beginning address of the newly allocated space (which address we will
-store into the left-hand side of the assignment).
-
-for our example, we would call \'allocate(3)\' and get back an address
-(say 0x100) at the beginning of 3 words of heap memory:
-
-  -- -- ----- ----- ----- -- --
-        xxx   xxx   xxx      
-  -- -- ----- ----- ----- -- --
-
-0x100\^
-
-and we would write the value 0x100 into \'x\'. we then need to generate
-code to initialize the values of the fields, which as in L1 are always
-initialized to 0 (which is also the value of nil for references):
-
-  -- -- --- --- --- -- --
-        0   0   0      
-  -- -- --- --- --- -- --
-
-0x100\^
-
-however, the runtime memory manager will need more information about the
-struct than its size in order to handle it correctly, namely it needs to
-know which of its fields are pointers to other structs. this is
-information that we have at compile-time but we need it at runtime (the
-reason we need it will become clear when we cover memory management
-schemes). to communicate this information, allocate will actually create
-space for \<num~words~\>+1 words of memory, with the extra word being
-[before]{.underline} the returned address:
-
-  -- ----- ----- ----- ----- -- --
-     xxx   xxx   xxx   xxx      
-  -- ----- ----- ----- ----- -- --
-
-0x100\^
-
-this \'header word\' is going to contain the following information:
-
-1.  the first byte, bits 0--7, holds the number of fields in the struct
-2.  bits 8--30 are a bit vector s.t. a bit is set iff the corresponding
-    field in the struct is a reference.
-3.  the last bit, bit 31, is set to 1 (for reasons that, again, will
-    become apparent when we discuss memory management).
-
-the compiler must generate code to fill in that information. for our
-example, the result of the generated code should be:
-
-  -- ---------------------------------- --- --- --- -- --
-     00000011011000000000000000000001   0   0   0      
-  -- ---------------------------------- --- --- --- -- --
-
-0x100\^
-
-that is, there are three fields and the second two are pointers. this
-scheme means that, given a pointer to a struct containing an address,
-the runtime can always read the word at address-4 to get the size of the
-struct and which fields are pointers.
-
-notice that this scheme limits the number of fields a struct can have:
-at most 23, the size of the bitvector. we\'re using this scheme because
-it\'s relatively simple, but constraining the number of fields is a
-tradeoff. we could use a more elaborate scheme to remove this
-restriction. for example, we could map each typename to an index, copy
-the symbol table to the static memory segment indexed by typename, and
-have the header word contain the appropriate typename index instead of
-struct size and a bitvector. then the runtime can read the header word
-and use that index to lookup the information in the static memory\'s
-symbol table. that scheme is more flexible, but more complex and
-expensive. which one to use is a matter of language design.
-
-to recap, when we generate code for \"\<access\> := new \<typename\>\",
-we:
-
-1.  generate a call to function \'allocate\' passing an argument that is
-    the number of fields in \<typename\>.
-2.  write the return value to the left-hand side of the assignment.
-3.  for each field of the struct being allocated, store a 0 to the
-    corresponding offset from the returned address.
-4.  compute the header word and write it to a -4 offset from the
-    returned address.
-
-### field access in expression
-
-example 1:
-
-struct %foo { int a; int b; };
-
-%foo x; x := new %foo; output x.b;
-
-let\'s focus on the output expression. x contains the address of a foo
-struct object in memory, which has two integer fields.
-
-in order to retrieve the correct value, we need to dereference x to get
-the address of the struct object in the heap, compute the offset into
-that struct object of field \'b\', then read the value at that address
-from memory.
-
-AST: \[access x b\]
-
-\[note: for convenience i\'m going to be more efficient about the
-generated code rather than strictly following our naive codegen
-algorithm.\]
-
-ld \[FR-4\] RR ; get the address stored in \'x\' ld \[RR+4\] RR ; get
-the value at that address + 4, because b is at a 4-byte offset from the
-beginning of the struct
-
-how did we know to use offset 4? because we look up \'x\' in the symbol
-table to get its type \'foo\', then look up \'foo\' to get the
-information about the field offsets. remember that the extra header word
-is immediately [before]{.underline} the returned address, so offset 0
-would be the first field of the struct.
-
-example 2:
-
-struct %foo { int a; %bar b; };
-
-struct %bar { int c; int d; %baz e; };
-
-struct %baz { int f; int g; };
-
-%foo x; x := new %foo; x.b := new %bar; x.b.e := new %baz; output
-x.b.e.f;
-
-let\'s focus again on the output expression. x, x.b, and x.b.e will all
-contain pointers into the heap; we\'re going to do the same thing as
-before except chained in a row.
-
-AST: \[access \[access \[access x b\] e\] f\]
-
-when we recursive through the AST for codegen, we\'ll end up generating
-code for \[access x b\] first, then \[access \<result\> e\], then
-\[access \<result\> f\]:
-
-ld \[FR-4\] RR ; get the address stored in \'x\' ld \[RR+4\] RR ; get
-the address stored in \'x.b\' at offset 4 ld \[RR+8\] RR ; get the
-address stored in \'x.b.e\' at offset 8 ld \[RR\] RR ; get the int
-stored in \'x.b.e.f\' at offset 0
-
-again, we look in the symbol table to compute the offsets. note that
-everything starts with looking up the type of \'x\' to see that it\'s a
-\'foo\', then looking at \'foo\' to see that the \'b\' field is at
-offset 4 and type \'bar\', then looking at \'bar\' to see the \'e\'
-field is at offset 8 and type \'baz\', then looking at \'baz\' to see
-the \'f\' field is at offset 0.
-
-### field access on lhs of assignment
-
-when the access path is on the left-hand side of an assignment we need
-to treat it differently. this is actually the same as when it\'s just a
-variable as in L1, but we didn\'t highlight the difference. let\'s look
-at it now, then generalize to arbitrary access paths.
-
-example:
-
-x := x + 1;
-
-when we evaluate the \'x\' in \'x + 1\' we want to find the address of
-\'x\' in memory and retrieve the value stored there:
-
-ld \[FR-4\] RR add 1 RR
-
-but when we look at \'x\' in the left-hand side we want just the address
-of \'x\', which is where we\'ll put the final value:
-
-sto RR \[FR-4\]
-
-we say that \'x\' in the right-hand side expression is an
-[rvalue]{.underline} and that \'x\' on the left-hand side is an
-[lvalue]{.underline}. basically, for an lvalue we want to stop at the
-address to store the value, while for an rvalue we want to go ahead and
-dereference that address to get the value currently stored there.
-
-now let\'s look at some non-trivial access paths:
-
-struct %foo { int a; int b; int c; };
-
-%foo x; x := new %foo; x.b := x.c;
-
-as usual, we want to evaluate the right-hand side to a value, then store
-it into the location specified by the left-hand side:
-
-ld \[FR-4\] RR ; get the address stored in \'x\' ld \[RR+8\] RR ; get
-the int stored at offset 8 ld \[FR-4\] OR ; get the address stored in
-\'x\' sto RR \[OR+4\] ; store the right-hand side value into \'x.b\' at
-offset 4
-
-what if we have an lvalue access path with multiple fields?
-
-struct %foo { int a; %bar b; int c; };
-
-struct %bar { int d; int e; };
-
-%foo x; x := new %foo; x.b := new %bar; x.b.d := x.c;
-
-then we follow the access paths as normal, except that we stop right
-before we dereference the last one:
-
-ld \[FR-4\] RR ; get the address stored in \'x\' ld \[RR+8\] RR ; get
-the int stored at offset 8 ld \[FR-4\] OR ; get the address stored in
-\'x\' ld \[OR+4\] OR ; get the address stored at offset 4 sto RR \[OR\]
-; store the right-hand value into \'x.b.d\' at offset 0
-
-### exercise {#exercise-15}
-
-generate code for the following program (again assuming no caller- or
-callee-save registers):
-
-struct %foo { int a; %bar b; };
-
-struct %bar { int c; int d; };
-
-def fun(%foo p, int q, %bar r) : int { %foo s; s := p; return s.a; }
-
-%foo x; int y;
-
-x := new %foo; x.b := new %bar; y := fun(x, 2, x.b); output y;
-
-SOLUTION
-
-; entry prologue push FR mov SR FR push 0b0 ; argument info: no pointer
-arguments push 0b1 ; local info: x is a pointer sub 8 SR ; allocate
-stack space for x and y sto 0 \[FR-4\] ; initialize x to nil sto 0
-\[FR-8\] ; initialize y to 0
-
-; x := new foo push 2 ; argument to \'allocate\': 2 words call allocate
-add 4 SR ; deallocate stack space for argument sto RR \[FR-4\] ; write
-return value to \'x\' sto 0 \[RR\] ; initialize x.a to 0 sto 0 \[RR+4\]
-; initialize x.b to nil sto 0b00000010010...01 \[RR-4\] ; initialize
-header word
-
-; x.b := new bar push 2 ; argument to \'allocate\': 2 words call
-allocate add 4 SR ; deallocate stack space for argument ld \[FR-4\] OR ;
-get address of struct in heap from \'x\' sto RR \[OR+4\] ; write return
-value to \'x.b\' sto 0 \[RR\] ; initialize x.b.c to 0 sto 0 \[RR+4\] ;
-initialize x.b.d to 0 sto 0b00000010000...01 \[RR-4\] ; initialize
-header word
-
-; y := fun(x, 2, x.b) ld \[FR-4\] RR ; address stored in \'x\' ld
-\[RR+4\] RR ; address stored in \'x.b\' push RR ; push \'x.b\' argument
-to \'fun\' push 2 ; push \'2\' argument to \'fun\' ld \[FR-4\] RR ;
-address stored in \'x\' push RR ; push \'x\' argument to \'fun\' call
-FUN add 12 SR ; deallocate stack space for arguments sto RR \[FR-8\] ;
-write return value to \'y\'
-
-; output y ld \[FR-8\] RR
-
-; entry epilogue mov FR SR pop FR ret
-
-; FOO prologue FOO: push FR mov SR FR push 0b101 ; argument info: first
-and third arguments are pointers push 0b1 ; local info: one local
-pointer add 4 SR ; allocate stack space for \'s\' sto 0 \[FR-4\] ;
-initialize \'s\' to nil
-
-; s := p ld \[FR+16\] RR ; get value of \'p\' param sto RR \[FR-4\] ;
-put it in \'s\'
-
-; return s.a ld \[FR-4\] RR ; get value of \'s\' ld \[RR\] RR ; get
-value of \'s.a\'
-
-; FOO epilogue mov FR SR pop FR ret
 
 middle-end: optimization (back to L1)
 =====================================
