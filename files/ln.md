@@ -2,9 +2,7 @@
 
 ## TODO:
 
-- set up course slack, invite students
-- announce office hours (mine, TAs)
-- close section (need to move students)
+- share invite link: https://join.slack.com/t/160-f25/shared_invite/zt-3elo16cnm-3hNei8zBMyzoDHeceWnXcg
 - create AI info form for assignments
 - in assignment writeup, tell them to use addresssanitizer
     - https://github.com/google/sanitizers/wiki/AddressSanitizer (the given flags for clang, but they're the same for gcc)
@@ -33,7 +31,7 @@
 - week 10.1: 
 - week 10.2: 
 
-## tentative assignment timing
+## TODO: tentative assignment timing
 
 - TODO: maybe decrease type checking, increase some of the others by making assignment due dates other than on class days
 
