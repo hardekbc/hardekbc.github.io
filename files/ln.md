@@ -2,21 +2,19 @@
 
 ## TODO:
 
-- TA duties form
-- close section (need to move students)
 - set up course slack, invite students
-- set office hours (mine, TAs)
-- plan assignments
+- announce office hours (mine, TAs)
+- close section (need to move students)
 - create AI info form for assignments
 - in assignment writeup, tell them to use addresssanitizer
     - https://github.com/google/sanitizers/wiki/AddressSanitizer (the given flags for clang, but they're the same for gcc)
 
 ## lecture timing
 
-- week 0.2 (quarter starts on thursday): 
+- week 0.2 (quarter starts on thursday): up to 'compiler overview::things we're leaving out'
 - week 1.1: 
 - week 1.2: 
-- week 2.1: 
+- week 2.1: [ASSIGN-1 OUT]
 - week 2.2: 
 - week 3.1: 
 - week 3.2: 
@@ -35,13 +33,15 @@
 - week 10.1: 
 - week 10.2: 
 
-## TODO: assignment timing
+## tentative assignment timing
 
-- week ??? assign-1 (lexing and parsing) [??? days]
-- week ??? assign-2 (type checking) [??? days]
-- week ??? assign-3 (lowering) [??? days]
-- week ??? assign-4 (codegen) [??? days]
-- week ??? assign-5 (gc) [??? days]
+- TODO: maybe decrease type checking, increase some of the others by making assignment due dates other than on class days
+
+- week 2.1 assign-1 (lexing and parsing) -- 14 days
+- week 4.1 assign-2 (type checking)      -- 14 days
+- week 6.1 assign-3 (lowering)           -- 9 days
+- week 7.2 assign-4 (codegen)            -- 13 days
+- week 9.* assign-5 (gc)                 -- 9 days
 
 ## grading scale
 
@@ -590,3 +590,1505 @@ executable machine code + RUNTIME == execution
 - [show grammar] [see OneNote]
 
     - see `cflat-docs/syntax.md`
+
+# lexing
+
+- [remind students what the lexer does; show example in OneNote]
+
+## how do we define the language tokens?
+
+- our first step is to define the tokens, i.e., the elements of our language
+
+- these come from our grammar: keywords, symbols, punctuation, constants, identifiers, etc
+
+    - [see grammar to point out tokens]
+    - [see OneNote for token list]
+
+- we specify what each kind of token looks like using regular expressions
+
+    - we're using somewhat extended regular expression notation, but it maps easily to the standard expressions you learned in 138
+
+```
+   r+ ⟶ rr*
+   r? ⟶ r | ϵ
+[abc] ⟶ a | b | c
+[a-z] ⟶ a | b | ... | z
+[^ab] ⟶ Σ - {a, b}
+```
+
+- we also need to specify what whitespace and comments look like (we cheated a bit in the grammar by using `-` in the c-comment regex, this is technically regular but can be very expensive to compute)
+
+```
+whitespace = (' ' | '\t' | '\n' | '\r')+
+
+c++-comment = `//`[^'\n']*
+-- notice we don't require '\n' at the end, which handles comments that go to
+   EOF without terminating
+
+c-comment = `/*`([^`*`] | `*`⋆[^`*/`])⋆`*`+/
+-- using ⋆ for kleene star and * for the literal asterisk character
+
+skip = (whitespace | c++-comment | c-comment)*
+```
+
+- notice that some tokens should carry extra information (the lexer and parser don't actually care about this extra info, but we'll need it for the rest of the compiler)
+
+    - if we have a Num, what were the digits? if we have an Id, what were the characters?
+
+    - we can represent this information as indices in the input string (example coming shortly)
+
+## how do we extract tokens (aka 'tokenize')?
+
+- now we know what our tokens are and what they look like; the next step is to map the actual characters in the input stream to a sequence of tokens
+
+    - the sequence of characters that make up a token is called a _lexeme_
+
+- example: "foo = bar + 01"
+
+```
+lexeme token
+------ -----
+foo    Id("foo") // Id(0,3)
+=      Gets
+bar    Id("bar") // Id(6,3)
++      Plus
+01     Num("01") // Num(12,2)
+```
+
+- we know how to recognize regular languages: convert a regular expression to an NFA, then simulate the NFA on some input
+
+- there are two ways we could go when implementing this idea:
+
+    1. have explicit Regex and NFA data structures and implement Regex-->NFA conversion and NFA simulation in code
+
+    2. manually figure out the NFA and hardcode its simulation using control flow (basically, a switch statement inside a for loop)
+
+- i'm going to explain things using (1) because it is the most general method and makes the underlying theory clear
+
+    - it's also what you would use if you were implementing a lexer generator (where there is no fixed set of tokens) or if you were designing the language and the set of tokens may change over time
+
+- i recommend that you use (2) for your acual project when it is assigned because it is simpler and easier, assuming you have a fixed, predetermined set of tokens as we do for cflat
+
+    - i have asked the TAs to explain how that works in more detail during the next discussion section
+
+- EXAMPLE [see OneNote]
+
+```
+RE
+| EmptyLang
+| EmptyString
+| CharRange { lower: char, upper: char } // e.g., [a-z]
+| Star { r: RE }
+| Concat { first: RE, second: RE }
+| Union { left: RE, right: RE }
+
+// for regex: `/*`([^`*`] | `*`⋆[^`*/`])⋆`*`+/
+re = RE::char_seq("/*").then(
+        RE::anything_but('*').or(
+          RE::char('*').star().then(RE::anything_but(['*','/'])
+        ).star()
+     )
+     .then(RE::char('*').plus())
+     .then(RE::char('/')))
+
+NFA
+- states: set<State>
+- transitions: map<State, vector<(option<RE::CharRange>, set<State>)>>
+- init: State
+- accepting: set<State>
+
+nfa = re.convert_to_nfa()
+
+nfa.accepts("/* this is a comment */");
+```
+
+- but we don't have a single regular expression and a single lexeme, we have a set of regular expressions corresponding to different lexemes and an input that contains a sequence of lexemes
+
+- tag each accepting state of each nfa with the token it maps to (or Skip if it maps to a comment or whitespace), then union all the nfas together into a single nfa
+
+    - this handles the fact that we're looking for multiple lexemes: when we get a match, look at the accepting state to see what token should be produced
+
+    - keep walking though the input emitting tokens as we find them, starting at the position after the previous match, until we've processed the entire input
+
+- EXAMPLE/EXERCISE
+
+```
+suppose we have:
+- TkAB(chars) = a+b
+- TkBA(chars) = b+a
+- skip = c+
+
+[draw NFA]
+
+process input "aabbaccabcbba"
+
+token stream: [TkAB(0..2), TkBA(3..4), TkAB(7..8), TkBA(10..12)]
+```
+
+- still a problem: ambiguity between the token regular expressions
+
+    - consider the following examples:
+
+        - "ab" ⟶ `[Id(ab)]` vs `[Id(a), Id(b)]`
+        - "whilex" ⟶ `[While, Id(x)]` vs `[Id(whilex)]`
+        - "while" ⟶ `[While]` vs `[Id(while)]`
+
+    - how do we figure out which token to emit if there are multiple possibilities?
+
+- solution 1: maximal munch
+
+    - take the longest possible match
+
+    - when lexing, record the last accepting state reached but keep on going until matching fails---then backtrack to the last accepted character
+
+    - this handles the first two examples:
+
+        - "ab" ⟶ `[Id(ab)]`
+        - "whilex" ⟶ `[Id(whilex)]`
+
+- solution 2: priorities
+
+    - maximal munch doesn't help if both possible lexemes are the same size (like our third example, "while")
+
+    - we give priorities to the different accepting states, and if there are multiple accepting states then we pick the one with highest priority
+
+    - for our language we'll say that keywords have priority over identifiers; this handles the third example:
+
+        - "while" ⟶ `[While]`
+
+- EXAMPLE/EXERCISE
+
+```
+suppose we have:
+- TkAB(chars) = a*b*
+- TkBA(chars) = b*a*
+- with priority(TkAB) > priority(TkBA)
+
+[draw NFA]
+
+process input "bbaabbbb"
+
+token stream: [TkBA(0..3), TkAB(4..7)]
+```
+
+## final thoughts
+
+- lexing can be easy if we define our syntax carefully, but full of pitfalls if we're careless
+
+- in general it's good to reduce ambiguity as much as possible; which token a lexeme corresponds to shouldn't depend on what context it's used in
+
+    - famous C++ example: `vector<set<int>>` is a syntax error because `>>` is read as a bitshift operator, you need to write `vector<set<int> >`
+
+    - this may have been fixed in more recent versions of the language, i'm not sure
+
+- why regular expressions, why not contex-free grammars?
+
+    - we can use CFGs (they can do anything REs can do), and there are examples where people have done so (see "scannerless parsers")
+
+    - in general lexing using regular expressions makes the parser a lot simpler and more efficient
+
+    - it does also explain why you can't nest c-style comments: proper nesting is context-free, you can't describe it using regular expressions
+
+# parsing
+## overview
+
+- we describe the syntax of our language as a context-free grammar, with tokens as the terminal symbols of our alphabet
+
+    - [show `cflat-docs/syntax.md` again]
+
+- our task is to prove that the given source code is really a member of our language. given a CFG and a string, we can prove that the string is a member of the CFG's language using a derivation tree (aka parse tree, concrete syntax tree)
+
+```
+grammar:
+ E ::= [1] Id | [2] E Op E | [3] ( E )
+Op ::= [4] + | [5] *
+
+string: "(x + y) * z"
+
+tokens: [OpenParen, Id(x), Plus, Id(y), CloseParen, Mul, Id(z)]
+-- for clarity we'll abbreviate the tokens using the corresponding characters
+
+derivation tree [arrange as tree]:
+E -[2]→ E Op E
+  -[3]→ ( E ) Op E
+  -[2]→ ( E Op E ) Op E
+  -[1]→ ( x Op E ) Op E
+  -[4]→ ( x + E ) Op E
+  -[1]→ ( x + y ) Op E
+  -[5]→ ( x + y ) * E
+  -[1]→ ( x + y ) * z
+```
+
+- the internal nodes of the tree are nonterminals, with the root being the grammar start symbol; the leaves of the tree are the tokens (in order)
+
+- if we can create such a derivation tree, then the token stream represents a syntactically correct program
+
+    - the derivation i went through in the example is called a _leftmost derivation_ because i always expanded the leftmost leaf in the derivation tree
+
+    - we could expand the leaves in any order and get the same tree, but leftmost is a natural order to use when we're processing the input from the beginning to the end---we're matching the beginning of the input before matching the rest of the input
+
+- this is the essence of parsing: proving that an input belongs to the language by constructing a derivation tree
+
+    - as discussed previously we rarely actually construct the entire derivation tree explicitly, instead we construct an abstract syntax tree that is more useful for compilation
+
+    - however, IDEs _do_ construct the derivation tree so that they can do things like syntax highlighting, etc
+
+## ambiguity
+
+- using the same grammar, we can give a derivation tree for the input `x + y + x * z + z`; in fact, we can give several
+
+- the biggest problem we face in parsing we also had to deal with in lexing: ambiguity
+
+    - a grammar is _ambiguous_ if there is at least one input in the language that has more than one parse tree
+
+- this is a problem because the parse tree determines how a program will be executed
+    
+    - consider `1 + 2 * 3` and the difference between `(1 + 2) * 3` and `1 + (2 * 3)` (draw as trees)
+
+    - the syntactic structure of the program influences its meaning, the same as in english
+
+    - consider "she saw the man with a telescope"; what does it mean?
+
+- arithmetic expressions are an easy example, but it can come up in lots of places---a famous example is "dangling elses"
+
+```
+stmt ::= `if` exp `then` stmt `else` stmt
+       | `if` exp `then` stmt
+       | x `=` exp
+
+// code
+a = false;
+c = 1;
+if a then
+if b then c = 2;
+else c = 3;
+```
+
+- what is the value of `c`?
+
+    - remember that whitespace is not significant, we skip it during lexing
+
+    - [show two parse trees, one where the `else` is attached to the first `if` and one where it is attached to the second]
+
+- so we want to avoid grammars that are ambiguous
+
+    - unfortunately, determining whether a grammar is ambiguous is undecidable
+
+    - but we _can_ determine whether a grammar is _deterministic_
+
+    - deterministic implies unambiguous, though unambiguous does _not_ imply deterministic
+
+- recall that a PDA is an NFA + a stack, a DPDA is a DFA + a stack, and DPDA are strictly less expressive than PDA (unlike regular languages where DFA and NFA are equally expressive)
+
+    - a PDA is deterministic if, from each state, the current input and the current top of the stack allows for at most one transition
+
+    - PDAs and CFGs are equivalent (we can transform each into the other)
+
+    - since DPDA are less expressive than PDA, there must be CFG that cannot be expressed as DPDA; these include all ambiguous grammars (and also some non-ambiguous grammars)
+
+    - a grammar that can be expressed with a DPDA is a deterministic grammar, and there is an algorithm that decides whether this is true
+
+- it's important to note that ambiguity is a property of a _grammar_, not a _formal language_
+
+    - the same formal language can have multiple grammars, some of which are ambiguous and some of which are not
+
+    - there exist formal languages that only have ambiguous grammars, but they don't arise for realistic programming languages
+
+- this gives us a solution: if the original grammar for our programming language syntax is not deterministic, transform it into one that is (while still describing the same syntax)
+
+    - this isn't always possible, but again for realistic programming languages it tends to be
+
+    - if it isn't, then we have to change our programming language syntax until it is
+
+- example (dangling elses again)
+
+```
+stmt ::= `if` exp `then` withelse `else` stmt
+       | `if` exp `then` stmt
+       | x `=` exp
+
+withelse ::= `if` exp `then` withelse `else` withelse
+           | x `=` exp
+```
+
+- this version of the grammar recognizes exactly the same set of inputs, but only allows for a single parse tree
+
+    - it requires any `else` to be associated with the "nearest" `if`
+
+- of course, we can always just change our programming language to make it obviously deterministic
+
+    - require that expressions use parentheses everywhere
+    - require that braces be used everywhere
+    - etc
+
+- this makes implementing the compiler easy, but can make programmers frustrated and annoyed
+
+    - it's often true that we can either make things convenient/nice for the programmer but complicated for the compiler implementor or vice-versa
+
+    - usually we should default to making things nice for the programmer even if it makes our lives difficult as compiler implementors
+
+## parsing strategies
+
+- we know what the goal of parsing is, but how do we do it? there are actually a large number of strategies with different tradeoffs in complexity, expressiveness, performance, ease of use, etc
+
+- let's take the same example we used earlier
+
+```
+grammar:
+ E ::= [1] Id | [2] E Op E | [3] ( E )
+Op ::= [4] + | [5] *
+
+string: "(x + y) * z"
+```
+
+- we can divide all of the strategies into two basic categories: top-down and bottom-up
+
+- TOP-DOWN: start from the root of the derivation tree, i.e., the grammar start symbol (`E` in this case) and work our way down to the leaves, selecting productions for each node that will result in the leaves matching the input string
+
+    - this seems like it involves a lot of guess-work, but clever versions of the approach can be very efficient
+
+    - [show top-down approach for example]
+
+- BOTTOM-UP: start from the leaves of the derivation tree, i.e., the input, and work our way up the tree selecting productions in reverse
+
+    - [show bottom-up approach for example]
+
+- besides top-down vs bottom-up, parsing strategies can also be divided by what class of grammars they work for
+
+    - there are strategies that work for _any_ grammar, including ambiguous ones (e.g., CYK, Earley, GLL, GLR, etc); they are O(n³) and, for ambiguous inputs, result in a parse forest instead of a parse tree
+
+    - there are strategies that work for any _deterministic_ grammar (e.g., LR, a bottom-up strategy); these are linear but complex to implement (usually we resort to automatically generating an LR parser instead of coding it by hand)
+
+    - there are strategies that work for a _subset_ of deterministic grammars (e.g., LL(k), a top-down strategy); these are also linear and, even though they are less expressive, they have other nice properties
+
+        - LL(k) parsers can be handwritten, giving very fine control over parsing and allowing for easier error recovery and error messages
+
+        - a popular choice for mainstream compilers, including gcc and clang
+
+        - this is what we'll be implementing for our language
+
+## recursive descent and LL(1)
+### intro
+
+- LL(1) is an example of a top-down parser, and a common strategy for these types of parsers (which we'll be using) is _recursive descent_
+
+    - there are other strategies, but recursive descent is the most popular
+
+- we'll go over a naive recursive descent strategy first, then show how an LL(1) grammar can make it much more efficient
+
+- to illustrate the ideas we'll use the following simple grammar
+
+```
+S ::= aSa | bSb | c
+```
+
+### naive recursive descent
+
+- from 138 we know that we can transform any CFG into a PDA
+
+    - there are several possible transformations, but we'll use the one that yields a top-down strategy
+
+```
+q0 -[ϵ, ϵ⟶S$]→ q1 -[ϵ, $⟶ϵ]→ q2 (accepting)
+                ⇵
+             [ϵ, S⟶aSa]
+             [ϵ, S⟶bSb]
+             [ϵ, S⟶c]
+             [a, a⟶ϵ]
+             [b, b⟶ϵ]
+             [c, c⟶ϵ]
+```
+
+- this is _not_ a DPDA because there are 3 possible transitions if `S` is on top of the stack
+
+    - for now we'll assume we have some oracle that lets us always pick the right transition to use
+
+- let's see what happens with input `abcba`; pay particular attention to the stack
+
+```
+ϵ ⟶ S$ ⟶ aSa$ ⟶ ̸aSa$ ⟶ ̸abSba$ ⟶ ̸a̸bSba$ ⟶ ̸a̸bcba$ ⟶ ̸a̸b̸cba$ ⟶ ̸a̸b̸c̸ba$ 
+  ⟶ ̸a̸b̸c̸b̸a$ ⟶ ̸a̸b̸c̸b̸a̸$
+```
+
+- the stack is going through a top-down derivation for the input
+
+    - when the top of the stack is `S` we expand it by pushing a production
+
+    - when the top of the stack is a terminal we match it against the input
+
+    - starting from `S` we work our way to the entire input string, and because of how the stack works we're getting a leftmost derivation
+
+- this approach gives us what we want, but relies on having an oracle; what if we don't have one?
+
+    - then we need to guess, and if we guess wrong then we need to backtrack, i.e., if the PDA rejects we need to rollback to the last place we guessed and guess something different
+
+    - this can be exponential if we always guess wrong at first; we'll see soon how an LL(1) grammar can prevent this problem from happening
+
+- how would we implement this idea in code?
+
+    - the PDA stack is what's keeping track of the derivation
+
+    - we don't need to actually translate the grammar to a PDA, we can use the computer's implicit function stack [remind them how a function stack works]
+
+    - in other words, we use recursion
+
+- here's how it works for our example in pseudocode [see OneNote]
+
+```
+S ::= aSa | bSb | c
+
+fn S() {
+  saved_input = curr_input;
+
+  try { // aSa
+    curr_input.consume('a');
+    S();
+    curr_input.consume('a');
+  }
+  else try { // bSb
+    curr_input = saved_input;
+    curr_input.consume('b');
+    S();
+    curr_input.consume('b');
+  }
+  else try { // c
+    curr_input = saved_input;
+    curr_input.consume('c')
+  }
+  else {
+    curr_input = saved_input;
+    fail
+  }
+}
+```
+
+- [show what happens for input `abcba`]
+
+- notice that the recursive function stack is mimicking what happened with the PDA stack---it's tracking the derivation
+
+    - when we make a recursive call we save our current place in the code, process the call, then resume from where we left off---e.g., the stack lets us remember that after we match an `a` and then try to match `S()`, we still need to match another `a`
+
+- here's the general idea for any grammar
+
+    - create a set of mutually recursive functions, one per nonterminal
+
+    - each function `A()` will have a case for each rule `A ::= α` in the grammar
+
+    - when `A()` is called it tries each case in turn until it succeeds or runs out of cases and fails
+
+        - suppose we have rules `A ::= α₁α₂...αₙ | β₁β₂...βₘ`, where each `αᵢ` and `βᵢ` may be either a terminal (i.e., a character) or a nonterminal
+
+        - then we create a function `A()` that tries the first rule, then if it doesn't work it tries the second rule, then if that doesn't work it fails
+
+        - for each rule we look at `αᵢ` (or `βᵢ` depending on which rule we're trying) and:
+
+            - if `αᵢ` is a terminal, tries to consume matching characters from the input; if successful goes to `αᵢ₊₁` else fails this rule
+
+            - if `αᵢ` is a nonterminal, calls the corresponding function; if the function returns successfully then we go to `αᵢ₊₁` else we fail this rule
+
+### LL(1) recursive descent
+
+- backtracking kills performance, and for some grammars recursion can result in non-termination---how can we make this strategy efficient?
+
+    - that's where an LL(1) grammar comes in
+
+- consider the PDA we created for our example gramar and note that we could make it a DPDA by adding _lookahead_
+
+```
+q0 -[ϵ, ϵ⟶S$]→ q1 -[ϵ, $⟶ϵ]→ q2 (accepting)
+                |↑
+      [a, ϵ⟶ϵ] || [ϵ, a⟶ϵ]
+                ↓|
+                qA
+                ⇵
+            [ϵ, S⟶aSa]
+
+[repeat construction for qB, qC]
+```
+
+- let's see what happens with input `abcba`
+
+    - [same as before, except not relying on oracle]
+
+    - it's completely deterministic, no guessing involved
+
+- what does that mean for our recursive descent algorithm? it means no backtracking is necessary [see OneNote]
+
+```
+fn S() {
+  if next token is 'a' { // aSa
+    input.consume('a');
+    S();
+    input.consume('a');
+  }
+  else if next token is 'b' { // bSb
+    input.consume('b');
+    S();
+    input.consume('b');
+  }
+  else if next token is 'c' { // c
+    input.consume('c');
+  }
+  else fail
+}
+```
+
+- there is a special case we need to worry about: what if a nonterminal has an ϵ production?
+
+    - just treat it as the default case, i.e., the thing to do if none of the other cases are true
+
+- new example grammar
+
+```
+A ::= xy | yBz
+B ::= wy | ϵ
+```
+
+- code
+
+```
+fn A() {
+  if next token is 'x' {
+    input.consume('x');
+    input.consume('y');
+  }
+  else if next token is 'y' {
+    input.consume('y');
+    B();
+    input.consume('z');
+  }
+  else fail
+}
+
+fn B() {
+  if next token is 'w' {
+    input.consume('w');
+    input.consume('y');
+  } else {
+    // don't consume anything, but still return success
+  }
+}
+```
+
+- the key is that by looking at the next token we _always_ know exactly what rule we should be trying to match (and if the next token isn't one we expect then we return an error)
+
+- a grammar s.t. we can use `k` tokens of lookahead to make the recursive descent algorithm completely deterministic is an LL(k) grammar
+
+    - this isn't true of all grammars, or even all deterministic grammars, but we can often make it work for real programming languages
+
+    - for us, k = 1 (and for most real programming languages)
+
+- why `LL(k)`?
+
+    - we're processing the input from `L`eft to right
+    - we're tracking a `L`eftmost derivation
+    - we're using `k` tokens of lookahead
+
+### exercise
+
+- given the following grammar
+
+```
+S ::= aPb | Qc | cRd | TcP 
+P ::= QR | TR | ε 
+Q ::= fR | b 
+R ::= d | gbc 
+T ::= ea | Ra
+```
+
+- write pseudocode for a recursive descent LL(1) parser; remember: 
+
+    - for each nonterminal there is a function
+    
+    - the function contains a case for each production rule for that nonterminal
+
+    - we use one token of look-ahead to determine which case to execute
+
+- trace the parser for inputs:
+
+    - `afgbcdb`  [PASS]
+    - `daceagbc` [PASS]
+
+- SOLUTION
+
+```
+fn S() {
+  if next token is a {
+    input.consume('a');
+    P();
+    input.consume('b');
+  }
+  else if next token is in {f, b} {
+    Q();
+    input.consume('c');
+  }
+  else if next token is c {
+    input.consume('c');
+    R();
+    input.consume('d');
+  }
+  else if next token is in {e, d, g} {
+    T();
+    input.consume('c');
+    P();
+  }
+  else fail
+}
+
+fn P() {
+  if next token is in {f, b} {
+    Q();
+    R();
+  }
+  else if next token is in {e, d, g} {
+    T();
+    R();
+  }
+}
+
+fn Q() {
+  if next token is f {
+    input.consume('f');
+    R();
+  }
+  else if next token is b {
+    input.consume('b');
+  }
+  else fail
+}
+
+fn R() {
+  if next token is d {
+    input.consume('d');
+  }
+  else if next token is g {
+    input.consume('gbc');
+  }
+  else fail
+}
+
+fn T() {
+  if next token is e {
+    input.consume('ea');
+  }
+  else if next token is in {d, g} {
+    R();
+    input.consume('a');
+  }
+  else fail
+}
+```
+
+## formalizing LL(1)
+### intro
+
+- how do we know if a grammar is LL(1) and thus suitable for implementing in this way? there are two criteria:
+
+    - no _left recursion_
+
+    - deterministic look-ahead (using 1 token)
+
+- if the grammar meets these criteria, it is LL(1)
+
+### left recursion
+
+- a grammar is _left recursive_ if there exists a derivation `A -->* Aα` for some nonterminal `A`
+
+    - this means that when matching `A`, we recursively need to match `A` again _without_ consuming any input
+
+    - if we're using recursion, this means that we're caught in an infinite recursive cycle
+
+- example
+
+```
+S ::= Sa | b
+
+fn S() {
+  if next token is `b` {
+    input.consume('b');
+  }
+  else if next token is `a` {
+    S();
+    input.consume('a');
+  }
+}
+
+input: "baa"
+```
+
+- in order to allow a recursive descent parsing strategy, we have to forbid left-recursive grammars
+
+### deterministic look-ahead
+
+- our intuition is that for any given nonterminal `A` that has multiple rules, looking at the next token in the input is sufficient to determine which rule we need to pick
+
+    - we call a grammar for which this is true a _predictive grammar_
+
+- our simple example from earlier: `S ::= aSa | bSb | c`
+
+    - if we have an `S` symbol and need to expand it with one of these rules, by looking at the next token in the input we can tell which rule to use
+
+- in general it may be a bit more complicated to figure out the symbols to use; take the grammar from the previous exercise, where some rules (e.g., for `P`) themselves start with nonterminals
+
+```
+S ::= aPb | Qc | cRd | TcP 
+P ::= QR | TR | ε 
+Q ::= fR | b 
+R ::= d | gbc 
+T ::= ea | Ra
+```
+
+- we can formalize this intuition; first we'll do so assuming there are no ϵ rules, then we'll add in ϵ rules (which make things a bit more complicated)
+
+### look-ahead without ϵ
+
+- let α, β be strings of terminals (T) and nonterminals (N), then:
+
+```
+FIRST(α) = { t ∈ T | α -->* tβ }
+```
+
+- in other words, FIRST(α) is the set of terminals that can be derived from α with 0 or more applications of the grammar production rules
+
+    - there is an algorithm to compute FIRST sets (given in the textbook), but for many grammars it's easy enough to compute manually by inspection
+
+- example
+
+```
+S ::= AB
+A ::= xBw | yBz | Bwz
+B ::= 0 | 1
+
+  FIRST(S) = { x, y, 0, 1 }
+  FIRST(A) = { x, y, 0, 1 }
+  FIRST(B) = { 0, 1 }
+FIRST(xBw) = { x }
+FIRST(yBz) = { y }
+FIRST(Bwz) = { 0, 1 }
+```
+
+- if a grammar is LL(1), then for any nonterminal `A ::= α | β` it must be true that FIRST(α) is disjoint from FIRST(β)
+
+    - thus, we just need to see if the next token belongs to FIRST(α) or FIRST(β) to determine which rule to use
+
+### look-ahead with ϵ
+
+- example
+
+```
+A ::= xBA | f
+B ::= xwB | ϵ
+
+  FIRST(A) = { x, f }
+  FIRST(B) = { x }
+FIRST(xBA) = { x }
+  FIRST(f) = { f }
+FIRST(xwB) = { x }
+  FIRST(ϵ) = {}
+```
+
+- at first it seems things are OK: for both `A` and `B` the FIRST sets of the productions rules are disjoint---but consider the input `xxf`
+
+    - `A` is the start symbol, so we begin matching there
+    - look-ahead = `x`, so we use the first rule `xBA` and consume `x`
+    - now we're matching `BA`
+    - look-ahead = `x`, so we use the first rule `xwB` and consume `x`
+    - now we're matching `wBA`
+    - ERROR: next input symbol is `f` which doesn't match `w`
+
+- what happened? the correct way to parse input `xxf` would be:
+
+    - expand `A` to `xBA`
+    - consume `x`
+    - expand `B` to ϵ
+    - expand `A` to `xBA`
+    - consume `x`
+    - expand `B` to ϵ
+    - expand `A` to `f`
+    - consume `f`
+
+- but we can't figure this out just looking at the next token because the ϵ allows us to "throw away" a nonterminal at any time (by picking the ϵ rule when expanding it)
+
+    - therefore looking at the next token doesn't always tell us what the correct thing to do is
+
+- enter FOLLOW sets: for any nonterminal `A`, `FOLLOW(A)` is the set of terminals that can _immediately_ follow any expansion of `A`
+
+    - that is, for all production rules `αAβ` FIRST(β) is included in FOLLOW(A)
+
+    - note that FOLLOW is only for nonterminals, whereas FIRST was for any string of terminals or nonterminals
+
+    - there is another algorithm for computing FOLLOW sets (in the textbook), but again it's often easy enough to manually compute it by inspection
+
+```
+A ::= xBA | f
+B ::= xwB | ϵ
+
+FOLLOW(A) = {}
+FOLLOW(B) = FIRST(A) = { x, f }
+```
+
+- if a grammar is LL(1), then for any nonterminal `A ::= α | β` it must be true that if α -->* ϵ, then FIRST(β) and FOLLOW(A) are disjoint
+
+    - in other words, by looking at the next token we can decide whether we should expand `A` or throw it away using ϵ
+
+    - when matching `A`, if the next token is in FIRST(α) expand to α, else if the first token is in FIRST(β) expand to β, else assume we're using the ϵ and match without consuming any input
+
+    - this is exactly the strategy we used when making our recursive descent parser---this property of LL(1) grammars is why it's guaranteed to work correctly
+
+- based on this requirement, the example grammar is _not_ LL(1) because FIRST(xwb) ∩ FOLLOW(B) = { x }, so they are not disjoint
+
+- to sum up:
+
+    - FIRST sets tell us which production rule to use based on the look-ahead, and for an LL(1) grammar this is unambiguous
+    
+    - FOLLOW sets tell us whether using the FIRST sets this way will actually work in the presence of ϵ rules, and for an LL(1) grammar it must be true that they will
+
+### exercise
+
+- compute the FIRST and FOLLOW sets of the following grammar and explain all the reasons why it is _not_ predictive
+
+```
+A ::= xBy | Bx | zCw
+B ::= wB | ε
+C ::= wC | DB
+D ::= yD | ε
+```
+
+- solution
+
+```
+    FIRST   FOLLOW
+--- ------- --------
+A   w,x,z   ∅
+B   w       x,y
+C   w,y     w
+D   y       w
+
+for A: FIRST(xBy) ∩ FIRST(Bx) = {x}
+for C: FIRST(wC) ∩ FIRST(DB) = {w}
+for C: FIRST(wC) ∩ FOLLOW(C) = {w}
+```
+
+### what about regular expressions in the production rules?
+
+- remember that the regular expressions are just convenient short-hand; expanding them back to "standard" CFGs helps understand how to deal with them
+
+- if the grammar is LL(1), then we can always determine how to handle them based on the look-ahead
+
+- dealing with `?`: remember that `r?` is just `r | ϵ`
+
+    - in the following example, if the grammar is LL(1) then α₂ and α₃ must begin with different terminals and so we can immediately tell whether to consume α₂ or α₃
+
+```
+// using ?
+A ::= α₁ α₂? α₃
+
+// we don't have to actually translate to this version, but it makes
+// clear how to process the ?
+A ::= α₁ B α₃
+B ::= α₂ | ϵ
+```
+
+- dealing with `*`: this means that the expression can happen any number of times (including 0)
+
+    - in the example below, if the grammar is LL(1) then α₂ and α₃ must begin with different terminals and so we can immediately tell whether to consume α₂ or α₃---then we keep asking that question in a loop until the answer is to consume α₃
+
+    - note that we had to translate the `*` using _right_ recursion since LL(1) grammars can't have left recursion, which automatically makes the parse right-associative; this is a problem if we actually want it to be left-associative
+
+        - we have to parse and then modify the AST afterwards
+
+        - it's easiest to not translate the grammar and just parse using the `*` operator directly per the below bullet
+
+    - if we're directly using the `*` in our parser instead of translating then we just use a loop to get a vector of α₂, then make it left- or right-associative when we put it into the AST depending on what we have specified for the language
+
+```
+// using *
+A ::= α₁ α₂* α₃
+
+// we don't have to actually translate to this version, but it makes
+// clear how to process the *
+A ::= α₁ B α₃
+B ::= α₂B | ϵ
+```
+
+- dealing with `+`: remember that `r+` is just `rr*`, we can deal with it just like `r*` except we require that there's at least one α₂
+
+## building the AST
+
+- recall that the derivation tree (aka parse tree, concrete syntax tree) contains more information than we really need after parsing
+
+    - e.g., punctuation, parentheses, braces, etc, as well as the exact sequence of expanded nonterminals used to build the tree
+
+    - it shows _how_ the program was parsed, but all we need after parsing is the underlying structure of the program
+
+    - this underlying structure is called the _abstract syntax tree_ (AST)
+
+- example grammar (arithmetic expressions with precedence to enforce LL(1))
+
+```
+E ::= FX
+X ::= + FX | ε
+F ::= GY
+Y ::= * GY | ε
+G ::= (E) | id
+```
+
+- concrete syntax tree for `x + y * z` (draw as tree)
+
+```
+E ⟶ [FX] 
+  ⟶ [GY]X 
+  ⟶ [id(x)]YX 
+  ⟶ id(x)[ϵ]X 
+  ⟶ id(x)[+FX] 
+  ⟶ id(x)+[GY]X
+  ⟶ id(x)+[id(y)]YX 
+  ⟶ id(x)+id(y)[*GY]X 
+  ⟶ id(x)+id(y)*[id(z)]YX
+  ⟶ id(x)+id(y)*id(z)[ϵ]X 
+  ⟶ id(x)+id(y)*id(z)[ϵ]
+```
+
+- abstract syntax tree (draw as tree)
+
+```
+(Add
+  Id(x)
+  (Mul
+    Id(y)
+    Id(z)
+  )
+)
+```
+
+- it's called the _abstract_ syntax tree because it abstracts out the unimportant (now that parsing is over) information from the concrete parse tree
+
+- we often directly compute the AST during parsing rather than creating a concrete parse tree and then abstracting it
+
+- we do this by inserting the AST construction logic directly into the functions doing the parsing
+
+    - instead of functions just consuming the input and returning nothing, they'll consume the input and return AST sub-trees
+
+    - when a function calls another function, it takes the returned AST sub-tree and adds it to the AST tree it's creating
+
+- so we need to define the AST data structure, then insert the appropriate logic into our parsing functions
+
+- example: for the grammar above, we could use the following data structure as the AST
+
+```
+AST
+| Id { name: string }
+| Add { left: AST, right: AST }
+| Mul { left: AST, right: AST }
+```
+
+- the recursive descent parser for the grammar [see OneNote]
+
+```
+fn E() { 
+  F();
+  X();
+}
+
+fn X() {
+  if next token is `+` {
+    input.consume('+');
+    F();
+    X();
+  }
+}
+
+fn F() {
+  G();
+  Y(); 
+}
+
+fn Y() {
+  if next token is '*' {
+    input.consume('*');
+    G();
+    Y();
+  }
+}
+
+fn G() {
+  if next token is `(` {
+    input.consume('(');
+    E();
+    input.consume(')');
+  }
+  else if next token is id(name) {
+    input.consume(id);
+  }
+  else fail
+}
+```
+
+- modified to produce an AST [see OneNote]
+
+```
+fn E() -> AST { 
+  a = F();
+  b = X();
+  if b is nil { return a; }
+  else { return AST::Add(a, b); }
+}
+
+fn X() -> AST {
+  if next token is `+` {
+    input.consume('+');
+    a = F();
+    b = X();
+    if b is nil { return a; }
+    else { return AST::Add(a, b); }
+  }
+  return nil;
+}
+
+fn F() -> AST {
+  a = G();
+  b = Y();
+  if b is nil { return a; }
+  else { return AST::Mul(a, b); }
+}
+
+fn Y() -> AST {
+  if next token is '*' {
+    input.consume('*');
+    a = G();
+    b = Y();
+    if b is nil { return a; }
+    else { return AST::Mul(a, b); }
+  }
+  return nil;
+}
+
+fn G() -> AST {
+  if next token is `(` {
+    input.consume('(');
+    ast = E();
+    input.consume(')');
+    return ast;
+  }
+  else if next token is id(name) {
+    input.consume(id);
+    return AST::Id(name);
+  }
+  else fail
+}
+```
+
+- example (or exercise): given the grammar and parser below, modify the parser to return an AST as also defined below and run it on `payawazaxa` [see OneNote]
+
+ambiguous grammar (think of `w`, `x`, `y`, `z` as binary operators, `p` as a unary operator, and `a` as a constant):
+```
+A ::= AyB | AzB | B
+B ::= BwC | BxC | C
+C ::= pC | a
+```
+
+LL(1) grammar:
+```
+A ::= BX
+X ::= yBX | zBX | ε
+B ::= CY
+Y ::= wCY | xCY | ε
+C ::= pC | a
+```
+
+```
+AST
+| a
+| w { op1: AST, op2: AST }
+| x { op1: AST, op2: AST }
+| y { op1: AST, op2: AST }
+| z { op1: AST, op2: AST }
+| p { op: AST }
+```
+
+recursive descent parser:
+```
+fn A() {
+  B();
+  X();
+}
+
+fn X() {
+  if next token is 'y' or 'z' {
+    if next token is 'y' { input.consume('y'); }
+    else { input.consume('z'); }
+    B();
+    X();
+  }
+}
+
+fn B() {
+  C();
+  Y();
+}
+
+fn Y() {
+  if next token is 'w' or 'x' {
+    if next token is 'w' { input.consume('w'); }
+    else { input.consume('x'); }
+    C();
+    Y();
+  }
+}
+
+fn C() {
+  if next token is 'p' {
+    input.consume('p');
+    C();
+  }
+  else if next tokan is 'a' {
+    input.consume('a');
+  }
+  else fail
+}
+```
+
+modified parser (SOLUTION)
+```
+fn A() -> AST {
+  a = B();
+  b = X();
+  if X matched 'y' { return AST::y(a, b); }
+  else if X matched 'z' { return AST::z(a, b); }
+  else { return a; }
+}
+
+fn X() -> AST {
+  if next token is 'y' or 'z' {
+    if next token is 'y' { input.consume('y'); }
+    else { input.consume('z'); }
+    a = B();
+    b = X();
+    if X matched 'y' { return AST::y(a, b); }
+    else if X matched 'z' { return AST::z(a, b); }
+    else { return a; }
+  }
+  return nil;
+}
+
+fn B() -> AST {
+  a = C();
+  b = Y();
+  if Y matched 'w' { return AST::w(a, b); }
+  else if Y matched 'x' { return AST::y(a, b); }
+  else { return a; }
+}
+
+fn Y() -> AST {
+  if next token is 'w' or 'x' {
+    if next token is 'w' { input.consume('w'); }
+    else { input.consume('x'); }
+    a = C();
+    b = Y();
+    if Y matched 'w' { return AST::w(a, b); }
+    else if Y matched 'x' { return AST::y(a, b); }
+    else { return a; }
+  }
+  return nil;
+}
+
+fn C() -> AST {
+  if next token is 'p' {
+    input.consume('p');
+    return AST::p(C());
+  }
+  else if next tokan is 'a' {
+    input.consume('a');
+    return AST::a;
+  }
+  else fail
+}
+```
+
+AST for `payawazaxa`
+```
+y(
+  p(a),
+  z(
+    w(a, a)
+    x(a, a)
+  )
+)
+```
+
+- what is the AST for cflat? [see OneNote]
+
+    - see `cflat-docs/ast.md`
+
+## transforming a grammar to LL(1)
+
+- FIXME: MAYBE SKIP OR ABBREVIATE FOR TIME? IT'S IN THE TEXTBOOK
+
+### intro
+
+- how do we take a grammar that isn't LL(1) and turn it into a grammar that is LL(1)?
+
+    - for example, our cflat grammar is not LL(1) and so we cannot use it for a recursive descent LL(1) parser as-is
+
+- there are three main things to we need to worry about
+
+    - precedence: when there are multiple ways to parse a given string, we need to refactor the grammar to enforce a single possible parse
+
+    - left-recursion: a grammar that has nonterminals in the "wrong" places can prevent recursive descent parsers from ever terminating, so we need to refactor the grammar to make sure this doesn't happen
+
+    - look-ahead: we need to make sure that the grammar is deterministic using a given amount of _look-ahead_
+
+### establishing precedence
+
+- if there are multiple ways to parse a given string, we need to force the grammar to allow only a single parse
+
+- we do this by establishing _precedence_: we enforce that one parse is preferable and should always be used if possible
+
+- example ambiguous grammar
+
+```
+E ::= id | E + E | E - E | E * E | E / E | (E)
+```
+
+- conventionally multiplication should have precedence over addition
+
+    - given `a + b * c`, we should treat it as `a + (b * c)`
+
+- there are several strategies that have been developed to enforce precedence in a grammar, but we'll use the classical solution that modifies the grammar itself to enforce the desired precedence
+
+- method:
+
+    - decide on the levels of precedence, e.g., {`()`} > {`*`,`/`} > {`+`,`-`}
+
+    - create a nonterminal for each level of precedence (we can reuse the original nonterminal for the lowest predecedence level)
+
+    - factor out the operations into the appropriate nonterminal for their level of precedence
+
+- example:
+
+```
+G = {`()`}
+F = {`*`,`/`}
+E = {`+`,`-`}
+
+E ::= E + F | E - F | F
+F ::= F * G | F / G | G
+G ::= (E) | id
+```
+
+- notice the following properties:
+
+    - each nonterminal rule that applies a binary operator has one operand that is the same nonterminal again and the other is the next highest precedence level nonterminal
+
+        - this allows the expression to have multiple of the same precedence level operators in a row
+        
+        - choosing which side is which controls the associativity of the operator: having the same nonterminal on the left makes the operator left associative; having it on the right makes the operator right associative
+
+    - each nonterminal (except the highest precedence, `G`) allows for applying an operator at the level of predecence or directly falling through to the next level
+
+        - this allows the expression to not have any operators at the lower precedence level, e.g., an expression that doesn't have `+` in it
+
+    -  the base cases for expressions (e.e., `id`) are always at the highest level of precedence
+
+        - this allows the expression to just be an identifier without any operators at all
+
+- examples
+
+```
+  x + y * z ==> x + (y * z)
+  x * y + z ==> (x * y) + z
+  x * y * z ==> (x * y) * z
+(x + y) * z ==> (x + y) * z
+```
+
+- we've looked at this using arithmetic operators as our examples, but it applies in many other situations, e.g.:
+
+    - relational and logical operators: `!(x < y) && z < y`
+
+    - subscript operators: `a + b[i]`
+
+    - type casts: `(double)a / b`
+
+- exercise: rewrite the following grammar assuming that all operator are left-associative and using the following precedence levels:
+
+    - {`p`} > {`w`,`x`} > {`y`,`z`}
+
+```
+A ::= A R A | p A | a
+R ::= w | x | y | z
+```
+
+- solution
+
+```
+A ::= A y B | A z B | B
+B ::= B w C | B x C | C
+C ::= p C | a
+```
+
+### removing left-recursion
+#### intro
+
+- we saw before that left recursion causes non-termination in a recursive descent parser; how can we remove it?
+
+- we can define two kinds of left recursion
+
+    - _direct_: there is a production of the form `A ::= Aα`
+
+    - _indirect_: there is a set of mutually recursive productions that allow a left-recursive derivation (possibly involving an ϵ rule)
+
+- example 1: indirect left recursion
+
+```
+A ::= B | alice
+B ::= C | bob
+C ::= A charlie
+
+consider A --> B --> C --> A charlie
+```
+
+- example 2: indirect left recursion with ϵ
+
+```
+A ::= B | alice
+B ::= C | bob
+C ::= DA charlie
+D ::= dave | ε
+
+consider A --> B --> C --> DA charlie --> A charlie
+```
+
+#### removing direct left recursion
+
+- this is easy to fix: any left-recursive production can be changed to an equivalent right-recursive production as follows
+
+- given: `A ::= Aα | β | γ` s.t. α,β,γ don't start with `A`
+
+    - this grammar says that there can be β or γ then a sequence of αs
+
+- transformed: `A ::= βB | γB`, `B ::= αB | ϵ`
+
+    - this grammar says the same thing, but using right-recursion
+
+- any left-recursive rule must have some non-recursive base case (β and γ in the above example), otherwise the recursive would never terminate
+
+    - we just rearrange those base cases to use right-recursion instead of left-recursion
+
+- what if there are multiple left-recursive rules for `A`?
+
+    - there must still be at least one base case that we can use
+
+    - example: `A ::= Aα | Aβ | γ`
+
+    - transformed: `A ::= γB`, `B ::= αB | βB | ϵ`
+
+- example
+
+```
+E ::= E+F | E-F | F
+F ::= (E) | id
+```
+
+- transformed
+
+```
+E ::= FG
+F ::= (E) | id
+G ::= +FG | -FG | ϵ
+```
+
+#### removing indirect left recursion
+
+- there are several strategies for removing indirect left recursion, but the conceptually simplest is to just inline productions to turn indirect recusion into direct recursion and then applying the transformation from earlier
+
+- example
+
+```
+A ::= B | alice
+B ::= C | bob
+C ::= A charlie
+```
+
+```
+A ::= C | bob | alice
+B ::= C | bob
+C ::= A charlie
+```
+
+```
+A ::= A charlie | bob | alice
+B ::= C | bob
+C ::= A charlie
+```
+
+```
+A ::= bob D | alice D
+D ::= charlie D | ϵ
+B ::= C | bob
+C ::= A charlie
+```
+
+- note that now `B` and `C` are not reachable from the start symbol `A` and can be removed; in general that may or may not happen
+
+- this strategy also works for dealing with ϵ
+
+```
+A ::= B | alice
+B ::= C | bob
+C ::= DA charlie
+D ::= dave | ϵ
+```
+
+```
+A ::= C | bob | alice
+B ::= C | bob
+C ::= DA charlie
+D ::= dave | ϵ
+```
+
+```
+A ::= DA charlie | bob | alice
+B ::= C | bob
+C ::= A charlie
+D ::= dave | ϵ
+```
+
+```
+A ::= dave A charlie | A charlie | bob | alice
+B ::= C | bob
+C ::= A charlie
+D ::= dave | ϵ
+```
+
+### left-factoring for predictability
+
+- after establishing precedence and removing left recursion, the grammar still may not be predictive
+
+- _left factoring_ is a transformation that can possibly make it predictive (but doesn't work for all grammars)
+
+- example: this grammar is not predictive because all three rules start with `id`
+
+```
+E ::= id | id[E] | id(E)
+```
+
+- but we can make it predictive by factoring out the `id`
+
+```
+E ::= id F
+F ::= [E] | (E) | ϵ
+```
+
+- this is the left-factoring transformation; in general terms:
+
+    - `A ::= αβ₁ | αβ₂ | ... | αβₙ`
+
+    - becomes `A ::= αB`, `B ::= β₁ | β₂ | ... | βₙ`
+
+### a final note [only need to cover if someone asks about it]
+
+- you might have learned in 138 that we can transform any grammar to remove ϵ rules, which might seem to make FOLLOW sets unnecessary
+
+- however, this transformation can make the grammar non-predictive, which we would need to fix using left-factoring
+
+- but left-factoring may re-introduce the ϵ rules, so we have to deal with them
