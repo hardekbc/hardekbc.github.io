@@ -2,16 +2,13 @@
 
 ## TODO:
 
-- share invite link: https://join.slack.com/t/160-f25/shared_invite/zt-3elo16cnm-3hNei8zBMyzoDHeceWnXcg
-- create AI info form for assignments
-- in assignment writeup, tell them to use addresssanitizer
-    - https://github.com/google/sanitizers/wiki/AddressSanitizer (the given flags for clang, but they're the same for gcc)
+- at end of quarter, send out AI survey form (create gradescope assignment for them to submit it)
 
 ## lecture timing
 
-- week 0.2 (quarter starts on thursday): up to 'compiler overview::things we're leaving out'
-- week 1.1: 
-- week 1.2: 
+- week 0.2 (quarter starts on thursday): up to (not including) 'compiler overview::things we're leaving out'
+- week 1.1: through 'lexing'
+- week 1.2: up to (not including) 'parsing::recursive descent and LL(1)::LL(1) recursive descent'
 - week 2.1: [ASSIGN-1 OUT]
 - week 2.2: 
 - week 3.1: 
@@ -58,6 +55,30 @@
 | 64--66     | D            |
 | 60--63     | D-           |
 | 00--59     | F            |
+
+## misc notes
+
+- this quarter i'm replacing the lir optimization assignment with a garbage collection assignment, and so moved the lecure material around accordingly (still covering the material, but later and less in-depth from last time)
+
+- i'm still not covering register allocation, mostly due to lack of time; if i do decide to cover it then i need to decide what to remove (and also create the lecture notes for it---see what i can crib from mehmet)
+
+- be sure to tell the students that when they access JSON files for their assignments (i.e., reading the input for the verification, lowering, and codegen assignments) they should be sure to use references and not deep copying (e.g., `json& funcs = value["functions"]` not `json funcs = value["functions"]`). they also probably want to create a new data structure (AST or LIR) from the JSON rather than only using the JSON itself.
+
+- gradescope
+
+    - sometimes student submissions give corrupted output (e.g., not utf-8), which causes the `DiffOutputFiles` to fail and thus the entire grading script; figure out a way to tolerate these kinds of failures and treat them as incorrect outputs (maybe add a specific test for this problem in `DiffOutputFiles`)
+
+    - students get confused by the output on a failure: we give the total number of tests passed out of the total number of tests, and they think it gives the actual test number (even though we give them the name of the test in the same message)---this is only a problem because that's how they identify the test in their communications to us which is confusing; maybe we can tweak the failure message to make it more clear?
+
+- assign-1
+
+    - copy-pasting the failed program from the grader output doesn't copy the special characters (e.g., `\r`, `\t`, etc); the students need to be aware of this possibility
+
+    - we give the students the LL(1) version of the grammar so they never actually have to use the grammar refactoring rules; i think this is fair given all the other stuff they have to do, but maybe think about giving quizzes (graded or not) where they have to refactor some simple grammars
+
+    - since test cases are generated as ASTs and then printed out as source code, the test cases have more regular syntax than the grammar allows---for example, toplevel constructs will always be in the same order, every function will have at most one let, and arithmetic ops are all parenthesized to make precedence explicit; to allow for testing the student parsers more thoroughly it would be good to create a printer that randomizes these things
+
+        - for now i've decided that this isn't worth fixing; maybe later if i have time
 
 # course logistics
 
