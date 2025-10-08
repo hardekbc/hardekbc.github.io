@@ -9,7 +9,7 @@
 - week 0.2 (quarter starts on thursday): up to (not including) 'compiler overview::things we're leaving out'
 - week 1.1: through 'lexing'
 - week 1.2: up to (not including) 'parsing::recursive descent and LL(1)::LL(1) recursive descent'
-- week 2.1: [ASSIGN-1 OUT]
+- week 2.1: up to (not including) 'parsing::building the AST' [ASSIGN-1 OUT]
 - week 2.2: 
 - week 3.1: 
 - week 3.2: 
@@ -1841,8 +1841,6 @@ y(
 
 ## transforming a grammar to LL(1)
 
-- FIXME: MAYBE SKIP OR ABBREVIATE FOR TIME? IT'S IN THE TEXTBOOK
-
 ### intro
 
 - how do we take a grammar that isn't LL(1) and turn it into a grammar that is LL(1)?
@@ -2111,3 +2109,111 @@ F ::= [E] | (E) | ϵ
 - however, this transformation can make the grammar non-predictive, which we would need to fix using left-factoring
 
 - but left-factoring may re-introduce the ϵ rules, so we have to deal with them
+
+# validation
+## what is validation
+
+- after parsing we know that the program is syntactically correct, but that doesn't necessarily mean that it's valid
+
+- what does "valid" mean? whatever the language designer decides it means
+
+- there are some common, trivial rules that are easy to check, like:
+
+    - there is a `main` function (or whatever entry point the language has)
+    - no two functions have the same name
+    - basically any purely syntactic check...
+
+- non-trivial validation can be done in several different ways
+
+    - cflat has a _static type system_, like C, C++, Java, etc; this means non-trivial validation is done by the compiler
+
+    - other language have dynamic type systems, where non-trivial validation happens at runtime
+
+    - we'll talk more about the pros and cons of this choice later
+
+## what is a static type system
+
+- recall the following example
+
+```
+let x:int = 0, y:int = 10;
+x = new int;
+y = x * y;
+```
+
+- this program doesn't make sense because it multiplies a pointer by an integer; other examples of things that don't make sense are: trying to access an integer as if it were a struct, trying to index into a function as if it were an array, etc
+
+    - we can't compile these nonsensical programs because there isn't any sensible assembly instructions that we can translate them to
+
+- a type system is a framework that allows us to precisely specify what things "make sense" for our language and what things do not
+
+- a _type_ describes a set of values along with what operations are valid for those values
+
+    - `int` describes the set of integers
+    - `&int` describes the set of pointers to integers
+    - `[int]` describes the set of arrays with integer elements
+    - etc
+
+- saying that expression `e` has type `T` means that when `e` is evaluated at runtime, the resulting value will belong to the set described by `T`
+
+    - `1 + 2` has type `int` because its value is `3`, which is an integer
+
+    - `new int` has type `&int` because its value is a pointer to a location in the heap that holds an integer
+
+- the type system provides a set of rules that allow us to assign a type to every element of the AST as long as that type is compatible with the operations being done by/one that element
+
+    - for example, the rules would not allow us to assign a type to `x * y` in the example above because `*` is not a valid operation on pointers
+
+    - note that type systems are language-specific; we could invent a new language where it _does_ make sense to multiply a pointer by an integer, in which its type system would allow it
+
+- type systems are covered in detail in CS 162, so i'm only going over the very basics here; i recommend 162 to learn more
+
+## how do type systems work
+
+- a type system is defined by:
+
+    - the set of types that the language recognizes
+    
+    - the typing rules that describe how to assign types to elements of the AST
+
+- the typing rules consist of:
+
+    - _typing judgements_ that state that a particular typing fact holds (e.g., that this element of the AST has this type)
+
+    - _inference rules_ that state how we can conclude whether a particular judgement is true
+
+- there is a very strong connection between type systems and formal logic
+
+    - judgements and inference rules come from the _natural deduction_ style of formal logic
+
+    - the _curry-howard correspondance_ states that types are propositions and programs are proofs; from this perspective a type checker is a proof verifier
+
+- TODO:
+
+    - explain what a judgement looks like and how to read it
+    - explain what an inference looks like and how to read it
+    - explain how to apply the rules to assign types to an AST
+    - explain how to turn a type system into code
+
+## categorizing type systems
+
+- type systems can be classified along a number of dimensions; we'll list some of the important ones and discuss their pros and cons
+
+### TODO: static vs dynamic
+
+### TODO: strong vs weak
+
+### TODO: explicit vs implicit
+
+## the cflat type system
+
+- cflat's type system has a simple, static, strong, explicit type system; what does this mean?
+
+    - _simple_: no polymorphism, dependent types, substructural types, etc
+    - _static_: types are checked at compile-time
+    - _strong_: a well-typed program cannot perform invalid operations
+    - _explicit_: the programmer explicitly annotates type information in the code
+
+- TODO: [go over `cflat-docs/validation.pdf`]
+
+- TODO: [go over OneNote example]
