@@ -7,10 +7,10 @@
 ## lecture timing
 
 - week 0.2 (quarter starts on thursday): up to (not including) 'compiler overview::things we're leaving out'
-- week 1.1: through 'lexing'
+- week 1.1: through end of 'lexing'
 - week 1.2: up to (not including) 'parsing::recursive descent and LL(1)::LL(1) recursive descent'
 - week 2.1: up to (not including) 'parsing::building the AST' [ASSIGN-1 OUT]
-- week 2.2: 
+- week 2.2: through end of parsing
 - week 3.1: 
 - week 3.2: 
 - week 4.1: 
