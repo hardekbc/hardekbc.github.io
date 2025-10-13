@@ -2176,44 +2176,288 @@ y = x * y;
     
     - the typing rules that describe how to assign types to elements of the AST
 
+- the set of types is usually described via a CFG (or something equivalent)
+
+    - note that there are usually an infinite number of possible types
+
+- EXAMPLE
+
+```
+τ ∈ Type ::= int | ref τ | τ... → τ
+[sequences of types may use vector notation or overlines instead of ellipses]
+```
+
 - the typing rules consist of:
 
     - _typing judgements_ that state that a particular typing fact holds (e.g., that this element of the AST has this type)
 
     - _inference rules_ that state how we can conclude whether a particular judgement is true
 
-- there is a very strong connection between type systems and formal logic
+    - there is a very strong connection between type systems and formal logic
 
-    - judgements and inference rules come from the _natural deduction_ style of formal logic
+        - judgements and inference rules come from the _natural deduction_ style of formal logic
 
-    - the _curry-howard correspondance_ states that types are propositions and programs are proofs; from this perspective a type checker is a proof verifier
+        - the _curry-howard correspondance_ states that types are propositions and programs are proofs; from this perspective a type checker is a proof verifier
 
-- TODO:
+- a _typing judgement_ states that a typing fact holds, and looks something like `Γ ⊢ e : τ` where:
 
-    - explain what a judgement looks like and how to read it
-    - explain what an inference looks like and how to read it
-    - explain how to apply the rules to assign types to an AST
-    - explain how to turn a type system into code
+    - `Γ` is a list of typing facts about the variables in scope, called the _context_
+    - `e` is the expression we're typing
+    - `τ` is the type of `e` that the judgement is asserting
+
+- EXAMPLE: `x:int, y:ref int ⊢ x + *y : int`
+
+    - we needed the context because `x + *y` by itself says nothing about the types of `x` or `y`, so it's impossible to determine what the type of `x + *y` is without that additional information
+
+- a _judgement_ explains how to prove that a judgement is correct; it is essentially an "if...then..." rule and looks like this:
+
+- EXAMPLE
+
+```
+Γ ⊢ e : ref τ
+-------------
+Γ ⊢ *e : τ
+```
+
+- from this example rule we are allowed to conclude:
+
+```
+x : ref int ⊢ *x : int
+x : ref ref int ⊢ *x : ref int
+x : ref ref int ⊢ **x : int
+```
+
+- a judgement may have 0 or more premises; all premises must be true in order to prove that the conclusion is true
+
+    - 0 premises means it's always true, i.e., an axiom
+
+- a type system consists of a set of inference rules that can refer to each other recursively, along with at least one non-recursive rule as a base case
+
+- EXAMPLE
+
+```
+Γ(x) = τ
+---------- [VAR]
+Γ ⊢ x : τ
+
+Γ ⊢ e : ref τ
+------------- [REF]
+Γ ⊢ *e : τ
+
+Γ ⊢ e1 : int   Γ ⊢ e2 : int
+--------------------------- [ADD]
+Γ ⊢ e1 + e2 : int
+```
+
+- from these example rules we can now prove that `x:int, y:ref int ⊢ x + *y : int`
+
+    - [draw expression as AST, type each node using the above rules]
+
+- inference rules allow us to conclude typing judgements, and are the _only_ way to conclude typing judgements...if there is an expression s.t. no inference rule applies, then we cannot assign a type to that expression and it is a type error
+
+- EXAMPLE: `x : int ⊢ *x` is ill-typed, as is `x:int, y:ref int ⊢ x + y`
+
+- turning a type system into a type checker implementation can range from straightfoward to really complicated depending on the type system itself
+
+    - in our case it will be straightforward
+    - turn each inference rule into a separate function
+    - each function takes an expression of the kind given in the conclusion of the rule and returns the type of that expression
+    - if the rule has premises, the function makes calls to other functions passing the context and appropriate sub-expression as arguments
+    - if there is no applicable rule then we return a type error
+
+- EXAMPLE
+
+```
+fn type(Γ : Context, e : Exp) -> Type {
+    if e is a variable then var(Γ, e)
+    else if e is a dereference then ref(Γ, e)
+    else if e is an addition then add(Γ, e)
+}
+
+fn var(Γ : Context, x : Variable) -> Type {
+    if Γ contains x then Γ(x) 
+    else fail
+}
+
+fn ref(Γ : Context, e : Exp) -> Type {
+    if type(Γ, e) = ref τ then τ
+    else fail
+}
+
+fn add(Γ : Context, e1 + e2 : Exp) -> Type {
+    if type(Γ, e1) = int and type(Γ, e2) = int then int
+    else fail
+}
+```
+
+- how do we come up with a type system for a language?
+
+    - it is language-dependent (the examples above are for a made-up language)
+
+    - the language designer must decide what types they want in the language based on the values and operators present in the language
+
+    - they must use the semantics of the language (i.e., how programs behave when they are executed) in order to create the appropriate inference rules
+
+    - ideally they would prove that their type system is _sound_, i.e., a well-typed program should always behave meaningfully wrt its semantics
+
+        - this doesn't mean that a well-typed program is always correct wrt what the programmer intended, just that whatever it does is always well-defined according to the language semantics
+
+        - if `x` and `y` are int and i write `x < y` when i should have used `x <= y`, that is not a type error even if it is a logic error, because `<` is well-defined for integers
+
+        - if i write `x(42)` when `x` is an int instead of a function then it should be a type error
+
+        - that is, a sound type system should catch all bugs that count as errors across all programs, no matter what they're trying to do
 
 ## categorizing type systems
 
 - type systems can be classified along a number of dimensions; we'll list some of the important ones and discuss their pros and cons
 
-### TODO: static vs dynamic
+- i have my own biases, but the point isn't to convince you which choices are the right ones, it's to give you a foundation so that you can decide for yourselves
 
-### TODO: strong vs weak
+### static vs dynamic
 
-### TODO: explicit vs implicit
+- a language's type system can be _static_ or _dynamic_
+
+    - static: types are checked by the compiler
+    - dynamic: types are checked at runtime
+
+- benefits of static
+
+    - static type systems can guarantee the absence of entire classes of runtime errors
+
+    - potential errors are detected at compile time instead of lurking in production code waiting to be triggered by a user
+
+    - type annotations can serve as useful code documentation (that is automatically checked by the compiler so can't go stale)
+
+    - static type information allows the compiler to do a much better job optimizing the code and results in much faster executables
+
+- drawbacks of static:
+
+    - determining exact program behavior is undecidable; in order to guarantee that programs don't behave badly, we must necessarily flag some programs that _wouldn't_ behave badly (example: `let x:int; if false { x = *x}`)
+
+        - we can make type systems more powerful and expressive to recognize more programs as correct, but type checking becomes more expensive and complicated; we can easily move into the realm of undecidable type checking
+
+    - advanced type systems can also be complicated for programmers to use and require lots of expertise
+
+- benefits of dynamic:
+
+    - faster, more flexible development because the programmer doesn't need to satisfy the type checker
+
+    - easier for the language designer because they don't need to create a type system or implement a type checker
+
+- drawbacks of dynamic:
+
+    - big performance penalty; programs in dynamic languages are generally much slower than comparable programs in static languages
+
+    - errors don't show up until runtime (e.g., after the program has been put in production and is being used by customers)
+
+        - we can mitigate this somewhat with extensive testing, but static type systems catch _all_ typing errors and testing can only catch a finite set of typing errors (those covered by the tests)
+
+        - as an anecdote, my grading script for assign-1, written in python, had a bug in it for exactly this reason: i forgot to qualify the name of a function appropriately and it wasn't caught until the autograder ran the script when grading a student's submission
+
+### explicit vs implicit
+
+- a static type system can be _explicit_ or _implicit_
+
+    - explicit: type annotations are part of the language syntax
+    - implicit: type annotations are optional
+
+- EXAMPLE
+
+```
+fn mul(x: int) -> int { return x * x; }
+
+VS
+
+fn mul(x) { return x * x; }
+```
+
+- some people conflate static typing with explicit typing because that's all they're familiar with, but it isn't true
+
+- languages with implicit types allow the programmer to omit type annotations, so the program looks just like a dynamically-typed one; the compiler must then _infer_ what the types should be in order to perform type checking
+
+    - obviously the more expressive the type system the more difficult and expensive this process is
+
+    - however, it also really helps with the complexity of advanced type systems
+
+- the benefit and drawback of explicit type systems is that the programmer writes the types so the types are immediately evident, adding documentation and making it easier to understand
+
+- the benefit and drawback of implicit type systems is that the programmer does _not_ write the types so the types are _not_ evident, lacking documentation and are harder to understand
+
+    - however, this is mitigated by modern IDEs which can do type inference and automatically add the types to the code's display
+
+- a number of modern languages take a mid-point, where the programmer must annotate _some_ type information (e.g., the types of function parameters and function return values) but the rest can be inferred by the compiler
+
+    - c++ added the `auto` keyword that instructs the compiler to infer an appropriate type, which is really useful for complicated types with lots of templating (though it's rather rudimentary compared to other implicitly-typed languages)
+
+### strong vs weak
+
+- a type system can be _strong_ or _weak_
+
+    - strong: provides guarantees (a well-typed program "can't go wrong", i.e., try to execute nonsensical operations)
+    - weak: no guarantees (a well-typed program _can_ "go wrong")
+
+- in other words, a weak type system can "lie to you", telling you that the program is well-typed (and so anything it does should make sense) but in reality the program execution could try to do nonsensical things
+
+    - C and C++ are the most well-known and widely-used languages with weak type systems
+
+    - not surprisingly, they are also the languages that cause the most problems with bugs and security vulnerabilities
+
+- the terms "strong" and "weak" are a bit controversial, and some people use them to mean different things...when discussing them with others, it's good to make sure everyone is using the terms the same way or it will get really confusing
+
+- strong guarantees seem obviously preferable to weak guarantees; why would we design a language with a weak type system (i.e., that allows the programmer to write code with undefined behavior)?
+
+    - the essential reason is _performance_, which comes up in a number of ways
+    
+    - an important example is dealing with _memory_
+
+        - garbage collection requires lots of runtime resources, causes unpredictable performance, and requires high memory usage (all of this was especially true back when C and C++ were being developed; it's less true today but still true)
+
+            - until recently, all strongly-typed languages had to use garbage collection
+
+        - if we don't want that overhead, then (at least until recently) the only alternative was to allow the programmer to manage memory manually (e.g., `free`/`delete`)
+
+            - but programmers often get manual memory management wrong, and that leads to memory unsafety (e.g., use-after-free errors) and that memory unsafety violates the guarantees provided by the type system
+
+            - these errors also lead to lots of security vulnerabilities
+
+            - allowing memory safety errors automatically leads to weak type systems, because those errors can be used to execute any operation we want regardless of what the type system says
+
+        - the motivation behind the rust programming language was to allow low-level systems programming _without_ garbage collection
+
+            - its designers were basically fed up with c++ and wanted a safe alternative
+
+            - the key thing that makes this possible is a _linear type system_, which is based on _linear logic_; both ideas have been in academia for decades
+
+            - rust is the first mainstream language to adopt the ideas and put them into practice in a production-quality language
+
+            - linear types allow the compiler to track memory ownership and, essentially, automatically insert `free`/`delete` where necessary in a way that is guaranteed to be correct
+
+    - it isn't _just_ memory, for example another performance-based example is signed integer overflow, which is undefined in C/C++
+
+        - constantly checking every arithmetic operation would be expensive, so we don't bother and leave it up to the programmer to prevent overflow
+
+    - C and C++ have literally hundreds of different kinds of undefined behaviors given in the language specs...do you know them all?
+
+    - why use a static type system at all if it is lying to you? again because of performance: having static types lets the compiler do a much better job of optimizing code
+
+- technically a dynamically-typed programming language _could_ use a weak type system, but there isn't much point---dynamically there is enough information that being weak would be a weird choice
+
+    - mostly we talk about static type systems being strong or weak
 
 ## the cflat type system
 
-- cflat's type system has a simple, static, strong, explicit type system; what does this mean?
+- cflat's type system has a simple, static, explicit, strong type system; what does this mean?
 
     - _simple_: no polymorphism, dependent types, substructural types, etc
     - _static_: types are checked at compile-time
-    - _strong_: a well-typed program cannot perform invalid operations
     - _explicit_: the programmer explicitly annotates type information in the code
+    - _strong_: a well-typed program cannot perform invalid operations
 
-- TODO: [go over `cflat-docs/validation.pdf`]
+- [go over `cflat-docs/validation.pdf`]
+
+    - rule ARRAY: we don't check that the index is within bounds; this will be a dynamic check that we add during codegen
+
+    - rule FIELD: notice that this implies that accessing a struct pointer automatically dereferences it, like java and unlike c++
 
 - TODO: [go over OneNote example]
