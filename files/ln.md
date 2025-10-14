@@ -2147,11 +2147,13 @@ y = x * y;
 
 - a type system is a framework that allows us to precisely specify what things "make sense" for our language and what things do not
 
+    - a type checker uses the type system in order to filter programs to only allow those that make sense
+
 - a _type_ describes a set of values along with what operations are valid for those values
 
-    - `int` describes the set of integers
-    - `&int` describes the set of pointers to integers
-    - `[int]` describes the set of arrays with integer elements
+    - `int` describes the set of integers; allowed to compare and do arithmetic
+    - `&int` describes the set of pointers to integers; allowed to dereference
+    - `[int]` describes the set of arrays with integer elements; allowed to index into
     - etc
 
 - saying that expression `e` has type `T` means that when `e` is evaluated at runtime, the resulting value will belong to the set described by `T`
@@ -2160,7 +2162,7 @@ y = x * y;
 
     - `new int` has type `&int` because its value is a pointer to a location in the heap that holds an integer
 
-- the type system provides a set of rules that allow us to assign a type to every element of the AST as long as that type is compatible with the operations being done by/one that element
+- the type system provides a set of rules that allow us to assign a type to every element of the AST as long as that type is compatible with the operations being done by/on that element
 
     - for example, the rules would not allow us to assign a type to `x * y` in the example above because `*` is not a valid operation on pointers
 
@@ -2209,7 +2211,7 @@ y = x * y;
 
     - we needed the context because `x + *y` by itself says nothing about the types of `x` or `y`, so it's impossible to determine what the type of `x + *y` is without that additional information
 
-- a _judgement_ explains how to prove that a judgement is correct; it is essentially an "if...then..." rule and looks like this:
+- an _inference rule_ explains how to prove that a judgement is correct; it is essentially an "if...then..." rule and looks like this:
 
 - EXAMPLE
 
@@ -2260,9 +2262,13 @@ x : ref ref int ⊢ **x : int
 - turning a type system into a type checker implementation can range from straightfoward to really complicated depending on the type system itself
 
     - in our case it will be straightforward
+
     - turn each inference rule into a separate function
+
     - each function takes an expression of the kind given in the conclusion of the rule and returns the type of that expression
+
     - if the rule has premises, the function makes calls to other functions passing the context and appropriate sub-expression as arguments
+
     - if there is no applicable rule then we return a type error
 
 - EXAMPLE
@@ -2405,7 +2411,7 @@ fn mul(x) { return x * x; }
 
 - the terms "strong" and "weak" are a bit controversial, and some people use them to mean different things...when discussing them with others, it's good to make sure everyone is using the terms the same way or it will get really confusing
 
-- strong guarantees seem obviously preferable to weak guarantees; why would we design a language with a weak type system (i.e., that allows the programmer to write code with undefined behavior)?
+- strong guarantees seem obviously preferable to weak guarantees; why would we design a language with a weak type system?
 
     - the essential reason is _performance_, which comes up in a number of ways
     
@@ -2423,13 +2429,13 @@ fn mul(x) { return x * x; }
 
             - allowing memory safety errors automatically leads to weak type systems, because those errors can be used to execute any operation we want regardless of what the type system says
 
-        - the motivation behind the rust programming language was to allow low-level systems programming _without_ garbage collection
+        - the motivation behind the Rust programming language was to allow low-level systems programming _without_ garbage collection
 
             - its designers were basically fed up with c++ and wanted a safe alternative
 
             - the key thing that makes this possible is a _linear type system_, which is based on _linear logic_; both ideas have been in academia for decades
 
-            - rust is the first mainstream language to adopt the ideas and put them into practice in a production-quality language
+            - Rust is the first mainstream language to adopt the ideas and put them into practice in a production-quality language
 
             - linear types allow the compiler to track memory ownership and, essentially, automatically insert `free`/`delete` where necessary in a way that is guaranteed to be correct
 
