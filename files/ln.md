@@ -2460,4 +2460,116 @@ fn mul(x) { return x * x; }
 
     - rule FIELD: notice that this implies that accessing a struct pointer automatically dereferences it, like java and unlike c++
 
-- TODO: [go over OneNote example]
+- EXAMPLE [see OneNote]
+
+```
+struct foo { f1: [int] }
+
+fn main() -> int {
+    let a:&foo;
+    a = new foo;
+    a.f1 = [int; 1];
+    return *bar(a.f1[0]);
+}
+
+fn bar(p: int) -> &int {
+    let q: &int;
+    q = new int;
+    if p < 10 { *q = p; return q; } 
+    else { return nil; }
+}
+```
+
+```
+Program
+- structs = { Struct("foo", { Decl("f1", Array(Int)) }) }
+- externs = {}
+- functions = {
+    Function(
+        name = "main"
+        params = []
+        rettyp = Int
+        locals = { Decl("a", Ptr(Struct("foo"))) }
+        stmts = [
+            Assign(
+                Id("a"), 
+                NewSingle(Struct("foo"))
+            ),
+            Assign(
+                FieldAccess(Id("a"), "f1"), 
+                NewArray(Int, Num(1))
+            ),
+            Return(
+                Deref(
+                    FunCall(
+                        Id("bar"),
+                        ArrayAccess(
+                            FieldAccess(Id("a"), "f1"),
+                            Num(0)
+                        )
+                    )
+                )
+            )
+        ]
+    ),
+    Function(
+        name = "bar"
+        params = [ Decl("p", Int) ]
+        rettyp = Ptr(Int)
+        locals = { Decl("q", Ptr(Int)) }
+        stmts = [
+            Assign(
+                Id("q"), 
+                NewSingle(Int)
+            ),
+            If(
+                BinOp(Lt, Id("p"), Num(10)),
+                [
+                    Assign(
+                        Deref(Id("q")),
+                        Id("p")
+                    ),
+                    Return(Id("q"))
+                ],
+                [Return(Nil)]
+            )
+        ]
+    )
+}
+```
+
+# front-end recap
+
+- let's review the steps we needed to go through to define our compiler front-end
+
+- start with a grammar for the concrete syntax of the language
+
+    - determine tokens and their regex descriptions
+
+    - define token data structure
+
+    - translate token descriptions to NFA and use maximal munch and prioritization to remove any ambiguity
+
+    - implement lexer to translate from source code to token stream
+
+    - check if grammar is LL(1), if not:
+
+        - decide on precedence levels and factor grammar to enforce them
+
+        - eliminate any left recursion
+
+        - check if grammar is predictive, apply left-factoring if necessary
+        
+        - if grammar is still not LL(1), we need to change the concrete syntax
+
+    - define the AST data structure
+
+    - translate grammar to recursive descent parser
+
+    - instrument parser functions to build AST
+
+    - validate AST
+
+- i want to emphasize that we've simplified some issues that happen in real-world languages like C, C++, Java, etc
+
+    - these often require some creative thinking to get them to fit into the frontend framework we've covered here, mostly because of ambiguity in the lexemes and/or grammar or because lexemes aren't strictly regular
