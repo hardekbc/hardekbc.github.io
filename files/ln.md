@@ -11,9 +11,9 @@
 - week 1.2: up to (not including) 'parsing::recursive descent and LL(1)::LL(1) recursive descent'
 - week 2.1: up to (not including) 'parsing::building the AST' [ASSIGN-1 OUT]
 - week 2.2: through end of parsing
-- week 3.1: 
+- week 3.1: up to (not including) 'validation::categorizing type systems'
 - week 3.2: 
-- week 4.1: 
+- week 4.1: [ASSIGN-2 OUT]
 - week 4.2: 
 - week 5.1: 
 - week 5.2: 
