@@ -9,11 +9,11 @@
 - week 0.2 (quarter starts on thursday): up to (not including) 'compiler overview::things we're leaving out'
 - week 1.1: through end of 'lexing'
 - week 1.2: up to (not including) 'parsing::recursive descent and LL(1)::LL(1) recursive descent'
-- week 2.1: up to (not including) 'parsing::building the AST' [ASSIGN-1 OUT]
-- week 2.2: through end of parsing
+- week 2.1: up to (not including) 'parsing::building the AST'
+- week 2.2: through end of 'parsing'
 - week 3.1: up to (not including) 'validation::categorizing type systems'
-- week 3.2: 
-- week 4.1: [ASSIGN-2 OUT]
+- week 3.2: just the very beginning of 'validation::the cflat type system'
+- week 4.1: 
 - week 4.2: 
 - week 5.1: 
 - week 5.2: 
@@ -28,15 +28,13 @@
 - week 10.1: 
 - week 10.2: 
 
-## TODO: tentative assignment timing
-
-- TODO: maybe decrease type checking, increase some of the others by making assignment due dates other than on class days
+## assignment timing
 
 - week 2.1 assign-1 (lexing and parsing) -- 14 days
 - week 4.1 assign-2 (type checking)      -- 14 days
 - week 6.1 assign-3 (lowering)           -- 9 days
 - week 7.2 assign-4 (codegen)            -- 13 days
-- week 9.* assign-5 (gc)                 -- 9 days
+- week 9.1/2 assign-5 (gc)               -- 14 days
 
 ## grading scale
 
@@ -60,15 +58,7 @@
 
 - this quarter i'm replacing the lir optimization assignment with a garbage collection assignment, and so moved the lecure material around accordingly (still covering the material, but later and less in-depth from last time)
 
-- i'm still not covering register allocation, mostly due to lack of time; if i do decide to cover it then i need to decide what to remove (and also create the lecture notes for it---see what i can crib from mehmet)
-
 - be sure to tell the students that when they access JSON files for their assignments (i.e., reading the input for the verification, lowering, and codegen assignments) they should be sure to use references and not deep copying (e.g., `json& funcs = value["functions"]` not `json funcs = value["functions"]`). they also probably want to create a new data structure (AST or LIR) from the JSON rather than only using the JSON itself.
-
-- gradescope
-
-    - sometimes student submissions give corrupted output (e.g., not utf-8), which causes the `DiffOutputFiles` to fail and thus the entire grading script; figure out a way to tolerate these kinds of failures and treat them as incorrect outputs (maybe add a specific test for this problem in `DiffOutputFiles`)
-
-    - students get confused by the output on a failure: we give the total number of tests passed out of the total number of tests, and they think it gives the actual test number (even though we give them the name of the test in the same message)---this is only a problem because that's how they identify the test in their communications to us which is confusing; maybe we can tweak the failure message to make it more clear?
 
 - assign-1
 
@@ -76,9 +66,11 @@
 
     - we give the students the LL(1) version of the grammar so they never actually have to use the grammar refactoring rules; i think this is fair given all the other stuff they have to do, but maybe think about giving quizzes (graded or not) where they have to refactor some simple grammars
 
-    - since test cases are generated as ASTs and then printed out as source code, the test cases have more regular syntax than the grammar allows---for example, toplevel constructs will always be in the same order, every function will have at most one let, and arithmetic ops are all parenthesized to make precedence explicit; to allow for testing the student parsers more thoroughly it would be good to create a printer that randomizes these things
+    - since test cases are generated as ASTs and then printed out as source code, the test cases have more regular syntax than the grammar allows---for example, toplevel constructs will always be in the same order, and every function will have at most one let; to allow for testing the student parsers more thoroughly it would be good to create a printer that randomizes these things
 
         - for now i've decided that this isn't worth fixing; maybe later if i have time
+
+    - the lexing and parsing is actually pretty fast, i could easily add more test cases to each test suite
 
 # course logistics
 
@@ -2327,6 +2319,11 @@ fn add(Γ : Context, e1 + e2 : Exp) -> Type {
     - static: types are checked by the compiler
     - dynamic: types are checked at runtime
 
+- one thing to be clear on: programmers need to think about types either way. when the programmer is doing something to a variable, they need to have an idea of what kind of value it contains and what operations can be done to it, i.e., its type.
+
+    - in static typing those types are written down and checked by the compiler
+    - in dynamic typing those types are just in the programmer's head
+
 - benefits of static
 
     - static type systems can guarantee the absence of entire classes of runtime errors
@@ -2334,6 +2331,8 @@ fn add(Γ : Context, e1 + e2 : Exp) -> Type {
     - potential errors are detected at compile time instead of lurking in production code waiting to be triggered by a user
 
     - type annotations can serve as useful code documentation (that is automatically checked by the compiler so can't go stale)
+
+    - static typing makes automatic refactoring more effective
 
     - static type information allows the compiler to do a much better job optimizing the code and results in much faster executables
 
@@ -2345,6 +2344,8 @@ fn add(Γ : Context, e1 + e2 : Exp) -> Type {
 
     - advanced type systems can also be complicated for programmers to use and require lots of expertise
 
+    - things break down at the boundaries of your system, e.g., when you're reading in data from elsewhere (files, network, standard in, etc); since that 'elsewhere' doesn't have the same type system you need to check for validity at runtime (which often involves parsing plus other checks)
+
 - benefits of dynamic:
 
     - faster, more flexible development because the programmer doesn't need to satisfy the type checker
@@ -2354,6 +2355,8 @@ fn add(Γ : Context, e1 + e2 : Exp) -> Type {
 - drawbacks of dynamic:
 
     - big performance penalty; programs in dynamic languages are generally much slower than comparable programs in static languages
+
+    - refactoring is more difficult
 
     - errors don't show up until runtime (e.g., after the program has been put in production and is being used by customers)
 
@@ -2579,3 +2582,236 @@ Program
 - i want to emphasize that we've simplified some issues that happen in real-world languages like C, C++, Java, etc
 
     - these often require some creative thinking to get them to fit into the frontend framework we've covered here, mostly because of ambiguity in the lexemes and/or grammar or because lexemes aren't strictly regular
+
+# lowering
+
+- now that we have a valid AST we could directly generate ISA code from it, but most modern compilers don't do that---instead, they _lower_ the AST into a simpler, lower-level intermediate representation (LIR)
+
+    - LIR is essentially ISA-agnostic assembly, which is particulary useful if the compiler has multiple backends---a lot of compilation work can be implemented once, for LIR, and then we only need to do individual codegen for each backend from the LIR
+
+    - LIR makes the code simpler and more explicit (e.g., the order of evaluation and the flow of control); the key thing is that each instruction does just one thing
+
+    - LIR is better for optimization because it's easier to reason about and transform
+
+- there are various forms of IR, but a common one (and the one we'll use) is _three-address code_ IR
+
+    - no instruction (well, except for calls) will have more than three "addresses" (think "variables/constants")
+
+- example of how LIR simplifies the AST code and makes evaluation order explicit (using more human-readable notation)
+
+    - instead of a deeply-nested tree of expressions, we end up with a flat sequence of simple instructions
+
+    - [see OneNote]
+
+```
+[source]
+x = foo(y+z+1, z*3).fld
+
+[AST]
+Assign(
+    Id("x"), 
+    FieldAccess(
+        Call(
+            Id("foo"),
+            [
+                Add(Add(Id("y"), Id("z")), Num(1)),
+                Mul(Id("z"), Num(3))
+            ]
+        ),
+        "fld"
+    )
+)
+
+[LIR]
+_const_1 = $const 1
+_const_3 = $const 3
+_tmp1 = $arith mul z _const_3
+_tmp2 = $arith add y z
+_tmp3 = $arith add _tmp2 _const_1
+_tmp4 = $call foo(_tmp3, _tmp1)
+_tmp5 = $gfp _tmp4 st::fld
+x = $load _tmp5
+```
+
+- our LIR is in the form of a _control-flow graph_ (CFG)
+
+    - the abbreviation is an unfortunate pun, this is _not_ "CFG" meaning "context-free grammar"
+
+    - a CFG is an explicit representation of the possible execution paths in a program---that is, when a program is executed, what are the possible sequences of instructions it may execute?
+
+    - a CFG is composed of nodes called _basic blocks_ (a labeled sequence of instructions) connected by edges representing control-flow between blocks
+
+    - a basic block is a linear sequence of instructions s.t. (1) it can only be entered at the beginning, and (2) it can only be left at the end
+
+        - i.e., there is no way to jump into or out of the middle of a basic block: you have to enter at the first instruction and can only leave after the last instruction
+
+        - every basic block has a label, which is used to target that basic block when transferring control from some other basic block
+
+        - every basic block ends in a _terminal_ instruction that says what basic block to go to next
+
+    - every function has a single _entry_ basic block and a single _exit_ basic block (containing the sole `$return` instruction)
+
+        - we always start executing the function at the entry block and leave the function after the exit block
+
+- [introduce LIR data structure] [see OneNote]
+
+    - [explain the LIR instructions]
+
+    - i separate Inst from Terminal to make clear that only certain things can go at the end of basic blocks; your implementation doesn't need to differentiate
+
+- example 1 (draw graph) [see OneNote]
+
+```
+[source]
+fn main() -> int {
+  let x:int, y:int, z:int;
+  if x != 0 {
+    x = 3; y = 2;
+  } else {
+    x = 2; y = 3;
+  }
+  z = x + y;
+  return z;
+}
+
+[AST]
+Function(
+    name = "main",
+    params = [],
+    rettyp = Int,
+    locals = { Decl("x", Int), Decl("y", Int), Decl("z", Int) },
+    stmts = [
+        If(
+            BinOp(NotEq, Id("x"), Num(0)),
+            [
+                Assign(Id("x"), Num(3)),
+                Assign(Id("y"), Num(2)),
+            ],
+            [
+                Assign(Id("x"), Num(2)),
+                Assign(Id("y"), Num(3)),
+            ]
+        ),
+        Assign(Id("z"), Add(Id("x"), Id("y"))),
+        Return(Id("z"))
+    ]
+)
+
+[LIR]
+fn main() -> int {
+let _const_0:int, _const_2:int, _const_3:int, _tmp1:int, x:int, y:int, z:int
+
+entry:
+  _const_0 = $const 0
+  _const_2 = $const 2
+  _const_3 = $const 3
+  _tmp1 = $cmp ne x _const_0
+  $branch _tmp1 tt ff
+
+tt:
+  x = $copy _const_3
+  y = $copy _const_2
+  $jump exit
+
+ff:
+  x = $copy _const_2
+  y = $copy _const_3
+  $jump exit
+
+exit:
+  z = $arith add x y
+  $ret z
+}
+```
+
+- example 2 (draw graph) [see OneNote]
+
+```
+[source]
+let x:int;
+while x != 10 { x = x + 1; }
+return x;
+
+[AST]
+locals: { Decl("x", Int) }
+stmts: [
+    While(
+        BinOp(NotEq, Id("x"), Num(10)),
+        [
+            Assign(Id("x"), Add(Id("x"), Num(1)))
+        ]
+    ),
+    Return(Id("x"))
+]
+
+[LIR]
+let _const_0:int, _const_1:int, _tmp1:int, x:int
+
+entry:
+  _const_1 = $const 1
+  _const_10 = $const 10
+  $jump while_hdr
+
+while_hdr:
+  _tmp1 = $cmp ne x _const_10
+  $branch _tmp1 while_body exit
+
+while_body:
+  x = $arith add x _const_1
+  $jump while_hdr
+
+exit:
+  $ret x
+```
+
+- our task is to translate valid programs from the AST data structure to the LIR data structure; this is called _lowering_
+
+- [go over lowering process] [see `docs/lowering.pdf`]
+
+    - we don't need to worry about producing the best possible (most efficient) code; we can clean it up later using various optimizations on the LIR
+
+- example of lowering process [see OneNote]
+
+    - [go through lowering process using translation vector]
+
+```
+[source]
+let x:int, y:int, z:int;
+x = input();
+z = 42;
+while z != 0 {
+  if y <= x { y = (y + 2) * x; }
+  else { y = x; }
+  z = x / y;
+}
+return y;
+
+[AST]
+locals: { Decl("y", Int), Decl("y", Int), Decl("z", Int) }
+stmts: [
+    Assign(Id("x"), Call(Id("input"), [])),
+    Assign(Id("z"), Num(42)),
+    While(
+        BinOp(NotEq, Id("z"), Num(0)),
+        [
+            If(
+                BinOp(Lte, Id("y"), Id("x")),
+                [ Assign(Id("y"), Mul(Add(Id("y"), Num(2)), Id("x"))) ],
+                [ Assign(Id("y"), Id("x")) ]
+            ),
+            Assign(Id("z"), Div(Id("x"), Id("y"))),
+        ]
+    ),
+    Return(Id("y"))
+]
+```
+
+# TODO: codegen
+
+# TODO: memory management
+
+# TODO: IR optimization
+
+# TODO: register allocation
+
+# TODO: course recap
