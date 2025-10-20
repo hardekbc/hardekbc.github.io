@@ -2649,9 +2649,7 @@ x = $load _tmp5
 
         - every basic block ends in a _terminal_ instruction that says what basic block to go to next
 
-    - every function has a single _entry_ basic block and a single _exit_ basic block (containing the sole `$return` instruction)
-
-        - we always start executing the function at the entry block and leave the function after the exit block
+    - every function has a single _entry_ basic block; we always start executing the function at the entry block
 
 - [introduce LIR data structure] [see OneNote]
 
