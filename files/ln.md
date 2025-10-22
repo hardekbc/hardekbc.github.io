@@ -13,7 +13,7 @@
 - week 2.2: through end of 'parsing'
 - week 3.1: up to (not including) 'validation::categorizing type systems'
 - week 3.2: just the very beginning of 'validation::the cflat type system'
-- week 4.1: 
+- week 4.1: through end of 'front-end recap'
 - week 4.2: 
 - week 5.1: 
 - week 5.2: 
@@ -56,9 +56,11 @@
 
 ## misc notes
 
-- this quarter i'm replacing the lir optimization assignment with a garbage collection assignment, and so moved the lecure material around accordingly (still covering the material, but later and less in-depth from last time)
+- this quarter i'm replacing the lir optimization assignment with a garbage collection assignment, and so moved the lecure material around accordingly (still covering the material, but later and less in-depth from last time in spring'24)
 
-- be sure to tell the students that when they access JSON files for their assignments (i.e., reading the input for the verification, lowering, and codegen assignments) they should be sure to use references and not deep copying (e.g., `json& funcs = value["functions"]` not `json funcs = value["functions"]`). they also probably want to create a new data structure (AST or LIR) from the JSON rather than only using the JSON itself.
+- gradescope is truncating some of the test cases in its output when a student's submission is incorrect...not at the end, but in the middle (it says "truncating" somewhere in the output). it isn't clear what the character limit is that will cause this to happen; i need to investigate and try to figure out a way to get the student the failing test case without truncation.
+
+    - i'm going to try an experiment: generate an equivalent test suite to give to the students, distinct from the one used on gradescope, and stop having gradescope reveal the test case. the idea is that if they can pass the secondary test suite, they should be able to pass the gradescope one (maybe there will be a handful of cases where we need to step in when they pass the secondary suite but still have trouble with the gradescope suite). we'll see how it goes.
 
 - assign-1
 
