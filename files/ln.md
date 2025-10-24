@@ -14,7 +14,7 @@
 - week 3.1: up to (not including) 'validation::categorizing type systems'
 - week 3.2: just the very beginning of 'validation::the cflat type system'
 - week 4.1: through end of 'front-end recap'
-- week 4.2: 
+- week 4.2: up to (not including) lowering expressions in `lower.md`
 - week 5.1: 
 - week 5.2: 
 - week 6.1: 
