@@ -604,7 +604,7 @@ executable machine code + RUNTIME == execution
 
     - see `cflat-docs/syntax.md`
 
-# lexing
+# lexing [~1 lecture]
 
 - [remind students what the lexer does; show example in OneNote]
 
@@ -802,7 +802,7 @@ token stream: [TkBA(0..3), TkAB(4..7)]
 
     - it does also explain why you can't nest c-style comments: proper nesting is context-free, you can't describe it using regular expressions
 
-# parsing
+# parsing [~3 lectures]
 ## overview
 
 - we describe the syntax of our language as a context-free grammar, with tokens as the terminal symbols of our alphabet
@@ -2104,7 +2104,7 @@ F ::= [E] | (E) | ϵ
 
 - but left-factoring may re-introduce the ϵ rules, so we have to deal with them
 
-# validation
+# validation [~3 lectures]
 ## what is validation
 
 - after parsing we know that the program is syntactically correct, but that doesn't necessarily mean that it's valid
@@ -2585,7 +2585,7 @@ Program
 
     - these often require some creative thinking to get them to fit into the frontend framework we've covered here, mostly because of ambiguity in the lexemes and/or grammar or because lexemes aren't strictly regular
 
-# lowering
+# lowering [~2 lectures]
 
 - now that we have a valid AST we could directly generate ISA code from it, but most modern compilers don't do that---instead, they _lower_ the AST into a simpler, lower-level intermediate representation (LIR)
 
@@ -2806,12 +2806,3770 @@ stmts: [
 ]
 ```
 
-# TODO: codegen
+# codegen [~4 lectures]
+## intro
 
-# TODO: memory management
+- once we have lowered to LIR, we're in the middle-end where we would perform optimizations; however for now we're going straight to the backend in order to get a working compiler as quickly as possible
 
-# TODO: IR optimization
+- going from LIR to a specific ISA is called _codegen_
 
-# TODO: register allocation
+    - for us, the ISA will be x86-64
 
-# TODO: course recap
+    - i am not going to teach you x86-64; i'll explain what the code needs to do and, for the assignment, i'll give a list of useful x86-64 instructions, a pointer to some relevant resources, and my own binary solution that you can use to figure out what to emit
+
+## necessary context
+### linker
+
+- typically programs are divided into multiple _compilation units_ (e.g., for C/C++ a file is a compilation unit); each compilation unit results in a binary _object file_, then all the object files are linked together into an _executable_
+
+    - source -[parser]-> compiler -[codegen]-> assembly -[assembler]-> object file
+
+    - { object files... } -[linker]-> executable
+
+- [demo using the code in `examples/linking/`]
+
+```
+cat main.c
+cat foo.c
+
+gcc -c -S foo.c // emit assembly into foo.s
+ls
+cat foo.s
+
+gcc -c foo.c // call assembler to compile into object file
+ls
+objdump -d foo.o
+
+gcc -c -S main.c // emit assembly into main.s
+ls
+cat main.s
+
+gcc -c main.c // call assembler to compile into object file
+ls
+objdump -d main.o
+
+gcc main.o foo.o
+ls
+objdump -d a.out
+
+./a.out
+echo $?
+```
+
+- notice how the call to `foo` inside of `main` changed after linking
+
+- the compiler proper is the part that's emitting assembly; the assembler produces object files and the linker produces an executable
+
+- note that `main` is not actually the starting point for execution, just the starting point for user code---really we begin in `_start` which does setup and then calls into `main`
+
+### static vs dynamic libraries
+
+- even after linking we still may not have all the code needed to execute a program; it depends on whether we're using _static linking_ or _dynamic linking_ for libraries
+
+    - static libraries have a `.a` extension (for "archive"); they are linked into the executable by the linker just like any other object file
+
+    - dynamic libraries have a `.so` extension (for "shared object"); they are _not_ linked into the executable during compilation---they are linked in as the executable is being loaded into memory when it is executed (each time it is executed)
+
+- there are pros and cons to each approach, and both are widely used
+
+    - static linking cons: larger executables; redundant copies in memory (across different executables)
+
+    - static linking pros: link-time optimizers can optimize the code; guaranteed to have the right version of the library when executing
+
+    - dynamic linking cons: invisible to compiler so can't be optimized; version available when executing may not match the version used when program was developed
+
+    - dynamic linking pros: smaller executable size; a single copy can be shared by multiple programs executing at once
+
+- we'll be using static linking for our compiler; you don't really need to know all this for writing the compiler but it's good to be aware of it in general
+
+### process layout in memory
+
+- when a binary is executed, the OS first loads it into memory (calling the dynamic linker if necessary) and then actually starts executing it
+
+    - the thing that loads an executable into memory is called a `loader`
+
+- it will be useful to know how the process is laid out in memory while it's executing
+
+    - this is virtual memory, not physical memory; if you've taken OS then you know the difference
+
+    - if you haven't taken OS, the important thing is that for our purposes you can think of process memory as just one big array
+
+    - the specifics can vary depending on OS, architecture; this is a fairly generic description that is "close enough" to most versions
+
+```
+(address 0) [ code segment | static segment | data segment ] (highest address)
+```
+
+- the `code segment` (aka `text segment`) is where the program instructions are located
+
+    - there is an architectural register called `pc` for "program counter", whose contents are the location of the next instruction to be executed (which will be in the code segment)
+
+- the `static segment` is where globals and constant strings are located; it's "static" because their locations can be determined ahead of time during compilation
+
+    - whenever you have a string literal in your code, like "blah", the compiler puts it into the static segment
+
+    - a pointer to a global or constant string is a pointer into the static segment
+
+- the `data segment` is where all of the stack and heap data lives; it's laid out as:
+
+```
+(low address) [heap --> | <-- stack] (highest address)
+```
+
+- the heap is where memory is dynamically allocated from (e.g., `new` or `malloc`); it grows from low addresses to high addresses
+
+    - the actual mechanics of how the heap is managed are handled by the language runtime; e.g., for C it's handled by the standard C library (though you can override this if you want)
+
+- the stack is for function calls; each call will push a "stack frame" onto the stack (so each instance will have its own stack frame) and returning from a call will pop the top stack frame off the stack
+
+    - this is where a function's parameters and local variables are stored; they live inside the stack frame of a particular function instance
+
+    - note that the stack grows "downward", from high addresses to low addresses; this is often true but not always---there are examples where it grows upwards, and even where it goes in a circle
+
+    - there are two important values wrt to the stack:
+
+        - the `stack pointer` points to the current top of the stack
+
+        - the `frame pointer` points to the base of the current stack frame
+
+    - stack manipulation is handled by the compiler; we'll need to insert instructions to make this happen properly
+
+### alignment and padding
+
+- `alignment` is talking about what addresses a piece of data in memory is allowed to start at; this is determined by the architecture we're compiling for
+
+    - e.g., a `word aligned` architecture means that all values must begin on a word boundary (for whatever size a word is in that architecture)
+
+- when the compiler assigns memory locations to variables, it needs to respect the requirements of whatever architecture it's targeting
+
+- this is particularly important for aggregate data like structs or arrays; we have to make sure that proper alignment is respected
+
+```
+struct foo { char a; int b; short c; long long int d; };
+
+assume:
+-      char:8
+-     short:16
+-       int:32
+- long long:64
+
+example alignment requirements:
+- chars are byte-aligned
+- shorts and ints are word-aligned (where a word == 32 bits)
+- long longs are double-word aligned
+```
+
+```
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+a  #  #  #  b  b  b  b  c  c  #  #  #  #  #  #  d  d  d  d  d  d  d  d
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+```
+
+- note that we had to insert padding between some of the fields to make alignment work; this is why it's bad practice when c/c++ programmers try to manually index into a struct like:
+
+```
+foo x{8,16,32,64}; 
+char y = **((char**)&x + 1);
+```
+
+- this code tries to read the first byte of `x.b`, but it's actually getting the padding between `x.a` and `x.b` that was inserted by the compiler, which is garbage
+
+- C/C++ require the layout of the fields of a struct to be in the same order as they were declared, but other languages allow them to be in any order (which can help with alignment)
+
+    - cflat will allow fields to be in a different order than they were declared
+
+- x86-64 is mostly 64-bit word aligned (with an exception we'll talk about later), and conveniently i've defined cflat so that all data is a multiple of a word, so most of the time we won't need to worry about alignment (except in one place)
+
+### garbage collection
+
+- the garbage collector (GC) will execute at runtime to manage memory, but the compiler needs to supply the GC with the information it needs to do its job
+
+- we'll go over how GC actually works after we go through codegen, but during codegen we need to handle the following:
+
+    - allow the GC to find all pointers on the stack; since the stack is just a sequence of 64-bit words that means we need a convention that the compiler and GC agree on to determine which words are pointers
+
+    - allow the GC to determine for heap-allocated objects whether they are arrays or singletons
+
+        - for arrays it needs to know how many elements the array has and whether the array elements are pointers
+
+        - for singletons it needs to know how many words it is and which words are pointers
+
+- we'll go over the conventions that our compiler will use at the appropriate places during codegen
+
+## stage 1: no structs, pointers, or functions other than main
+### intro
+
+- a LIR::Program that contains only the `main` function, with no structs or externs; no variables have a pointer type
+
+- relevant LIR instructions: `$arith`, `$cmp`, `$const`, `$copy`, `$branch`, `$jump`, `$ret`
+
+- we'll see at this stage that variables are only an illusion of the programming language---they don't exist in machine code
+
+    - a program has variables, machine code has registers and memory locations
+
+- i'm not going to give you an exact set of instructions for emitting x86-64 assembly; i'll explain what the code needs to do and then you'll have to do some exploration to figure out the exact x86-64 details
+
+    - i will give you some useful information and my own binary solution, so as long as you understand what the code is _supposed_ to do, it shouldn't be hard to figure out how to do it from those
+
+    - [maybe spend some time showing how to use my solution to figure out what to generate, once i've shown the example]
+
+### example
+
+- example: [see `examples/codegen/stage-1.{lir, s}`] [see OneNote]
+
+### codegen summary
+
+1. create standard assembly program template (everything except `main` itself) 
+
+    - for programs in stage 1 it will always be the same
+
+    - [point it out in the example above]
+
+2. create the prologue for `main`: setting things up as we enter the function
+
+    - this version is specifically for `main`, we'll tweak it a bit when we add other functions later
+
+3. output the ISA instructions for each LIR basic block
+
+4. create the epilogue for `main`: tearing things down as we leave the function
+
+### context
+
+- `main` was called from `_start`, which called it by pushing the return address on the stack and then jumping to the `main` label
+
+- `main` has no parameters and returns an `int`
+
+- 2 important registers:
+
+    - `FP` holds the _frame pointer_ value, which points to the bottom of the current function's stack frame (i.e., the return address for the caller)
+
+    - `SP` holds the _stack pointer_ value, which points to the current top of the stack (that is, whatever the topmost value on the stack is; `SP + 1` is undefined memory)
+
+- we (the compiler writers) are responsible for managing `FP` and `SP` appropriately
+
+### the function prologue
+
+- `FP` is still pointing to the bottom of the stack frame for `_start`, but we're creating a new stack frame and need to set `FP` accordingly
+
+- `SP` is the current top of the stack, and so will be the bottom of the new stack frame we're creating
+
+- our new stack frame needs (1) a word containing the number of local variables that are pointers (for GC); (2) space for the local variables where the values of those locals will live
+
+    - we will put the pointer-typed locals first, right after the GC word, then all non-pointer locals---that way the GC will know how many pointers there are and where they are
+
+- but remember that when `main` returns we need to restore the stack back to what it was for its caller
+
+- [show a diagram of what we want the stack to look like after the prologue]
+
+- so when creating the prologue we should:
+
+    1. emit the `main` label so `_start` has somewhere to jump
+
+    2. emit instructions to:
+    
+        - push `FP` onto the stack to save its old value
+
+        - set `FP` to the current value of `SP` (so `FP` is now saving the old value of `SP`)
+
+        - decrement `SP` to add space for the GC word and local variables (remember the stack grows _down_, that's why we decrement)
+
+            - we'll need to remember the stack location for each local, so we'll have to create a map that the rest of codegen for `main` can use
+
+            - remember that the stack grows _down_: the offset will be negative
+
+            - also remember that we need all pointer-typed locals to be right after the GC word, then all non-pointer locals
+
+            - anytime a LIR instruction mentions a variable, the mapping will tell us where in memory that variable's value is relative to `FP` (with the stack location at `FP - (2 * <wordsize>)` being the first local, because `FP - <wordsize>` is the GC info word)
+
+            - in the rest of these notes, for variable `x` we'll use `[x]` to mean its memory location
+
+        - zero initialize all local variable values (unlike C/C++, cflat defines all variable to start as 0)
+
+            - the cflat runtime library supplies a function `_cflat_zero_words(start, num_words)` that we can call to do this (note that _cflat_zero_words starts at a lower address and goes up, so `start` should be the end of the locals on the stack)
+
+        - call `_cflat_init_gc()` to set up the GC runtime (this is only for `main`, no other function will have this call)
+
+        - jump to `main_entry` (to keep labels globally unique, we'll always prepend the function's name)
+
+- there's one bit of complexity with allocating stack space: for x86-64 the stack pointer _must_ be double-word aligned (i.e., always pointing to a multiple of 16 bytes)
+
+    - we can assume that before `main` was called the stack was correctly aligned
+
+    - the caller pushed the return address and we pushed `FP`, keeping it aligned properly
+
+    - then we added space for the GC word and locals, which are all 1 word
+
+    - if that was an odd number then `SP` is no longer correctly aligned
+
+    - FIX: when adding space for GC word + locals, if there are an odd number pretend that there's one extra (it will just be space on the stack at the end of the locals block that we'll never use)
+
+- this is a simplified function prologue because there are no parameters to deal with...later we'll go over a more complete version that works for functions with parameters
+
+### the function epilogue
+
+- we need to reset the stack to the way it was before entering this function (this will be the same for all functions)
+
+- emit the `main_epilogue` label
+
+- emit instructions to:
+
+    1. restore the previous value of `SP` by setting it to `FP` (which the prologue set to the old value of `SP`)
+
+    2. restore the previous value of `FP` by popping it off the stack (where the prologue stored it)
+
+    3. pop the return address from the stack (put there by the caller) and jump to it (conveniently, there's a single x86 instruction that does this)
+
+- note that restoring the previous value of `SP` implicitly pops the current stack frame off of the stack...everything in that old stack frame is now garbage
+
+### translating LIR basic blocks to ISA basic blocks
+
+- for each basic block, we should emit the block's label (prepended with `main_`) and then emit ISA instructions for each LIR instruction
+
+- `x = $const <num>`
+
+    - store `<num>` in `[x]`
+
+- `x = $copy y`
+
+    - load the value from `[y]` and store it in `[x]`
+
+- `x = $arith <aop> y z`
+
+    - apply `<aop>` to the values from `[y]` and `[z]`, storing the result in `[x]`
+
+    - if `aop` is Add, Sub, or Mul then we can just use the appropriate x64 instruction
+
+    - if `aop` is Div then things get more complicated
+
+        - see the x86-64 info for how division works
+
+        - instead of getting a hardware error on division by 0, cflat will say that anything divided by 0 is 0; we could do this in several ways but we'll do it by transforming anything like `x/0` into `0/1` using conditional moves (see the x86-64 info and my `cflat` implementation)
+
+- `x = $cmp <rop> y z`
+
+    - compare the values from `[y]` and `[z]`, setting a condition code
+
+    - store 0 or 1 to `[x]` depending on `<rop>` and the condition code that was set
+
+- `$jump lbl`
+
+    - jump to `main_<lbl>`
+
+- `$branch x lbl1 lbl2`
+
+    - compare the value from `[x]` to 0
+
+    - if not equal, jump to `main_<lbl1>`
+
+    - else, jump to `main_<lbl2>`
+
+- `$ret x`
+
+    - by convention, the return value goes in a special register (`%rax` for x86-64); the caller knows to look for the return value there
+
+    - put the value from `[x]` in `%rax`
+
+    - jump to `main_epilogue`
+
+### review example
+
+- show the example again and point out how it was generated according to these rules
+
+## TODO: stage 2: globals
+
+- we're not including the implicit global function pointers in this stage, those will come when we add other functions besides `main`
+
+- we need to add a location for the globals, but they can't be on the stack because they live through the entire program and are accessible from all functions
+
+- we put them in the static segment, which in x86 assembly is specified in the `.data` section
+
+    - previously we emitted `.data` as part of our assembly program template but didn't put anything in it
+
+    - we also need to initialize them to 0, just like function locals
+
+    - we use the `.globl` directive to declare and initialize globals
+
+- global variable locations are computed as an offset from the instruction pointer, which in x86-64 is `%rip` (this is not a pointer you manipulate directly, this is the program counter)
+
+    - for global `g`, `g(%rip)` is the memory location of `g`'s value
+
+- example: [see `examples/codegen/stage-2.{lir, s}`] [see OneNote]
+
+```
+g:int
+
+fn main() -> int {
+  let x:int
+
+  entry:
+    x = $copy 42
+    g = $copy x
+    $ret g
+}
+```
+
+```
+.data
+
+.globl g
+g: .zero 8
+
+.text
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $16, %rsp
+  movq $0, -8(%rbp)
+  jmp main_entry
+
+main_entry:
+  movq $42, -8(%rbp)
+  movq -8(%rbp), %r8
+  movq %r8, g(%rip)
+  movq g(%rip), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+## TODO: stage 3: extern calls
+
+- additional LIR instruction: `$call_ext`
+
+- how do we call a function? we're actually going to do it differently depending on whether it's an extern or an internal function
+
+    - we'll assume that extern calls are to functions defined in object files generated from C code (like our cflat runtime library)
+
+    - for extern functions we need to use the standard x86-64 calling convention (though it's still simpler than the full convention because (1) we know all values are 1 word, and (2) we're being naive in how we're using registers)
+
+    - for internal functions we can use a simpler convention that makes things easier
+
+    - i'll talk more about the difference later, i'll just describe the convention here
+
+- `x = $call_ext foo(op1, ...)`
+
+    - place the first 6 arguments in the registers `%rdi, %rsi, %rdx, %rcx, %r8, %r9`, in that order
+
+    - if there are more than 6 arguments, push the rest onto the stack (first arg topmost, i.e., push starting with last arg)
+
+    - `call foo`
+
+    - if any arguments were pushed to the stack, restore the stack pointer
+
+    - the callee's return value (if any) is in `%rax`, store it to `x` if relevant
+
+- there's one more bit of complexity: we have to maintain the stack alignment
+
+    - remember that the stack must be double-word aligned immediately before a `call`
+
+    - we may have pushed some arguments to the stack; if we pushed an odd number then the alignment is off
+
+    - if that happens, we need to add one more word to the stack (and remember to remove it after the call returns, along with the pushed args)
+
+- extern functions don't need to be declared in the assembly file, the assumption is that the linker will figure things out later
+
+    - but having them means we can't compile the resulting assembly as an executable, only as an object file
+
+- example 1: [see `examples/codegen/stage-3_1.{lir, s}`] [see OneNote]
+
+```
+extern foo(int) -> int
+
+fn main() -> int {
+  let x:int
+
+  entry:
+    x = $call_ext foo(42)
+    $ret x
+}
+```
+
+```
+.data
+.text
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $16, %rsp
+  movq $0, -8(%rbp)
+  jmp main_entry
+
+main_entry:
+  movq $42, %rdi
+  call foo
+  movq %rax, -8(%rbp)
+  movq -8(%rbp), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+- example 2: [see `examples/codegen/stage-3_2.{lir, s}`] [see OneNote]
+
+```
+extern foo(int, int, int, int, int, int, int) -> int
+
+fn main() -> int {
+  let x:int
+
+  entry:
+    x = $call_ext foo(1, 2, 3, 4, 5, 6, 7)
+    $ret x
+}
+```
+
+```
+.data
+.text
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $16, %rsp
+  movq $0, -8(%rbp)
+  jmp main_entry
+
+main_entry:
+  movq $1, %rdi
+  movq $2, %rsi
+  movq $3, %rdx
+  movq $4, %rcx
+  movq $5, %r8
+  movq $6, %r9
+  pushq $7
+  subq $8, %rsp
+  call foo
+  movq %rax, -8(%rbp)
+  addq $16, %rsp
+  movq -8(%rbp), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+## TODO: stage 4: internal calls
+### intro
+
+- we handle internal functions and calls differently from calls to extern functions in order to make implementing functions easier
+
+    - otherwise when generating ISA for an instruction we have to constantly worry about where a parameter is (register vs memory) and, if it's in a register, whether we need to worry about overwriting it and thus should save it or not (e.g., if making our own call to another function)
+
+    - there isn't anything technically hard about using the standard method, it's just more complicated (and more efficient for the resulting executable, which is why they use it)
+
+- additional lir instructions: `$call_dir`, `$call_idr`
+
+- we'll see in this stage that, like variables, functions are an illusion of the programming language---they don't exist in machine code
+
+### calling conventions in general
+
+- for externs i just gave a procedure for calling another function and getting the result, but since the callee was extern we didn't see how the callee function behaved
+
+- now that we're dealing with internal functions where we implement both the call and the function being called let's dig in deeper
+
+- functions are an abstraction, in order to get "function-like" behavior we need to implement it
+
+    - a _calling convention_ specifies how "functions" (i.e., the code blocks that implement function behavior) interact
+
+    - the caller and callee need to agree to a protocol; the caller needs to know how to set up a function call so that the callee gets its arguments, knows where to return, and knows how to return a value
+
+    - there are various calling conventions; as the name implies it's just an agreement that both parties adhere to
+
+- we split the calling convention into the following pieces:
+
+    - _pre-call_: setting things up in the caller to pass info to the callee
+
+    - _function prologue_: setting things up in the callee to accept the info
+
+    - _function epilogue_: tearing down the callee and getting back to the caller
+
+    - _post-return_: tearing things down back in the caller and getting the return value
+
+- since there is no such thing as "function local variable", all functions use the same set of registers; part of the convention is about what to do so that functions don't overwrite each other's data
+
+    - _caller-save_ registers: the caller is responsible for saving the values in these registers (if it still needs them) before making a call; the callee can use them freely
+
+    - _callee-save_ registers: the caller is free to assume that any values in these registers will remain untouched by the callee; the callee can use them but only if it saves their values and then restores them before returning
+
+- first i'll talk about the general x86-64 calling convention, which is a bit complicated; then i'll go over our simplified version
+
+- caller: pre-call
+
+    - save any caller-save registers currently being used
+
+    - place the first 6 one-word arguments in a specific set of registers (designated by the convention as "argument passing registers")
+
+    - place any arguments greater than one word or past the first 6 one-word arguments onto the stack in a specific order (so the callee knows which value maps to which parameter)
+
+    - push the return address (the instruction immediately past this call) into the stack
+
+    - jump to the callee label
+
+- callee: function prologue
+
+    - if we're using any callee-save registers, push them onto the stack
+
+    - set the callee's frame pointer and allocate space on the stack for any locals
+
+- callee: function epilogue
+
+    - place the return value in a specific register (designated by the convention as the "return register")
+
+    - deallocate the stack frame
+
+    - restore the callee-save registers, including the frame pointer
+
+    - pop the return address from the stacl
+
+    - jump to the return address
+
+- caller: post-return
+
+    - pop any arguments placed onto the stack
+
+    - restore any caller-save registers
+
+- notice that we're using the pre-call and post-return convention for extern calls, except we're guaranteed that all arguments are only one word and we don't need to worry about caller/callee-save registers
+
+### our calling convention for internal calls
+
+- we're going to use our own calling convention that is simpler than the standard one for several reasons:
+
+    - we'll always push all arguments on the stack, never pass them in registers
+
+    - all arguments and return values are integers or pointers, i.e., 1 word
+
+    - since we're doing naive codegen, we don't need to worry about caller/callee-save registers because we never store information in a register past the end of a LIR instruction
+
+        - with one exception: calls to the cflat runtime library used to implement a single LIR instruction (like `$alloc`); we have to assume that the call may overwrite any caller-save register we're using to implement the instruction
+
+- `x = $call_dir foo(op1, ..., opN) then bb`
+
+    - push `op1` though `opN` to the stack, starting with `opN` and ending with `op1` (so it's the topmost value on the stack)
+
+    - fix stack alignment as necessary
+
+    - `call foo`
+
+    - if any arguments were pushed to the stack, restore the stack pointer
+
+    - the callee's return value (if any) is in `%rax`, store it to `x` if relevant
+
+    - jump to `bb`
+
+- `x = $call_idr fp(op1, ...) then bb`
+
+    - just like a direct call except use `call *op` where `op` is an operand denoting the value of the function pointer
+
+### revisiting the function prologue
+
+- `main` didn't have any parameters, so we didn't need to worry about them
+
+- for functions with parameters, we see that the caller pushes the corresponding arguments on the stack _before_ calling the callee; this means that all parameter values are at a _positive_ offset from the callee's frame pointer
+
+    - remember to account for the saved frame pointer: the first argument on the stack is at `FP + <wordsize>`
+
+    - remember that the args were pushed left-to-right, so the first parameter's value is the one closest to the frame pointer
+
+- when emitting a function's prologue and recording offsets for locals, we can record offsets for parameters at the same time
+
+    - remember that locals can shadow parameters, so if a local and a parameter have the same name then any reference to that name means the local
+
+- other than the offsets being positive, we can treat parameters just like locals
+
+- note that this is why we're using the simpler calling convention, otherwise some parameters would be in registers and some in the stack (and we would also have to worry about overwriting those registers if we aren't careful)
+
+### implicit function pointers
+
+- if we have functions other than `main`, then we also have global variables with the same name that are intended to be function pointers to those functions 
+
+- when emitting declarations for global variables, if the global has the same name as a function then we handle it differently:
+
+    - we need to mangle the name to avoid conflicting with the label used for the function itself; append `_` to the global's name (this means that when translating LIR instructions that use this global, we need to add the `_` as well)
+
+    - we need to initialize the value of the variable to the corresponding function's address (again using assembly directives)
+
+### examples
+
+- example 1: [see `examples/codegen/stage-4_1.{lir, s}`] [see OneNote]
+
+```
+fn main() -> int {
+  let x:int
+  entry:
+    x = $call_dir foo(40, 2) then exit
+
+  exit:
+    $ret x
+}
+
+fn foo(p: int, q: int) -> int {
+  let x:int
+  entry:
+    x = $arith add p q
+    $ret x
+}
+```
+
+```
+.data
+.text
+
+.globl foo
+foo:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $16, %rsp
+  movq $0, -8(%rbp)
+  jmp foo_entry
+
+foo_entry:
+  movq 16(%rbp), %r8
+  addq 24(%rbp), %r8
+  movq %r8, -8(%rbp)
+  movq -8(%rbp), %rax
+  jmp foo_epilogue
+
+foo_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $16, %rsp
+  movq $0, -8(%rbp)
+  jmp main_entry
+
+main_entry:
+  pushq $2
+  pushq $40
+  call foo
+  movq %rax, -8(%rbp)
+  addq $16, %rsp
+  jmp main_exit
+
+main_exit:
+  movq -8(%rbp), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+- example 2: [see `examples/codegen/stage-4_2.{lir, s}`] [see OneNote]
+
+```
+foo: &(int) -> int
+
+fn main() -> int {
+  let x:int, fp:&(int) -> int
+
+  entry:
+    fp = $copy foo
+    x = $call_idr fp(42) then exit
+
+  exit:
+    $ret x
+}
+
+fn foo(p: int) -> int {
+  entry:
+    $ret p
+}
+```
+
+```
+.data
+
+.globl foo_
+foo_: .quad "foo"
+
+.text
+
+.globl foo
+foo:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $0, %rsp
+  jmp foo_entry
+
+foo_entry:
+  movq 16(%rbp), %rax
+  jmp foo_epilogue
+
+foo_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $16, %rsp
+  movq $0, -8(%rbp)
+  movq $0, -16(%rbp)
+  jmp main_entry
+
+main_entry:
+  movq foo_(%rip), %r8
+  movq %r8, -8(%rbp)
+  subq $8, %rsp
+  pushq $42
+  call *-8(%rbp)
+  movq %rax, -16(%rbp)
+  addq $16, %rsp
+  jmp main_exit
+
+main_exit:
+  movq -16(%rbp), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+## TODO: stage 5: adding pointers
+### intro
+
+- now we can have memory allocation (including arrays)
+
+    - unlike C/C++, cflat is a safe language; this means that we need to detect any array accesses that are out-of-bounds (and also allocations for a non-positive amount of memory)
+
+- additional LIR instructions: `$load`, `$store`, `$alloc`, `$gep`
+
+- strategy for arrays (any allocation can be treated as an array):
+
+    - when something is allocated on the heap, we'll check that the size is positive and then we'll allocate an additional word (the `header`) that contains the number of allocated objects; we'll put this at the beginning of the object and return a pointer to the word immediately after the header (so the address of the header is at `-WORDSIZE` offset from the returned pointer)
+
+    - when we do pointer arithmetic using `$gep`, we'll check against the number that's stored in its header and make sure that the result is in-bounds
+
+- what if the check fails?
+
+    - we'll add some boilerplate ISA blocks to handle when there's a problem with allocation or indexing; they'll print an error message and immediately abort execution
+
+    - `.invalid_alloc_length` is used when we try to allocate a non-positive number of elements
+    
+    - `.out_of_bounds` is used when we try to index an array out of bounds
+
+### translating instructions
+
+- `x = $load y`
+
+    - the value of `y` is an address in memory; the value at _that_ address is what we need to store to `x`
+
+    - read the value of `y` from its location on the stack, then read the value at that address, then store it to `x`
+
+- `$store x op`
+
+    - the value of `x` is an address in memory; we want to update the value at _that_ address with the value of `op`
+
+    - get the value of `op`, then read the value of `x`, then store the value of `op` at that address
+
+- `x = $alloc op`
+
+    - we only have integers and pointers so far and they're both size `WORDSIZE`, so we're allocating `op` words _plus_ one word for the header
+
+        - the original value must be greater than 0; if this check fails we'll have the executable abort by jumping to the `.invalid_alloc_length` block
+
+    - in order to actually allocate the memory we'll call into the cflat runtime library, which has a function `_cflat_alloc` that takes a number of words to allocate and returns a pointer to the allocated memory
+
+    - so in total:
+
+        - compare `op` with 0, if not greater-than then jump to `.invalid_alloc_length`
+
+        - compute `op + 1`, then call `_cflat_alloc` passing the result as an argument (this counts as an extern call, even though it isn't declared as such); let `ptr` be the return value of the call
+
+            - IMPORTANT: anything in a caller-save register may potentially be overwritten by the call to `_cflat_alloc`
+    
+        - store `op` into the location whose address is in `ptr`
+
+        - store `ptr + WORDSIZE` into `x` (i.e., the address of the first element past the header word)
+
+- `x = $gep y op`
+
+    - compare `op` with 0; if less-than then jump to `.out_of_bounds`
+
+    - load value at `y - WORDSIZE` (the header word); call it `hdr`
+
+    - compare `op` with `hdr`; if not less-than then jump to `.out_of_bounds`
+
+    - store `y + (op * WORDSIZE)` into `x` (i.e., the pointer to the requested element)
+
+### example
+
+- example: [see `examples/codegen/stage-5.{lir, s}`] [see OneNote]
+
+```
+fn main() -> int {
+  let x:&int, y:int, z:&int
+
+  entry:
+    x = $alloc 10
+    z = $gep x 5
+    y = $load z
+    y = $arith add y 1
+    $store z y
+    $ret y
+}
+```
+
+```
+.data
+
+out_of_bounds_msg: .string "out-of-bounds array access"
+invalid_alloc_msg: .string "invalid allocation amount"
+        
+.text
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $32, %rsp
+  movq $0, -8(%rbp)
+  movq $0, -16(%rbp)
+  movq $0, -24(%rbp)
+  jmp main_entry
+
+main_entry:
+  movq $10, %r8
+  cmpq $0, %r8
+  jle .invalid_alloc_length
+  movq $1, %rdi
+  imulq %r8, %rdi
+  incq %rdi
+  call _cflat_alloc
+  movq $10, %r8
+  movq %r8, 0(%rax)
+  addq $8, %rax
+  movq %rax, -8(%rbp)
+  movq $5, %r8
+  cmpq $0, %r8
+  jl .out_of_bounds
+  movq -8(%rbp), %r9
+  movq -8(%r9), %r10
+  cmpq %r10, %r8
+  jge .out_of_bounds
+  imulq $8, %r8
+  addq %r9, %r8
+  movq %r8, -24(%rbp)
+  movq -24(%rbp), %r8
+  movq 0(%r8), %r9
+  movq %r9, -16(%rbp)
+  movq -16(%rbp), %r8
+  addq $1, %r8
+  movq %r8, -16(%rbp)
+  movq -16(%rbp), %r8
+  movq -24(%rbp), %r9
+  movq %r8, 0(%r9)
+  movq -16(%rbp), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+
+.out_of_bounds:
+  lea out_of_bounds_msg(%rip), %rdi
+  call _cflat_panic
+
+.invalid_alloc_length:
+  lea invalid_alloc_msg(%rip), %rdi
+  call _cflat_panic
+```
+
+## TODO: stage 6: adding structs
+### intro
+
+- now we can have user-defined structs
+
+- additional LIR instructions: `$gfp`
+
+- we also need to tweak allocations and indexing because now we may be allocating more than one word per object
+
+    - which also means we need to worry about field layout
+
+### translating instructions
+
+- in order to construct a pointer to a particular field of a struct, we have to know the offset of each field
+
+    - alignment is a factor, but since all fields are one word in cflat we don't need to worry about that
+
+    - C/C++ require that fields are laid out in the declared order, but cflat doesn't
+
+    - we'll order the fields alphabetically
+
+- `x = $gfp y fld`
+
+    - let `&st` be the type of `y` and `off` be the offset of `fld` in `st` in bytes
+
+    - add `off` to the value of `y` and store it in `x`
+
+### tweaking allocation and indexing
+
+- `x = $alloc op`
+
+    - if type of `x` is `&st` then we're allocating `(op * sizeof(st)) + 1` words
+
+    - the invalid array length check and the value in the header (number of elements) remains the same
+
+- `x = $gep y op`
+
+    - the checks on the index remain the same
+
+    - if type of `y` is `&st` then we store `y + (op * WORDSIZE * sizeof(st))` into `x`
+
+### example
+
+- example 1: [see `examples/codegen/stage-6_1.{lir, s}`] [see OneNote]
+
+```
+struct foo {
+  f1: int
+  f2: int
+}
+
+fn main() -> int {
+  let x:&foo, y:&int, z:&int
+
+  entry:
+    x = $alloc 1
+    y = $gfp x f1
+    z = $gfp x f2
+    $ret 0
+}
+```
+
+```
+.data
+
+out_of_bounds_msg: .string "out-of-bounds array access"
+invalid_alloc_msg: .string "invalid allocation amount"
+        
+.text
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $32, %rsp
+  movq $0, -8(%rbp)
+  movq $0, -16(%rbp)
+  movq $0, -24(%rbp)
+  jmp main_entry
+
+main_entry:
+  movq $1, %r8
+  cmpq $0, %r8
+  jle .invalid_alloc_length
+  movq $2, %rdi
+  imulq %r8, %rdi
+  incq %rdi
+  call _cflat_alloc
+  movq $1, %r8
+  movq %r8, 0(%rax)
+  addq $8, %rax
+  movq %rax, -8(%rbp)
+  movq -8(%rbp), %r8
+  leaq 0(%r8), %r9
+  movq %r9, -16(%rbp)
+  movq -8(%rbp), %r8
+  leaq 8(%r8), %r9
+  movq %r9, -24(%rbp)
+  movq $0, %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+
+.out_of_bounds:
+  lea out_of_bounds_msg(%rip), %rdi
+  call _cflat_panic
+
+.invalid_alloc_length:
+  lea invalid_alloc_msg(%rip), %rdi
+  call _cflat_panic
+```
+
+- example 2: [see `examples/codegen/stage-6_2.{lir, s}`] [see OneNote]
+
+```
+struct foo {
+  f1: int
+  f2: int
+}
+
+fn main() -> int {
+  let x:&foo, y:&foo, z:&int
+
+  entry:
+    x = $alloc 10
+    y = $gep x 5
+    z = $gfp y f2
+    $ret 0
+}
+```
+
+```
+.data
+
+out_of_bounds_msg: .string "out-of-bounds array access"
+invalid_alloc_msg: .string "invalid allocation amount"
+        
+.text
+
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $32, %rsp
+  movq $0, -8(%rbp)
+  movq $0, -16(%rbp)
+  movq $0, -24(%rbp)
+  jmp main_entry
+
+main_entry:
+  movq $10, %r8
+  cmpq $0, %r8
+  jle .invalid_alloc_length
+  movq $2, %rdi
+  imulq %r8, %rdi
+  incq %rdi
+  call _cflat_alloc
+  movq $10, %r8
+  movq %r8, 0(%rax)
+  addq $8, %rax
+  movq %rax, -8(%rbp)
+  movq $5, %r8
+  cmpq $0, %r8
+  jl .out_of_bounds
+  movq -8(%rbp), %r9
+  movq -8(%r9), %r10
+  cmpq %r10, %r8
+  jge .out_of_bounds
+  imulq $16, %r8
+  addq %r9, %r8
+  movq %r8, -16(%rbp)
+  movq -16(%rbp), %r8
+  leaq 8(%r8), %r9
+  movq %r9, -24(%rbp)
+  movq $0, %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+
+.out_of_bounds:
+  lea out_of_bounds_msg(%rip), %rdi
+  call _cflat_panic
+
+.invalid_alloc_length:
+  lea invalid_alloc_msg(%rip), %rdi
+  call _cflat_panic
+```
+
+## x86-64 info
+
+- [go over `x64-info.md`]
+
+- [go over how to use `cflat` executable to go from source to lir to assembly so they can see what the grader expects for codegen]
+
+    - TODO: [come up with some concrete examples]
+
+# TODO: memory management [~2 lectures]
+## intro
+
+- programmers are presented with an illusion that the computer has an arbitrary amount of memory
+
+- this is false; every computer has a fixed amount of memory and if a program uses too much it will crash
+
+- the runtime has to keep track of what memory has been allocated and what memory is in the available pool
+
+- when the program asks for memory the runtime has to pick some available memory to allocate and remove it from the available pool
+
+- the program has to somehow return memory back to the available pool when it doesn't need it anymore
+
+- there are two kinds of memory a programmer deals with:
+
+    - stack memory: this is automatically handled by the compiler, allocating memory on function entry and reclaiming it on function exit
+
+    - heap memory: this is the one we need figure out how to deal with
+
+- first we'll discuss some possible data structures that the runtime can use to manage memory
+
+- then we'll discuss different strategies for how the runtime can be made aware that previously allocated memory is now available
+
+    - this is the hard part; it's easy to know when we need memory to be allocated, it's a lot harder to know when we don't need it anymore
+
+## data structures
+### intro
+
+- the runtime has to keep track of allocated vs available memory and efficiently move memory back and forth between these sets
+
+- there are a varity of data structures it can use for this purpose, with various tradeoffs
+
+    - we'll look at some basic strategies
+
+    - real-world strategies are highly tuned and optimized versions of these basic strategies
+
+- this is independent of how the runtime knows when allocated memory becomes available again, which we'll discuss later
+
+### freelist
+
+- we can think of heap memory as one big array of bytes
+
+    - for simplicity we'll use units of words instead of bytes, just to make examples easier
+
+    - _contiguous_ words means next to each other in memory
+
+- unallocated memory is organized as a linked list, where contiguous words are chunked together into blocks called "free blocks"
+
+- each free block contains metadata: (1) the size of the free block, and (2) the address of the next free block
+
+- we reserve a distinguished location that always serves as the head of the freelist (i.e., a pointer to the first free block)
+
+- searching through the freelist is `O(n)`, where `n` is the number of free blocks
+
+- splicing free blocks in or out of the freelist is `O(1)`
+
+```
+      0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+--------+---+---+---+---+---+---+---+---+---+
+ [head] | [free block]
+```
+
+- allocating memory
+
+    - given a request for `N` words of memory, search through the freelist to find a free block to satisfy the request
+
+        - there are a number of possible strategies; one of the simplest is _first fit_, i.e., the first one big enough to satisfy the request
+    
+    - splice out the first `N` words of the free block (leaving any remaining memory on the freelist) and return the address of the allocated memory
+
+- deallocating memory
+
+    - goal: given the address of memory that was previously allocated, return it back to the freelist
+
+    - in order to do so, we have to know how much memory was allocated (otherwise we don't know how much to put back)
+
+    - this means that when we allocate the memory, we should allocate an extra header word to track the size (just like we did for codegen of cflat arrays)
+
+    - given the address, we read the word immediately before that address to get the size and then splice the memory back into the freelist
+
+- example 1 [show heap as array, with 10 words of memory]
+
+```
+// we start with 1 word in the header and a single 9 word free block
+a = malloc(2) // allocate 3 words
+b = malloc(2) // allocate 3 words
+c = malloc(2) // allocate 3 words
+free(a)       // return 3 words as a free block
+free(c)       // return 3 words as a free block
+a = malloc(4) // OOM due to fragmentation
+```
+
+- the biggest problem with freelists is _external fragmentation_
+
+    - allocated and unallocated memory are interleaved, and there may not be any sufficiently large free blocks to satisfy a request even if there are sufficient free words in total
+
+    - we can mitigate (but not solve) this problem using _coalescing_: periodically sweep the freelist to find free blocks that are next to each other and merge them into a single free block
+
+    - note that we need to add more metadata marking whether a block of memory is free or allocated so that we can do this sweep
+
+- example 2 [show heap as array, with 10 words of memory]
+
+```
+// we start with 1 word in the header and a single 9 word free block
+a = malloc(2) // allocate 3 words
+b = malloc(2) // allocate 3 words
+free(a)       // return 3 words as a free block
+free(b)       // return 3 words as a free block
+// sweep to coalesce free blocks
+c = malloc(4) // allocate 5 words
+```
+
+- note that we _cannot_ coalesce memory by moving allocated memory around, because this would invalidate the pointers being used by the executing program
+
+    - e.g., in our first example we're stuck with an OOM error
+
+### buddy system
+
+- instead of a linked list, the heap is organized as a binary tree
+
+    - the root node represents the entire heap
+
+    - each child node represents half the memory of its parent
+
+    - memory is always allocated in powers of 2
+
+- we store the nodes of the binary tree in a set of lists, one for each power of 2 up to the size of the heap
+
+    - each list contains the free nodes of that size
+
+    - searching for a free block is now `O(lg n)` instead of `O(n)`
+
+```
+  .
+  .
+  .
+ 32 ↦ _
+ 64 ↦ _
+128 ↦ _
+256 ↦ _
+512 ↦ address 0 (the entire heap)
+```
+
+- allocating memory
+
+    - given a request for `N` words of memory, first we compute the next power of 2 greater than `N`; call this `M`
+
+    - look in the list of free blocks of size `M`; if non-empty then take a node off the list and return its address (we're done)
+
+    - otherwise, keep going up by powers of 2 until we find a non-empty list (if there is no such list we've run out of memory)
+
+    - once we've found a large enough free block, break it down into powers of 2 until we have a block of size `M`, putting the remaining blocks on the appropriate lists
+
+- deallocating memory
+
+    - given a block of `N` words (which will be a power of 2), place it on the appropriate list
+
+        - note that we need to know the size of the allocated memory, just as with freelists
+
+    - now coalesce the heap: look at the sibling block of the newly freed block to see if it's free; if so then remove both blocks from that list and put the combined block in the next list up; repeat until no more memory can be coalesced
+
+    - note that this coalescing strategy is much more efficient than for freelists; instead of a linear sweep over all memory we only need to try at most `O(lg n)` times
+
+- example (assuming 512 words of memory)
+
+```
+// start with a single 512 word free block
+a = malloc(35)   // [64] + 64 + 128 + 256
+b = malloc(100)  // [64] + 64 + [128] + 256
+c = malloc(60)   // [64] + [64] + [128] + 256
+d = malloc(121)  // [64] + [64] + [128] + [128] + 128
+free(c)          // [64] + 64 + [128] + [128] + 128
+free(a)          // 128 + [128] + 128
+free(b)          // 256 + [128] + 128
+free(d)          // 512
+```
+
+- the buddy system doesn't suffer from external fragmentation like freelists, but it does suffer from _internal fragmentation_
+
+    - allocating larger than necessary blocks, so some memory is allocated but never used
+
+    - this is necessary because all memory must be allocated in powers of 2
+
+    - this is the price for a more efficient data structure
+
+### arenas
+
+- _arena-based_ memory management is also called _region-based_ memory management
+
+- at a macro-level it operates kind of like the freelist data structure, except instead of individual object allocations we deal with large, contiguous chunks of memory (much larger than an individual object allocation)
+
+    - these are the _arenas_
+
+- the idea is that we allocate a single arena to hold a bunch of objects that will all have similar lifetimes (i.e., they will all be deallocated at the same time)
+
+- when we allocate an object inside an arena, we use a _bump pointer_ that points to the next free address in the arena
+
+    - so allocation is extremely fast: just increment the bump pointer
+
+    - what if we allocate more than the arena can hold? then we need to pull another arena from the arena freelist and chain it to this one
+
+- we never deallocate individual objects, instead we deallocate an entire arena (and any arena chained from it)
+
+    - this is really fast because splicing an arena into the arena freelist is constant time
+
+- arenas work well if there are a small number of arenas, each of which contain many objects that all have the same lifetime
+
+- arenas work poorly if there are lots of arenas (then we have the same problems as with freelists) and/or objects have different lifetimes (in which case there's lots of internal fragmentation)
+
+### copying/compacting
+
+- the entire heap is kind of like a single arena, where memory is allocated via a bump pointer
+
+- objects are reclaimed in batches (like arenas), but unlike arenas objects don't have to have the same lifetimes
+
+- any live objects are copied to a new location (typically all compacted together into a contiguous chunk)
+
+- notice that this can only work for strongly typed languages and with the cooperation of the compiler
+
+    - if we copy a live object to a new location then we need to update all pointers to that object with the new location
+
+    - this can't happen in weakly-typed languages (where we don't even know what's a pointer and what's not)
+
+    - the compiler has to help as well, so we know where pointers are stored (e.g., which stack offsets)
+
+- this strategy is solely used with some forms of tracing garbage collector, as we'll describe in a bit
+
+    - most production-quality language runtimes for managed languages (java, .net, javascript, etc) use this strategy
+
+## manual memory management
+
+- once we have the runtime data structure set up, the remaining piece is how the runtime knows when allocated memory should become available
+
+- in manual memory management, the programmer makes memory deallocation explicit when writing their code
+
+    - e.g., `free` in C, or `delete` in C++
+
+- that means that it is the programmer's responsibility to track all allocated memory and decide when a particular allocation is no longer needed
+
+    - this won't work with the copying strategy, because manual memory management automatically means a language must be weakly typed
+
+    - the most common strategies are freelist variants
+
+- pros:
+
+    - easy for the compiler and runtime
+
+    - provides low-level control over exactly when memory is deallocated
+
+    - no runtime overhead beyond that of the memory management data structure
+
+- cons:
+
+    - programmers make mistakes...a lot: use-after-free, double-free, memory leaks, etc
+
+        - the symptoms of these bugs are nondeterministic and can be very difficult to detect and track down
+
+        - a lot of these mistakes turn out to be security vulnerabilities as well
+
+    - code is more complicated and harder to understand, because it has to integrate logic to track memory availability in addition to whatever else it's trying to do
+
+## automatic memory management
+### intro
+
+- if we don't want the programmer to handle memory management, then either the compiler or the runtime needs to do so
+
+    - this frees the programmer from worrying about memory and wipes out an entire class of possible bugs
+
+- when is allocated memory safe to reclaim?
+
+    - if the program will never access it again (i.e., it is _dead_)
+
+    - knowing this required predicting the future: at what point can we safely say that a particular piece of allocated memory is dead?
+
+- all automated schemes approximate deadness with _unreachability_: if the memory is no longer accessible by the program, then clearly it must be dead
+
+    - e.g., if there is a single pointer referencing it and that pointer gets assigned a new value
+
+    - this is an approximation of deadness because a piece of memory could still be accessible, yet the program may never actually access it
+
+- different automated memory management schemes track reachability in different ways
+
+### reference counting
+
+- this strategy is typically backed by something like the freelist data structure
+
+- reference counting associated a counter with every object that keeps track of how many pointers there are to that object
+
+    - when we assign a pointer to that object, we increment the counter
+
+    - when we assign a pointer away from that object, we decrement the counter
+
+    - these increments and decrements are usually added by the compiler/interpreter, not the programmer
+
+- when the counter reaches 0, there are no pointers to that object and so it is unreachable and can be reclaimed
+
+- this is the way cpython (the reference implementation for python) manages memory
+
+- this is also how c++ smart pointers work (shared_ptr and unique_ptr)
+
+- example 1 [show heap as a graph of objects]
+
+```
+a = new Foo
+b = new Bar
+b.x = a
+b.y = new Foo
+b = new Bar   // reclaim memory
+```
+
+- example 2 [show heap as a graph of objects]
+
+```
+b = new Bar
+b.x = new Foo
+b.x.z = b
+b = new Bar  // no memory reclaimed
+```
+
+- as the second example shows, reference counting can't handle cyclic structures
+
+    - reference counts will never go to zero
+
+    - we either disallow cyclic structures, or use some other mechanism to handle them
+
+- the other main problem with reference counting is performance: every pointer assignment requires multiple accesses to memory to decrement and increment the appropriate counters
+
+- however, it is simple to implement and collects garbage as soon as it becomes unreachable
+
+### tracing
+#### intro
+
+- tracing collectors don't keep close track of reachability the way reference counting does; instead they wait until memory is exhausted and only then figure out what it and is not reachable
+
+- they are called tracing collectors because they "trace" reachable memory in order to determine what objects are reachable; anything not reached during the trace must be dead
+
+    - note that tracing requires type information: we have to know what is a pointer and what is not (which requires knowing what type of object we're pointing to in the heap)
+
+    - this generally requires a strongly-typed language, though there are conservative tracing collectors that can work to some degree for weakly-typed languages (by making safe "guesses")
+
+- there are a wide variety of trace-based garbage collectors; this is the most popular strategy for many languages
+
+#### mark-sweep
+
+- this strategy is typically backed by something like the freelist data structure
+
+- the runtime allocator does nothing to reclaim memory until an allocation request is made that it can't satisfy
+
+- when a collection is triggered:
+
+    - it identifies the _root set_: the pointers into the heap that the program can directly access (e.g., local variables on the stack and globals)
+
+    - starting from the root set, it traces all reachable objects in the heap and marks them as live
+
+    - then it sweeps through the heap and frees any memory that isn't marked as live
+
+- once a collection is over the allocator tries again to satisfy the previously failed request; if it can't then the program really is OOM
+
+- example 1 [show heap as a graph of objects]
+
+```
+a = new Foo
+b = new Bar
+b.x = a
+b.y = new Foo
+b = new Bar   // doesn't reclaim memory
+c = new Foo   // assume OOM, triggers collection
+```
+
+- example 2 [show heap as a graph of objects]
+
+```
+b = new Bar
+b.x = new Foo
+b.x.z = b
+b = new Bar
+c = new Foo   // assume OOM, triggers collection
+```
+
+- each mark-sweep collection does work proportional to the entire heap, which is a lot of wasted work if most of the heap is dead
+
+- because it touches the entire heap for every collection it has poor cache locality, harming program performance
+
+#### semi-space
+
+- this is an example of a copying/compacting collector
+
+- we split memory into two halves: the `from` space and the `to` space
+
+- memory is always allocated in `from` space (hence the name), using a bump pointer (so allocation is extremely fast)
+
+- when the `from` space is exhausted, we trace live memory just like mark-sweep _but_ instead of marking live objects, we copy them into `to` space (hence the name)
+
+    - we have to update relevant pointers when we copy an object to a new location
+
+- once all live objects have been copied, we swap which space is the `from` space and which is the `to` space, and start allocating from the new `from` space (which used to be the `to` space)
+
+- example 1 [show heap as array, with 24 words of memory]
+
+```
+a = new Foo    // 3 words
+b = new Bar    // 3 words
+b.x = a
+b.y = new Foo
+b = new Bar   // doesn't reclaim memory
+c = new Foo   // triggers collection
+```
+
+- example 2 [show heap as array, with 24 words of memory]
+
+```
+a = new Foo
+b = new Bar
+a.f = b
+c = new Foo
+b = new Bar
+b.x = a.f
+c = new Foo // triggers collection, multiple pointers to same object
+```
+
+- as example 2 shows, a naive version of copying will create multiple copies of the same object, one for each path to that object
+
+- to prevent this problem, when we copy an object we should leave behind a _forwarding pointer_ in its old location
+
+    - whenever we trace an object, if we see a forwarding pointer we can stop tracing and just update to the indicated location
+
+    - note that this requires some metadata to distinguish between an object and a forwarding pointer
+
+- [example 2 redux, this time with forwarding pointers]
+
+- a copying collector really does require strong typing, because we have to update pointer values---we can't just guess what's a pointer and what isn't, so conservative GC doesn't work
+
+- semi-space has some really good properties:
+
+    - allocation is extremely fast
+    
+    - work for a collection is only proportional to the number of live objects
+    
+    - there is no fragmentation (internal or external)
+    
+    - it enables good locality because things are compacted together
+
+- but it does have some disadvantages:
+
+    - available memory is cut in half
+    
+    - long pause times for collections
+
+#### generational
+
+- generational collection is based on an empirical observation: "young objects die quickly", that is, recently allocated objects are likely to not live very long
+
+    - this implies that we should focus our memory reclamation efforts mostly on recently allocated objects
+
+- we divide memory into two pieces, like semi-space, except that this time we have a _nursery_ and an _older space_ where the nursery is much smaller than the older space
+
+- we allocate into the nursery using a bump pointer
+
+- when the nursery is exhausted, we collect _only_ the nursery, copying any live objects into the older space
+
+    - this is called a _minor collection_
+
+    - we leave forwarding pointers just like semi-space
+
+- when the older space is exhausted, we collect the entire heap
+
+    - this is called a _major collection_
+
+    - if the nursery is much smaller than the older space then we can't use it to copy live objects during a major collection; what do we do with them?
+
+    - generational collection is parameterized by how the older space is treated; it could be mark-sweep, semi-space, or even another generational collector
+
+- notice that if the empirical observation is true, we'll almost always be doing minor collections and very rarely do a major collection
+
+- example 1 [use graph, divided into nursery and older space]
+
+```
+for i in 0..10 {
+  // assume major collection after 5 iterations
+  a = new Foo
+  for j in 0..8 {
+    // assume minor collection after second iteration, then every three iterations
+    b = new Foo
+    b.f = new Bar
+  }
+}
+```
+
+- there is an issue we need to address, though: what if an object in the older space points into the nursery?
+
+- example 2 [use graph as before]
+
+```
+a = new Foo
+b = a
+for i in 0..8 {
+  // assume minor collection after second iteration, then every three iterations
+  // remember later minor collections don't look at `a`, only `b`
+  b.f = new Foo
+  b = b.f
+}
+```
+
+- we need to include any such pointers as part of the root set, but how?
+
+    - we keep a _remember set_ of pointers from older space into the nursery and include it in the root set when doing a minor collection
+
+    - whenever the program updates a pointer value, we check if it's from the older space into the nursery, and if so then update the remember set
+
+        - this check is called a _write barrier_
+
+- [example 2 redux, using remember sets]
+
+- generational collection is the most popular form of automatic memory management in commercial garbage collectors
+
+    - all the advantages of semi-space
+
+    - entire memory can be used (unlike semi-space)
+
+    - minor collections have small pause times (because nursery is small)
+    
+    - major collections can be done using many different methods
+
+    - lots of possible optimizations (immortal space, large object space, etc)
+
+- the main disadvantage is the requirement for write barriers, which can impact program performance
+
+### linear types
+
+- having the runtime dynamically track memory in order to know when to reclaim it has some downsides
+
+    - performance overhead
+
+    - unpredictability
+
+- can we get the performance and predictability of manual memory management while still making it completely automated?
+
+    - yes we can!
+
+    - all the benefits of automatic memory management _and_ manual memory management
+
+- the key idea is to use _linear types_
+
+    - checked during validation, just like we did for cflat
+
+    - gives compiler enough information to safely insert frees automatically
+
+- type systems are closely related to formal logic, and linear type systems are related to something called linear logic
+
+    - whereas classical logic is a logic about truth, linear logic is a logic about resources: unlike truth, resources are finite and consumable
+
+    - consider the classical logic formula `A, A ⥰ B ⊢ A ∧ B`, and suppose `A` stands for "i have cake" and `B` stands for "i am full"; this formula says that i can both have my cake _and_ i can eat that cake, simultaneously
+
+    - linear logic recognizes that cake is a finite and consumable resource; we can deduce `A, A ⥰ B ⊢ B` but not `A, A ⥰ B ⊢ A ∧ B`
+
+- what does this have to do with types? memory is also a finite and consumable resource, and we can use linear logic to reason about it
+
+    - a given heap object can only be pointed to by one pointer, e.g., `x = new Foo`
+
+    - we can move ownership to a different pointer, but then the original one no longer has ownership: `y = x; z = *x` is an error
+
+    - when an owning pointer goes out of scope, necessarily the object it points to becomes unreachable and can be reclaimed (this doesn't mean that heap objects are lexically scoped because we can always transfer ownership to a pointer outside the current scope, like returning it from the enclosing function)
+
+    - effectively we're doing compile-time reference counting, where the reference counts can only be `1` or `0` and the type system guarantees that we can count correctly
+
+- example (well-typed)
+
+```
+fn foo(p:&int) -> &int {
+  let a:&int = p, b:&int;
+  b = new int;
+  *b = *a;
+  return b;
+  // object pointed to by `a` is deallocated here
+  // object pointed to by `b` is not
+}
+```
+
+- example (ill-typed)
+
+```
+fn foo(p:&int) -> &int {
+  let a:&int = p, b:&int;
+  b = new int;
+  *b = *p;  // COMPILER ERROR, `p` no longer owns any object
+  return b;
+}
+```
+
+- linear types have been known in academia for decades, but only in the last decade has the idea made its way into the mainstream with the rust language
+
+- strictly linear types can be a bit hard to work with, so we can introduce the idea of "borrowing" ownership
+
+    - a pointer can retain ownership, but allow other pointers to temporarily borrow access to the object
+
+    - the key is that the type system can guarantee that these borrows never outlive the owning pointer
+
+- note that modern c++ has the notion of "unique_ptr", which expresses a similar idea (unique ownership of an object, allowing it to be automatically reclaimed when the owning pointer goes out of scope)
+
+    - in c++ this is only a heuristic, there is no guarantee that it will be correct (it's trivial to write a program that passes the compiler but violates ownership)
+
+    - there is no formal notion of borrowing; we can copy the raw pointer from a unique_ptr but there are no checks for how we use those copies
+
+# TODO: IR optimization [~4 lectures]
+## intro
+
+- we have a fully functional compiler, but it is fairly naive in terms of the generated machine code---we'd like to optimize the program as we're compiling it in order to produce better executables
+
+- what do we mean by optimization? what are we optimizing?
+
+    - usually we mean performance: making the generated code execute faster
+    
+    - sometimes we want to optimize for other things, like code size, memory consumption, or power consumption (all of which are important for embedded systems, for example)
+    
+    - for our purposes we'll focus on performance optimization
+
+- "optimization" is a somewhat misleading term, because it implies we're going to find some optimal (i.e., best) solution
+
+    - in reality finding the best solution is np-hard or undecidable and we're just looking for a better solution (i.e., the optimized code runs faster than the unoptimized code)
+
+- how do we optimize for performance?
+
+    - we want to reduce the amount of required computation---either eliminate instructions or replace operations with faster versions
+
+    - we still need to guarantee that the resulting program "does the same thing", or the compiler will break the user's program
+
+- some examples:
+
+    - arithmetic identities: `x = y * 0` ⟶ `x = 0`
+
+    - constant folding: `x = 1 + 2` ⟶ `x = 3`
+
+    - constant propagation: `x = 3; y = x + 3` ⟶ `x := 3; y := 6`
+
+    - redundancy elimination: `x = a + b; y = a + b` ⟶ `x = a + b; y := x`
+
+    - strength reduction: `x = y / 2` ⟶ `x = y >> 1`
+
+- optimization = analysis + transformation
+
+    - we need to use program analysis (aka static analysis) to determine what is true about the program's behavior (e.g., what things are constant values, what expressions are guaranteed to evaluate to the same value, etc)
+    
+    - then we select code transformations that, based on the information provided by the analysis, are safe (preserve behavior) and effective (improve performance)
+
+- we can perform optimizations in the backend on the generated assembly code, but then we would have to reimplement them for each backend we add to the compiler
+
+    - there are some optimizations that are inherently target specific, and we reserve those for the backend, but mostly we try to optimize in a target-agnostic way so that we can reuse the same optimizations for all targets
+
+- the optimizer can also operate at a number of different scopes, ranging from small fragments of code (local optimization) to entire functions (global optimization) to set of functions (interprocedural optimization) to entire programs (whole-program optimizations)
+
+    - the term "global" may seem odd since we're focusing in on one single function; the term comes from a time when local optimization was the norm and operating at an entire function scope was seen as extremely aggressive---operating on even larger scopes than that was out of the question
+
+    - the larger the scope that the optimizer operates at, the more effective it is but the more complex and expensive it is
+
+- for this class
+
+    - we'll focus on local optizations and global optimizations
+
+    - we'll assume there are no pointers, structs, globals, or function calls
+
+    - so the only LIR instructions we need to worry about are: `$copy`, `$arith`, `$cmp`, `$jump`, `$branch`, and `$ret`
+
+    - this simplifies a lot of things and is enough to give the basic idea
+
+## safety and profitability
+### intro
+
+- we stated two important properties of optimization:
+
+    - it should be safe (preserve program behavior)
+    
+    - it should be profitable (improve program performance)
+
+- let's dig a little into each, because they aren't as straightforward as they seem
+
+### safety
+
+- we said that optimizations should preserve behavior, but what does that mean? if you think about it, the whole point is to change program behavior by making it run faster using different instructions---what are we preserving? what does "behavior" even mean?
+
+- roughly, we can think of the behavior we're preserving as user-observable events independent of time
+
+    - in other words, if we run the original program `P` and record the user-observable events (e.g., outputs) without timestamps, then do the same with the optimized program `P'`, we should get the same thing
+
+- this definition isn't quite adequate for languages like C and C++, which have the concept of "undefined behavior"
+
+    - literally, this means that for certain code expressions and statements the language standard doesn't say what should happen, thus the compiler implementor is free to do whatever they want
+    
+    - in fact, it goes even further than that: a program that executes a statement with undefined behavior isn't defined at all; the entire program execution is undefined, not just that statement
+    
+    - this is important to understand: the effects of undefined behavior are not confined to the statement that is undefined, or even the execution after that statement, but the _entire_ execution, even before that statement is executed
+
+- how can undefined behavior affect the program execution before the behavior even happens? that seems like magic
+
+    - the reason a language allows undefined behavior is so that the compiler is free to make certain assumptions when it optimizes a program, making the optimizations more effective
+
+    - basically, the compiler is allowed to assume that undefined behavior will never happen when it checks whether a given optimization is allowed or not (i.e., would it change the program's behavior); it's up to the programmer to ensure that this assumption is true, not the compiler
+
+    - if the assumption is false, the optimization actually _can_ change program behavior from the unoptimized version, but that's the programmer's fault not the compiler's fault
+
+- let's look at an example (adapted from the blog of John Regehr, a CS professor whose research deals a lot with undefined behavior in C)
+
+```
+#include <limits.h>
+#include <stdio.h>
+
+int main() { 
+  printf("%d\n", (INT_MAX+1) < 0);
+  printf("%d\n", (INT_MAX+1) < 0);
+  return 0; 
+}
+```
+
+- this program asks the question (twice): if we take the maximum integer value and add 1, do we get a negative number? in other words, do integers wrap around?
+
+    - so what happens when we run this program?
+
+```
+$ gcc test.c -o test
+$ ./test
+0
+0
+
+or:
+
+$ gcc test.c -o test
+$ ./test
+1
+1
+
+or:
+
+$ gcc test.c -o test
+$ ./test
+0
+1
+
+or:
+
+$ gcc test.c -o test
+$ ./test
+42
+foo
+```
+
+- any of these could happen, or anything else---the program has undefined behavior because it exhibits signed integer overflow, that is, we took a signed integer and added a value to it that caused the result to be out of the range that a signed integer can express; the C standard says this this is undefined
+
+    - note that the result doesn't need to be consistent, even within the same execution
+
+    - also note that unsigned integer overflow is defined
+
+- you might think: "on an x86 the C integer add instruction is implemented using the x86 ADD assembly instruction, which operates using two's complement arithmetic, which does wrap around---thus, if i'm running the program on an x86 i can expect to get 1"---but this is bad reasoning, for the following reasons:
+
+    1. you don't know what architectures your program will be compiled on, even if you are compiling for x86 right now
+
+    2. not all compilers will work this way, even on an x86, even if the one you're using right now does
+
+    3. at certain optimization levels, a compiler that may work this way previously will stop working this way because it takes advantage of the undefined behavior to optimize the program
+
+- let's take a closer look at that third reason with another example:
+
+```
+int stupid(int a) { return (a+1) > a; }
+```
+
+- note that if we pass in `INT_MAX` for `a` then we get undefined behavior
+
+- the compiler optimizer can reason this way:
+
+    - case 1: `a` is not `INT_MAX`; then the answer is guaranteed to be 1
+
+    - case 2: `a` is `INT_MAX`; then the behavior is undefined and we can do whatever we want; let's make the answer 1
+
+- it then outputs the following optimized code:
+
+```
+int stupid(int a) { return 1; }
+```
+
+- this is completely valid, even if we're running the program on an x86 and using the x86 ADD instruction which exhibits two's complement behavior, so that `INT_MAX + 1 < INT_MAX`
+
+    - so if we don't optimize the function works one way, but if we do optimize it works another
+
+- we've only looked at signed integer overflow, but the C99 language standard lists 191 kinds of undefined behavior
+
+    - do you know them all?
+
+    - this is why it's always a good idea to use `-Wall` for C/C++ compilation and pay attention to the warnings
+
+### profitability
+
+- another consideration is that the transformation we apply to the code to optimize it should actually result in faster code; this can be trickier than you might think
+
+- example: function inlining; consider:
+
+```
+fn foo(a:int) -> int { return a + 1; }
+
+fn main() -> int {
+  let x:int = foo(2);
+  return x;
+}
+```
+
+- at runtime, the execution will look something like:
+
+    - `pre-call`
+    - `foo prologue`
+    - compute `a+1`
+    - `foo epilogue`
+    - `post-return`
+    - return `x`
+
+- notice that the `pre-call`, `prologue`, `epilogue`, and `post-return` are all overhead that comes because we're making a function call
+
+- we can optimize this code by _inlining_ the function call, that is, by copying the body of the function directly into the caller:
+
+```
+fn main() -> int {
+  let x:int = 2 + 1;
+  return x;
+}
+```
+
+- this has exposed another optimization opportunity for constant folding and propagation, yielding the following optimized program:
+
+```
+fn main() -> int {
+  return 3;
+}
+```
+
+- function inlining both eliminates the overhead of function calls and also exposes many opportunities for optimization that wouldn't be obvious if we looked at functions in isolation
+
+- we can perform function inlining whenever we know exactly which function is being called (always for direct calls, sometimes for indirect calls)
+
+- you might think: inlining one function call was good, so obviously we should inline as many as possible! but this actually is not a good idea; for one, we can't fully inline recursive calls (we would get into a cycle of infinitely repeated inlinings); but let's ignore that issue---the real problem is that inlining comes with a cost: the code becomes larger
+
+```
+fn foo(a:int) -> _ { <body> }
+
+fn main() -> int {
+  foo(2);
+  foo(3);
+  return 0;
+}
+```
+
+- becomes:
+
+```
+fn main() -> int {
+  <body with a = 2>
+  <body with a = 3>
+  return 0;
+}
+```
+
+- there were two calls to `foo`, so we doubled the amount of code inside `foo`'s body; now consider the following:
+
+```
+fn bar(b:int) -> _ { <body> }
+
+fn foo(a:int) -> _ {
+  bar(a+10);
+  bar(a+20);
+}
+
+fn main() -> int {
+  foo(2);
+  foo(3);
+  return 0;
+}
+```
+
+- becomes:
+
+```
+fn main() -> int {
+  <body with b = 12>
+  <body with b = 22>
+  <body with b = 13>
+  <body with b = 23>
+  return 0;
+}
+```
+
+- we doubled the amount of code in `foo`, which doubled the amount of code in `bar`
+
+- in general, inlining can increase code size exponentially; this impacts not just memory consumption, but also performance because the large code size can blow the instruction cache and cause large slowdowns
+
+- in practice, compilers use a set of complicated heuristics to determine whether a function call should be inlined or not
+
+- many optimizations have similar considerations: just because we _can_ apply the optimization doesn't mean it's a good idea; we need to figure out in each case whether applying the optimization results in a net performance benefit or loss and act accordingly
+
+## local optimizations
+### intro
+
+- local optimizations operate on basic blocks; we iterate through each block (in arbitrary order) and apply the local optimizations to optimize each block in isolation from each other
+
+- because they only apply to straightline code (the basic block), they tend to be much simpler than global analyses
+
+- we'll go over some examples of common local optimizations
+
+### constant folding and arithmetic identities
+
+- we've already mentioned these; they're simple optimizations that operate on single instructions
+
+    - the idea is that sometimes we don't need to wait for the program to execute in order to evaluate expressions, we can do it right in the compiler
+
+- for each instruction: 
+
+    - if all the operands are constants, evaluate the operation (`$arith` or `$cmp`)
+    
+    - if some of the operands are constants, attempt to apply an arithmetic identity (for `$arith`)
+
+```
+x * 1 = x
+1 * x = x
+x * 0 = 0
+0 * x = 0
+x + 0 = x
+0 + x = x
+x - 0 = 0
+0 - x = -x
+x - x = 0
+```
+
+- if we are able to evaluate a branch condition to a constant, we can turn the branch into an unconditional jump
+
+### local value numbering
+
+- this is a slightly more complicated optimization that operates on the entire basic block; our goal is to identify redundant expressions computed by the basic block so that we don't compute the same thing more than once
+
+- example 1:
+
+```
+a = 4
+b = 5
+c = a + b
+d = 5
+e = a + b
+```
+
+- clearly the second `a + b` is redundant and we could optimize this as:
+
+```
+a = 4
+b = 5
+c = a + b
+d = 5
+e = c
+```
+
+- a naive approach would be to simply scan down the list of instructions in the basic block and record which ones we see; if we see it again, replace it with the left-hand side of the first instruction to compute that expression---but this doesn't always work
+
+- example 2:
+
+```
+a = 4
+b = 5
+c = a + b
+a = 5
+e = a + b
+```
+
+- the naive optimization would be incorrect, because the value of the second `a + b` is different than the value of the first `a + b`
+
+- here's another problem; example 3:
+
+```
+a = 4
+b = 5
+c = a + b
+d = 5
+e = b + a
+```
+
+- the second expression `b + a` is syntactically different than the first `a + b` but is semantically identical; we need to be able to recognize that fact while still distinguishing expressions like `a - b` and `b - a`
+
+- our strategy will be to tag expressions with numbers s.t. semantically identical expressions (like `a + b` and `b + a` in example 3) are given the same number and hence are recognized as equivalent while semantically different expressions (like the first `a + b` and the second `a + b` in example 2) are given different numbers
+
+    - note that our goal is not to guarantee that we find all equivalent expressions; this is uncomputable---we want to find as many as we can while still being fast and while guaranteeing that we never incorrectly find non-equivalent expressions to be equivalent
+
+- the algorithm:
+
+    1. initialize a table mapping expressions to value numbers (starting empty); we often use a hash table, and thus this optimization is sometimes called "hash-based value numbering"
+
+    2. for each basic block instruction in order: 
+    
+        - look up each variable operand to get its value number; assign a fresh number if it doesn't have one already and record it in the table
+        
+        - if the operator is commutative, order the operand value numbers from least to greatest
+        
+        - look up the entire expression (using the operand numbers instead of variables) in the table to get its number; assign a fresh number if it doesn't have one already and record it in the table
+        
+        - update the table to map the left-hand side variable to the number for the right-hand side expression
+
+    3. for any two instructions `x = <e1>` and `y = <e2>` s.t. `x` and `y` have the same value number at `y = <e2>`, we can replace `<e2>` with `x`
+
+- [go through examples 1--3 above]
+
+- example 4
+
+```
+x = a + d
+y = a
+z = y + d
+```
+
+- we can see from this example that local value numbering can discover equivalent expressions even if they use different variables altogether
+
+- example 5
+
+```
+a = x + y
+a = 1
+b = x + y
+c = x + y
+b = 2
+d = x + y
+```
+
+- how can we transform this code to optimize it based on the value numbering?
+
+    - we know that `x + y` in all four expressions will have the same value, but `a` and `b` are redefined at various points
+    
+    - it would be incorrect to replace `c = x + y` with `c = a` and incorrect to replace `d = x + y` with either `d = a` or `d = b`
+
+    - we can only safely transform `c = x + y` to `c = b` and `d = x + y` to `d = c`
+
+- this is why we have the caveat in the algorithm that we can only replace `<e2>` with `x` _if_ `x` and `y` have the same value number _at that  instruction_
+
+    - for the instruction `c = x + y` we see that while `a` originally had the same value number as `c`, now it has a different value number and so cannot be used
+    
+    - similarly, for the instruction `d = x + y` we see that neither `a` nor `b` still have the same value number as `d` and so neither can be used.
+
+### exercise 
+
+- optimize the following code using local value numbering:
+
+```
+a = b - c
+d = c - b
+e = c 
+f = a * d
+g = b - e
+h = d * a
+d = 42
+i = e - b
+```
+
+- SOLUTION
+
+```
+a = b - c
+d = c - b
+e = c
+f = a + d
+g = a
+h = f
+d = 42
+i = d
+```
+
+## global optimizations
+### general intro
+
+- we have looked at analysis and optimization at the basic block level (local optimization), but the limited scope means that we can miss many optimization opportunities; let's widen our scope to entire functions, i.e., global optimization
+
+- remember that optimization = analysis + transformation; we split global optimization into two pieces:
+
+    1. program analyses to determine what transformations are safe to do
+
+    2. the actual transformations that optimize the program
+
+- the analyses required for global optimization tend to be more complicated than for local optimization, and we have developed a specific theoretical framework for it called _dataflow analysis_
+
+    - compiler developers tried a lot of ad-hoc global analyses at first, but found that they were very difficult to get correct; dataflow analysis provides a handy set of tools such that, if you use them correctly, you will get a correct analysis
+
+- first we'll look at some high-level examples of optimizations we might want to perform
+
+- then we'll dig deeper into the DFA framework for program analysis that is required to enable those optimizations
+
+    - there's a lot of math that goes into showing that these analyses will terminate and give the correct answer; we won't go into that math, it's outside the scope of the class (and just to implement the analyses you don't need to know the math)
+
+    - if you want to understand the math behind it all, see my graduate course CS 260
+
+- finally we'll go in-depth into a specific set of DFA analyses and the optimizations they enable
+
+- there are _many_ more optimizations than the ones described here, these are just a sampling
+
+### high-level optimization examples
+#### constant propagation
+
+- we want to precompute constant values during compilation so we don't have to compute them at runtime
+
+- there are often constants present in source code, but even more tend to get added as the code is lowered and transformed in various ways
+
+- original code
+
+```
+entry:
+  x = $copy 40
+  y = $arith add x 2
+  $ret y
+```
+
+- becomes
+
+```
+entry:
+  x = $copy 40
+  y = $arith add 40 2
+  $ret 42
+```
+
+#### global common subexpression elimination
+
+- we want to avoid computing the same expression multiple times if they will always have the same answer
+
+- original code
+
+```
+entry:
+  x = $arith add p q
+  y = $arith add p q
+  z = $arith add x y
+  $ret z
+```
+
+- becomes
+
+```
+entry:
+  x = $arith add p q
+  y = $copy x
+  z = $arith add x y
+  $ret z
+```
+
+#### copy propagation
+
+- we want to avoid making superfluous copies of things at runtime when possible
+
+- this is often useful as a cleanup phase after other optimizations (can also be useful after lowering)
+
+- original code (from result of GCSE)
+
+```
+entry:
+  x = $arith add p q
+  y = $copy x
+  z = $arith add x y
+  $ret z
+```
+
+- becomes
+
+```
+entry:
+  x = $arith add p q
+  y = $copy x
+  z = $arith add x x
+  $ret z
+```
+
+#### dead code elimination
+
+- we want to eliminate code whose execution at runtime is irrelevant
+
+- another one that's useful to clean up after other optimizations
+
+- original code (from result of constant propagation)
+
+```
+entry:
+  x = $copy 40
+  y = $arith add 40 2
+  $ret 42
+```
+
+- becomes
+
+```
+entry:
+  $ret 42
+```
+
+- original code (from result of copy propagation)
+
+```
+entry:
+  x = $arith add p q
+  y = $copy x
+  z = $arith add x x
+  $ret z
+```
+
+- becomes
+
+```
+entry:
+  x = $arith add p q
+  z = $arith add x x
+  $ret z
+```
+
+### DFA intro
+
+- the above examples were trivially correct and easy to reason about, since they were all contained in a single block
+
+- to safely apply such transformations globally, we need to analyze the entire function
+
+- what does a program analysis do, exactly?
+
+    - it computes _invariants_ about program execution: things that are guaranteed to always be true
+
+    - this information is what tells us whether a transformation is safe
+
+- what invariants does it compute?
+
+    - it depends on the specific analysis
+
+    - each analysis will decide on a set of possible invariants that it's looking for
+
+- example: _sign analysis_ looks for invariants about whether a variable's value is _positive_, _negative_, or _zero_
+
+```
+fn abs(a:int, b:int) -> int { 
+  let c:int;
+  if (a < b) { c = b - a; } else { c := a - b; } 
+  return c;
+}
+```
+
+- given this function, we don't know what the values of the arguments will be, nor whether we will take the true or false branch of the conditional---but we can infer the invariant that the value returned by this function will always be non-negative; here's our reasoning:
+
+    - either `a < b` or `b < a` or `a == b`
+    
+    - if `a < b` then we take the true branch, `c` is positive
+    
+    - if `b < a` then we take the false branch, `c` is positive
+    
+    - if `a == b` then we take the false branch, `c` is zero
+    
+    - therefore `c` cannot be negative at the return statement
+
+- in this example we are reasoning about the sign of `c` (positive, negative, or zero), so the facts that we care about pertain to that; in other analyses we care about other properties (as we'll see examples of soon)
+
+- dataflow analysis provides a general framework that is independent of the particular facts we want to reason about; basically, it's a template into which we plug in different kinds of things depending on the specific analysis we're trying to perform
+
+- it's important to note that computing _exactly_ the correct set of invariants is an undecidable problem (which we can prove using the techniques you learned in 138)
+
+    - this means we can only _approximate_ the exact set of invariants
+
+    - it's critical that we never compute a _false_ invariant, therefore we allow the analysis to miss true invariants in return for guaranteeing that it never finds a false invariant
+
+    - this means that we may miss some possible optimizations that we could have safely performed, but in return we'll never perform optimizations that break the program
+
+- example: sign analysis redux
+
+```
+fn foo(a:int, b:int) -> int {
+  let c:int;
+  if a < b { c = b - a; }
+  if b < a { c = a - b; }
+  if a == b { c = 1; }
+  return c;
+}
+```
+
+- for this example we can reason about signedness again and determine that `c` must always be positive at the return statement
+
+    - however, our analysis may say only that `c` will be non-negative, or even that it may be any of positive, negative, or zero
+
+    - these are true invariants, but not as precise as they could be (being positive implies both of those things)
+
+### DFA framework
+
+- remember that DFA is a template; we define how it works while leaving certain parts unspecified (which will be filled in by each specific analysis)
+
+    - we'll describe the framework here, then give a number of concrete examples
+
+- these parts are defined by a specific analysis:
+
+    - an _abstract store_ datatype, along with an operation called _join_ that combines two abstract stores into a new abstract store
+
+        - this abstract store will contain the invariants that we're computing for the analysis being implemented
+
+        - the join operation combines the invariants from two abstract stores into a new set of invariants that over-approximate the originals, i.e., if `A ⊔ B = C` then `A ⇒ C` and `B ⇒ C` (but `C` may be less precise than `A` or `B`)
+
+    - the _initial abstract store_ `init`
+
+        - these are the invariants that hold at the entry of the function
+
+    - the _bottom_ abstract store `bot`
+
+        - this is the store that says no invariants have been computed yet
+
+    - for each LIR instruction a function `F` that transforms an input abstract store into an output abstract store for that instruction
+
+        - sometimes we only need the non-terminals `F_copy`, `F_arith`, and `F_cmp`, each taking a store as an argument and returning a store as a result
+
+        - sometimes the terminals are relevant too: `F_br`, `F_jmp`, `F_ret`
+
+        - these functions describe how an instruction modifies the computed invariants
+
+- given these parts, we can define how DFA works independent of any given analysis
+
+- for each basic block `bb` we'll define:
+
+    - `IN_bb` (the incoming abstract store for `bb`)
+    - `OUT_bb` (the outgoing abstract store for `bb`)
+
+- we initialize these as follows:
+
+    - `IN_entry` = `init`
+    - `IN_bb` = `bot` for all `bb` ̸= `entry`
+    - `OUT_bb` = `bot` for all `bb`
+
+- we create a worklist `work` of basic blocks, initialized to contain every basic block
+
+    - these are the basic blocks that remain to be processed
+
+    - it doesn't matter what order the basic blocks are processed in, the DFA framework guarantees we'll get the same answer
+
+    - this means the worklist can be a set, queue, stack, etc (it's probably easiest to make it a stack implemented using a vector)
+
+- while the worklist isn't empty, we continually do the following:
+
+    - pop a basic block `bb` from the worklist
+
+    - `IN_bb` = `⨆ OUTₚ` s.t. `p` is a predecessor of `bb` in the CFG
+
+        - this says that the input could be coming from any of the `bb`'s predecessors, and so `IN_bb` needs to over-approximate all of the inputs
+
+    - let `store` = `IN_bb` (IMPORTANT: this is a copy)
+
+    - for each instruction `i` from 0..len(`bb`):
+
+        - `store` = `F_inst(store)`, where `F_inst` is the function relevant to instruction `i`
+
+        - note that we're updating `store` in-place; at the end of all the instructions we have the store leaving the basic block
+
+    - if `store` ̸= `OUT_bb` (i.e., the invariants have changed):
+
+        - `OUT_bb` = `store`
+
+        - for each basic block `s` that is a successor of `bb` in the CFG, add `s` to the worklist
+
+- during the worklist loop we may revisit the same basic block multiple times; this can happen because of loops
+
+- this algorithm is designed to ensure that (1) the worklist will eventually become empty; and (2) when it does, each basic block's `IN_bb` and `OUT_bb` will contain correct invariants for the entry and exit of that basic block
+
+    - we may need the invariants for a specific instruction inside `bb`, not just the entry or exit
+
+    - we can compute that by taking `IN_bb` and applying `F_inst` up to the instruction in question and stopping there
+
+- [show high-level overview of worklist algorithm in action on some CFG]
+
+### constant propagation (constants analysis)
+
+- we want to precompute constant values during compilation so we don't have to compute them at runtime
+
+    - [show simple example again]
+
+- the analysis tells us what constants exist at each program point
+
+- the transformation is trivial given the analysis: for each instruction that uses variables, if the analysis says that a variable has a constant value at that point then we replace the variable with that value
+
+    - then we can apply local constant folding as discussed earlier
+
+- to fill in the DFA framework, we need to:
+
+    - define an abstract store datatype
+
+    - define a join operation on abstract stores
+
+    - define the initial abstract store
+
+    - define the bottom abstract store
+
+    - for each `inst` in {`$copy`, `$arith`, `$cmp`}, define `F_inst`
+
+- then we just apply the DFA worklist algorithm and we have our analysis
+
+- the abstract store datatype
+
+    - the invariants we're interested in are `variable X has constant value Y`
+
+    - our abstract store will map each variable to either:
+    
+        - a constant value
+        - an "i don't know" value (i.e., maybe it's a constant or maybe not)
+        - an "no value yet" value (i.e., the variable is undefined)
+
+    - we'll call the "i don't know value" `⊤` (TOP) and the "no value yet" `⊥` (BOTTOM) for reasons having to do with the math behind DFA (which we won't go into)
+
+    - so the abstract store is a map from variable to one of {`n ∈ 𝐙`, `⊤`, `⊥`}
+
+- joining abstract stores
+
+    - given two abstract stores, we need to compute a new abstract store that is guaranteed to be correct no matter which input store is "true"
+
+    - let's focus on some variable `x`, which each input store will map to `n ∈ 𝐙`, `⊤`, or `⊥`; we'll say `x₁` is from one store and `x₂` is from the other and `x₃` is for the new store
+
+        - if `x₁ ↦ n` and `x₂ ↦ n`, then `x₃ ↦ n`
+
+        - if `x₁ ↦ n₁` and `x₂ ↦ n₂` s.t. `n₁ ̸= n₂`, then `x₃ ↦ ⊤`
+
+        - if `x₁ ↦ ⊤` or `x₂ ↦ ⊤`, then `x₃ ↦ ⊤`
+
+        - if `x₁ ↦ ⊥` and `x₂ ↦ X`, then `x₃ ↦ X` (or vice-versa)
+
+    - we do this for each variable in the input stores to get the complete output store
+
+- example
+
+```
+[a ↦ 1, b ↦ 2, c ↦ ⊤, d ↦ ⊥] ⊔
+[a ↦ 1, b ↦ 3, c ↦ 0, d ↦ 4]
+=
+[a ↦ 1, b ↦ ⊤, c ↦ ⊤, d ↦ 4]
+```
+
+- initial abstract store
+
+    - what is guaranteed to be true at the entry of the function? we zero-initialize all locals; we don't know the parameter values
+
+    - `init` = `[x ↦ ⊤, y ↦ 0]` for `x ∈ params`, `y ∈ locals`
+
+- bottom abstract store
+
+    - this is used for all the `IN` and `OUT` stores that we haven't computed yet
+
+    - `bot` = `[x ↦ ⊥]` for `x ∈ locals`
+
+- `x = $copy op`
+
+    - given `store`, update with new value of `x`
+
+    - `store[x]` = [
+        `n` if `op` is `n`;
+        `store[y]` if `op` is `y`
+      ]
+
+- `x = $arith <aop> op1 op2`
+
+    - given `store`, update with new value of `x`
+
+    - for `add` (other operations left as exercise)
+
+```
+ + | ⊥ | c₂ | ⊤
+---+---+----+---
+⊥  | ⊥   ⊥   ⊥
+c₁ | ⊥ c₁+c₂ ⊤
+⊤  | ⊥   ⊤   ⊤
+```
+
+- `x = $cmp <rop> op1 op2`
+
+    - given `store`, update with new value of `x`
+
+    - for `lte` (other operations left as exercise)
+
+```
+ ≤ | ⊥ | c₂ | ⊤
+---+---+----+---
+⊥  | ⊥   ⊥   ⊥
+c₁ | ⊥ c₁≤c₂ ⊤
+⊤  | ⊥   ⊤   ⊤
+```
+
+- given the computed constants, we can trivially transform the program to use the constants instead of variables where possible
+
+- for this analysis we can actually be a bit more clever with `$branch`: if the branch condition is a constant then we know which label we'll jump to and we can ignore the other one (i.e., not put it on the worklist)
+
+- example [see OneNote]
+
+```
+fn foo(p:int, q:int) -> _ {
+  let x:int, y:int
+  entry:
+    $jump hdr
+
+  hdr:
+    x = $cmp lte y q
+    $branch x body exit
+
+  body:
+    p = $copy 4
+    q = $copy 3
+    y = $arith add p q
+    $jump hdr
+
+  exit:
+    $ret
+}
+```
+
+- exercise [see OneNote]
+
+```
+fn foo() -> int {
+  let x:int, y:int, z:int, _t1:int, _t2:int
+  entry:
+    x = $copy 1
+    y = $copy 2
+    $jump hdr
+
+  hdr:
+    _t1 = $cmp lte 0 x
+    $branch _t1 body exit
+
+  body:
+    _t2 = $cmp eq x 1
+    $branch _t2 tt ff
+
+  tt:
+    z = $copy 42
+    $jump end
+
+  ff:
+    z = $arith add 40 y
+    $jump end
+
+  end:
+    x = $copy z
+    $jump hdr
+
+  exit:
+    $ret z
+}
+```
+
+### global common subexpression elimination (available expressions)
+
+- we want to determine what expressions we've already computed that we can reuse at later program points, avoiding having to compute them again
+
+    - [show example below on OneNote; notice in the example that `p * 4` is guaranteed to have been computed along all paths to the assignment to `z` and for each path to have the same value as when it was computed (though that value is different for each path)]
+
+- the analysis tells us what expressions are available at each program point
+
+    - they are guaranteed to have been computed along all paths to this program point
+
+    - for each path the value is guaranteed to be the same at this program point
+
+- the transformation must then insert copies to take advantage of the available expressions
+
+- as before, to fill in the DFA framework, we need to:
+
+    - define an abstract store datatype
+
+    - define a join operation on abstract stores
+
+    - define the initial abstract store
+
+    - define the bottom abstract store
+
+    - for each `inst` in {`$copy`, `$arith`, `$cmp`}, define `F_inst`
+
+- then we just apply the DFA worklist algorithm and we have our analysis
+
+- the abstract store datatype
+
+    - the invariants we're interested in are `expression E is available` (where "available" means what we specified above)
+
+    - since we're analyzing LIR, an expression `E` is either `<aop> op1 op2` or `<rop> op1 op2`
+
+    - so our abstract store will be a set of available expressions
+
+- joining abstract stores
+
+    - given two abstract stores, we need to compute a new abstract store that is guaranteed to be correct no matter which input store is "true"
+
+    - this is just set intersection, i.e., an expression is guaranteed to be available if it was available in both input stores
+
+- initial abstract store
+
+    - at the entry to the function we haven't computed any expressions yet
+
+    - `init` = `{}`
+
+- bottom abstract store
+
+    - we optimistically set `bot` = the set of all expressions used in the function
+
+    - this is safe because the analysis will remove expressions as necessary (because join is set intersection)
+
+- `x = $copy op`
+
+    - this may change the value of `x`, so update `store` to remove any expressions using `x`
+
+- `x = $arith <aop> op1 op2`
+
+    - the expression `<aop> op1 op2` has been computed, so add it to `store`
+
+    - this may change the value of `x`, so update `store` to remove any expressions using `x` (this may include the expression we just added)
+
+- `x = $cmp <rop> op1 op2`
+
+    - same as for `$arith`
+
+- example [see OneNote]
+
+```
+fn foo(p:int) -> int {
+  let x:int, y:int, z:int, t:int
+  entry:
+    x = $arith mul p 4
+    t = $cmp lte 0 p
+    $branch t bb1 exit
+
+  bb1:
+    p = $arith add 1 p
+    y = $arith mul p 4
+    $jump exit
+
+  exit:
+    z = $arith mul p 4
+    $ret z
+}
+```
+
+- exercise [see OneNote]
+
+```
+fn foo(a:int, b:int) -> int {
+  let x:int, y:int, z:int, t:int
+  entry:
+    x = $arith add a b
+    y = $arith mul a b
+    $jump hdr
+
+  hdr:
+    z = $arith add a b
+    t = $cmp lt z y
+    $branch t body exit
+
+  body:
+    a = $arith add a 1
+    x = $arith add a b
+    $jump hdr
+
+  exit:
+    $ret x
+}
+```
+
+- once we've computed the available expressions we need to transform the program to take advantage of them
+
+    - there are various schemes; we'll use a simple one that works but may leave redundancies that other optimizations need to clean up (like copy propagation and dead code elimination)
+
+    - for each expression `e ∈ E` create a fresh variable `Vₑ`
+
+    - for each instance of `e` in an `$arith` or `$cmp`, if `e` is available at that point replace the `$arith` or `$cmp` with `$copy Vₑ`
+
+    - for each definition `x = e` s.t. `e` was replaced with `$copy Vₑ` somewhere, insert a copy `Vₑ = $copy x` immediately afterward
+
+        - notice we don't check whether _that specific_ definition needs to be available, so this may insert extraneous copies that need to be cleaned up later
+
+- example [same as above example]; SOLUTION:
+
+```
+fn foo(p:int) -> int {
+  let x:int, y:int, z:int, _t1:int, V₁:int
+  entry:
+    x = $arith mul p 4
+    V₁ = $copy x
+    _t1 = $cmp lte 0 p
+    $branch _t1 bb1 exit
+
+  bb1:
+    p = $arith add 1 p
+    y = $arith mul p 4
+    V₁ = $copy y
+    $jump exit
+
+  exit:
+    z = $copy V₁
+    $ret z
+}
+```
+
+- exercise [same as above exercise]; SOLUTION:
+
+```
+fn foo(a:int, b:int) -> int {
+  let x:int, y:int, z:int, t:int, V₁
+  entry:
+    x = $arith add a b
+    V₁ = $copy x
+    y = $arith mul a b
+    $jump hdr
+
+  hdr:
+    z = $copy V₁
+    V₁ = $copy z         // THIS IS EXTRANEOUS; WE COULD JUST USE x instead of V₁
+    t = $cmp lt z y
+    $branch t body exit
+
+  body:
+    a = $arith add a 1
+    x = $arith add a b
+    V₁ = $copy x
+    $jump hdr
+
+  exit:
+    $ret x
+}
+```
+
+### dead code elimination (liveness)
+
+- we want to remove code that computes something that is never used (we call this _dead code_)
+
+    - [show simple example again]
+
+    - this is a very useful optimization for cleaning up after other optimizations, like the ones above
+
+- the analysis is going to tell us what variables may be _live_ at each program point; a variable is live if it may be used at some later program point
+
+    - any variable that is not live at a program point must be dead (i.e., definitely won't be used at some later program point)
+
+    - liveness requires us to look into the future at what will happen later in the program; how do we know whether a variable will be used or not?
+
+    - we reverse the CFG: all edges are flipped, we treat basic blocks as if the terminal is the starting point, and we start with the function exit (the `$ret`) instead of the function entry
+
+    - this means at a particular program point we've already seen the later program points and so we know what is live or dead at this program point
+
+    - we can use the same DFA framework as before, just on the reversed CFG---`IN` is for the terminal instruction of a basic block, `OUT` is for the top of a basic block
+
+- the transformation is trivial given the analysis: for each instruction that defines a variable `x`, if the analysis says that `x` is not live at this point then we remove the instruction
+
+- there is a more generalized and powerful analysis we could use called _faint variables analysis_ that could potentially eliminate even more code because it takes transitive deadness into account, but we'll stick with the simpler liveness analysis
+
+    - note in the example below that `b` is considered live at the `$arith` because it is later used as the operand of a `$copy`, even though it is a copy into a dead variable, and thus `a` is considered live at the first `$copy` and so only the final `$copy` can be removed; a more careful analysis would show that `a` and `b` are effectively dead and all the instructions besides `$ret` could be removed
+
+```
+a = $copy 1
+b = $arith add a 1
+a = $copy b
+$ret 2
+```
+
+- as before, to fill in the DFA framework, we need to:
+
+    - define an abstract store datatype
+
+    - define a join operation on abstract stores
+
+    - define the initial abstract store (for the reversed CFG)
+
+    - define the bottom abstract store
+
+    - for each `inst` in {`$copy`, `$arith`, `$cmp`, `$branch`, `$ret`}, define `F_inst` (remembering that we're going backwards)
+
+        - notice that we're including `$branch` and `$ret`, because they can use variables as operands
+
+- then we just apply the DFA worklist algorithm and we have our analysis
+
+- the abstract store datatype
+
+    - the invariants we're interested in are `variable x may be live at this point` (where "live" means what we defined above)
+
+    - so the abstract store will be a set of variables that are live at a given program point
+
+- joining abstract stores
+
+    - given two abstract stores, we need to compute a new abstract store that is guaranteed to be correct no matter which input store is "true"
+
+    - this is just set union, i.e., a variable may be live if it is live in either input store
+
+- initial abstract store (i.e., at the exit of the function because we reversed the CFG)
+
+    - at the exit of the function nothing is live
+
+    - `init` = `{}`
+
+- bottom abstract store
+
+    - we assume nothing is live: `bot` = `{}`
+
+- `x = $copy op`
+
+    - update `store` to remove `x`
+
+    - if `op` = `y` then update `store` to include `y`
+
+- `x = $arith <aop> op1 op2`
+
+    - update `store` to remove `x`
+
+    - if `op1` or `op2` = `y` then update `store` to include `y`
+
+- `x = $cmp <rop> op1 op2`
+
+    - same as `$arith`
+
+- `$branch x bb1 bb2`
+
+    - update `store` to include `x`
+
+- `$ret x`
+
+    - update `store` to include `x`
+
+- given the analysis, we can trivially transform the program to remove any instruction that assigns to a dead variable
+
+- example/exercise [see OneNote]
+
+```
+fn foo(a:int, b:int) -> int {
+  let x:int, y:int, z:int
+
+  entry:
+    x = $copy 0
+    $jump hdr
+
+  hdr:
+    y = $cmp lt x a
+    $branch y body exit
+
+  body:
+    b = $copy 2
+    y = $arith add a x
+    z = $arith mul a x
+    x = $arith add x 1
+    $jump hdr
+
+  exit:
+    z = $arith add a z
+    $ret z
+}
+```
+
+### copy propagation (reaching defs)
+
+- we want to avoid superfluous copies
+
+    - [show simple example again]
+
+    - this transformation doesn't actually remove copies, it just makes them obsolete; a later optimization (like dead code elimination) can then remove the obsolete copies
+
+    - the analysis and transformation are actually a lot like constant propagation; with a little tweaking we could do them both at once
+
+- the analysis tells us what copies _reach_ each program point
+
+    - a copy `x = $copy y` reaches a program point PP iff (1) it is guaranteed to be computed along all paths to PP; and (2) neither `x` nor `y` are assigned to along any path from the copy to PP
+
+    - if these are true then it means `x` and `y` must have the same value at PP and so we are allowed to replace `x` with `y`, making the copy `x = $copy y` obsolete
+
+- the transformation is trivial given the analysis: for each instruction that uses a variable `x`, if the analysis says that a copy `x = $copy y` reaches that point then we replace `x` with `y`
+
+- as before, to fill in the DFA framework, we need to:
+
+    - define an abstract store datatype
+
+    - define a join operation on abstract stores
+
+    - define the initial abstract store
+
+    - define the bottom abstract store
+
+    - for each `inst` in {`$copy`, `$arith`, `$cmp`}, define `F_inst`
+
+- then we just apply the DFA worklist algorithm and we have our analysis
+
+- the abstract store datatype
+
+    - the invariants we're interested in are `"x = $copy y" reaches this point` (where "reaches" means what we specified above)
+
+    - note that we only care when the operand is a variable; if it were a constant then it would have been caught by constant propagation
+
+    - so our abstract store will be a set of copies that reach the current program point
+
+- joining abstract stores
+
+    - given two abstract stores, we need to compute a new abstract store that is guaranteed to be correct no matter which input store is "true"
+
+    - this is just set intersection, i.e., a copy is guaranteed to reach this point if it reached it in both input stores
+
+- initial abstract store
+
+    - at the entry to the function we haven't computed any copies yet
+
+    - `init` = `{}`
+
+- bottom abstract store
+
+    - we optimistically set `bot` = the set of all copies in the function
+
+    - this is safe because the analysis will remove copies as necessary (because join is set intersection)
+
+- `x = $copy op`
+
+    - update `store` to remove any copy to or from `x` (note the _or from_ part)
+
+    - if `op` = `y`, update `store` to include this copy
+
+- `x = $arith <aop> op1 op2`
+
+    - update `store` to remove any copy to or from `x`
+
+- `x = $cmp <rop> op1 op2`
+
+    - same as `$arith`
+
+- given the computed copies, we can trivially transform the program to use the copies where possible
+
+- example/exercise [see OneNote]
+
+```
+fn foo(a:int, b:int, c:int) -> int {
+  let x:int, y:int, z:int
+
+  entry:
+    x = $copy a
+    y = $copy b
+    z = $copy c
+    $branch a tt exit
+
+  tt:
+    y = $arith add x y
+    a = $copy y
+    b = $cmp eq a z
+    y = $copy b
+    $jump exit
+
+  exit:
+    x = $arith add y z
+    $ret x
+}
+```
+
+## order of optimizations
+
+- the last thing to mention is that the _order_ of optimizations can make a big difference in how effective they are
+
+- we saw for GCSE that our optimization left a lot of copy assignments and dead variables, which can then be cleaned up by other optimizations like copy propagation and dead code elimination; it turns out that many optimizations modify the code in such a way that they enable other optimizations, and this can even be cyclic (A enables B which enables A again)
+
+- so what's the best order? this isn't an easy question to answer, and heavily depends on the code being optimized
+
+    - the optimization levels in a compiler such as `gcc` or `clang` (`-O1`, `-O2`, `-O3`, etc) are just convenient flags that specify a series of optimizations determined by the compiler developers to "usually" do a pretty good job
+    
+    - you (the compiler user) can actually specify the exact set of optimizations that you want to apply and what order you want to apply them in, and if you do it right you can often get even faster code than by using the default compiler flags
+    
+    - however, figuring out what optimizations to use in what order can take a lot of trial and error, and you'll never know whether you found the best possible ordering
+
+# register allocation [SKIPPED FOR TIME]
+## intro
+
+- our naive codegen strategy only uses registers as temporaries: for each instruction we read from memory to registers, did the operation, then stored the result back to memory
+
+- memory access is _extremely_ slow compared to registers, thousands of cycles vs a single cycle
+
+    - this is more of a problem for compute-bound programs; if the program is already waiting on other things (e.g., I/O, like the network or disk) then memory access times aren't as important
+
+- there are a lot of microarchitectural optimizations aimed at mitigating this problem, like caches, pipelining, out of order execution, speculative execution, etc; still, the compiler can do a lot to help (especially for simpler architectures that don't have all those optimizations)
+
+- our goal should be to go to memory as little as possible and to use registers as much as possible
+
+    - ideally, every variable should be in its own dedicated register instead of on the stack and we only go to memory when absolutely required (e.g., for a load or store instruction)
+
+    - problem: there are arbitrarily many variables and only a fixed number of registers
+
+    - if all the variables fit in registers then things are relatively easy (we still need to worry about caller- and callee-save registers), but if not then we have to figure out some way to map variables to registers, hopefully so that memory accesses are minimized
+
+- this is the problem of _register allocation_: within a function, assigning variables to registers to avoid memory access (assignment may vary over the course of the function)
+
+    - there is such a thing as interprocedural register allocation (i.e., over all functions not just within a single function), but that's generally too expensive for compilation
+
+    - there are also register allocation schemes that only operate at the level of a single basic block rather than the whole function; these were more common in olden times and may still be used in some places, but aren't really common today
+    
+    - single-function register allocation is the norm
+
+    - note that i did not specify that register allocation needs to find the _optimal_ assignment of variables to registers, just _some_ assignment; i'll talk more about that later
+
+- register allocation has been studied for decades and there are tons of variants and optimizations; we'll be looking at the basics
+
+## examples TODO: [need to update code examples to cflat v0.2]
+### easy case [see OneNote]
+
+- [number of variable <= number of registers]
+
+- LIR
+
+```
+fn main() -> int {
+  let x:int, i:int
+
+  entry:
+    x = $copy 10
+    $jump hdr
+
+  hdr:
+    i = $cmp neq x 1
+    $branch i body exit
+
+  body:
+    x = $arith sub x 1
+    $jump hdr
+
+  exit:
+    $ret x
+}
+```
+
+- NAIVE
+
+```
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $16, %rsp
+  movq $0, -8(%rbp)  // i
+  movq $0, -16(%rbp) // x
+  jmp main_entry
+
+main_entry:
+  movq $10, -16(%rbp)
+  jmp main_hdr
+
+main_hdr:
+  cmpq $0, -16(%rbp)
+  movq $0, %r8
+  setne %r8b
+  movq %r8, -8(%rbp)
+  cmpq $0, -8(%rbp)
+  jne main_body
+  jmp main_exit
+
+main_body:
+  movq -16(%rbp), %r8
+  subq $1, %r8
+  movq %r8, -16(%rbp)
+  jmp main_hdr
+
+main_exit:
+  movq -16(%rbp), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+- OPTIMIZED (assuming 2 available registers)
+
+```
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  movq $0 %r9     // i
+  movq $0 %r10    // x
+  jmp main_entry
+
+main_entry:
+  movq $10, %r9
+  jmp main_hdr
+
+main_hdr:
+  cmpq $1, %r9
+  movq $0, %r8
+  setne %r8b
+  cmpq $0, %r8
+  jne main_body
+  jmp main_exit
+
+main_body:
+  subq $1, %r9
+  jmp main_hdr
+
+main_exit:
+  movq %r9, %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+### non-easy case 1 [see OneNote]
+
+- [number of variable > number of registers, but non-overlapping lifetimes]
+
+- LIR
+
+```
+fn main() -> int {
+  let x:int, y:int, i:int
+
+  entry:
+    x = $copy 10
+    $jump hdr1
+
+  hdr1:
+    i = $cmp neq x 1
+    $branch i body1 next
+
+  body1:
+    x = $arith sub x 1
+    $jump hdr1
+
+  next:
+    y = $copy 1
+    $jump hdr2
+
+  hdr2:
+    i = $cmp neq y 10
+    $branch i body2 exit
+
+  body2:
+    y = $arith add y 1
+    $jump hdr2
+
+  exit:
+    $ret y
+}
+```
+
+- NAIVE
+
+```
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $32, %rsp
+  movq $0, -8(%rbp)   // i
+  movq $0, -16(%rbp)  // x
+  movq $0, -24(%rbp)  // y
+  jmp main_entry
+
+main_entry:
+  movq $10, -16(%rbp)
+  jmp main_hdr1
+
+main_hdr1:
+  cmpq $0, -16(%rbp)
+  movq $0, %r8
+  setne %r8b
+  movq %r8, -8(%rbp)
+  cmpq $0, -8(%rbp)
+  jne main_body1
+  jmp main_next
+
+main_body1:
+  movq -16(%rbp), %r8
+  subq $1, %r8
+  movq %r8, -16(%rbp)
+  jmp main_hdr2
+
+main_next:
+  movq $1, -24(%rbp)
+  jmp main_hdr2
+
+main_hdr2:
+  cmpq $10, -24(%rbp)
+  movq $0, %r8
+  setne %r8b
+  movq %r8, -8(%rbp)
+  cmpq $0, -8(%rbp)
+  jne main_body2
+  jmp main_exit
+
+main_body2:
+  movq -24(%rbp), %r8
+  addq $1, %r8
+  movq %r8, -24(%rbp)
+  jmp main_hdr2
+
+main_exit:
+  movq -24(%rbp), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+- OPTIMIZED (assuming 2 available registers)
+
+```
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  movq $0 %r9     // i
+  movq $0 %r10    // x, then y
+  jmp main_entry
+
+main_entry:
+  movq $10, %r9
+  jmp main_hdr1
+
+main_hdr1:
+  cmpq $1, %r9
+  movq $0, %r8
+  setne %r8b
+  cmpq $0, %r8
+  jne main_body2
+  jmp main_next
+
+main_body1:
+  subq $1, %r9
+  jmp main_hdr1
+
+main_next:
+  movq $1, %r9
+  jmp main_hdr2
+
+main_hdr2:
+  cmpq $10, %r9
+  movq $0, %r8
+  setne %r8b
+  cmpq $0, %r8
+  jne main_body2
+  jmp main_exit
+
+main_body2:
+  addq $1, %r9
+  jmp main_hdr2
+
+main_exit:
+  movq %r9, %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+### non-easy case 2 [see OneNote]
+
+- [number of variable > number of registers, overlapping lifetimes]
+
+- LIR
+
+```
+fn main() -> int {
+  let x:int, y:int, i:int
+
+  entry:
+    x = $copy 10
+    $jump hdr1
+
+  hdr1:
+    i = $cmp neq x 1
+    $branch i body1 next
+
+  body1:
+    x = $arith sub x 1
+    $jump hdr1
+
+  next:
+    y = $copy 1
+    $jump hdr2
+
+  hdr2:
+    i = $cmp neq y 10
+    $branch i body2 exit
+
+  body2:
+    y = $arith add y 1
+    $jump hdr2
+
+  exit:
+    x = $arith add x y
+    $ret x
+}
+```
+
+- NAIVE
+
+```
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $32, %rsp
+  movq $0, -8(%rbp)   // i
+  movq $0, -16(%rbp)  // x
+  movq $0, -24(%rbp)  // y
+  jmp main_entry
+
+main_entry:
+  movq $10, -16(%rbp)
+  jmp main_hdr1
+
+main_hdr1:
+  cmpq $0, -16(%rbp)
+  movq $0, %r8
+  setne %r8b
+  movq %r8, -8(%rbp)
+  cmpq $0, -8(%rbp)
+  jne main_body1
+  jmp main_next
+
+main_body1:
+  movq -16(%rbp), %r8
+  subq $1, %r8
+  movq %r8, -16(%rbp)
+  jmp main_hdr2
+
+main_next:
+  movq $1, -24(%rbp)
+  jmp main_hdr2
+
+main_hdr2:
+  cmpq $10, -24(%rbp)
+  movq $0, %r8
+  setne %r8b
+  movq %r8, -8(%rbp)
+  cmpq $0, -8(%rbp)
+  jne main_body2
+  jmp main_exit
+
+main_body2:
+  movq -24(%rbp), %r8
+  addq $1, %r8
+  movq %r8, -24(%rbp)
+  jmp main_hdr2
+
+main_exit:
+  movq -16(%rpb), %r8
+  addq -24(%rbp), %r8
+  movq %r8, -16(%rbp)
+  movq -16(%rbp), %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+- OPTIMIZED
+
+```
+.globl main
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $16, %rsp  // space for x
+  movq $0 %r9     // i
+  movq $0 %r10    // x, then y
+  jmp main_entry
+
+main_entry:
+  movq $10, %r9
+  jmp main_hdr1
+
+main_hdr1:
+  cmpq $1, %r9
+  movq $0, %r8
+  setne %r8b
+  cmpq $0, %r8
+  jne main_body2
+  jmp main_next
+
+main_body1:
+  subq $1, %r9
+  jmp main_hdr1
+
+main_next:
+  movq %r9, -8(%rbp) // spill x
+  movq $1, %r9
+  jmp main_hdr2
+
+main_hdr2:
+  cmpq $10, %r9
+  movq $0, %r8
+  setne %r8b
+  cmpq $0, %r8
+  jne main_body2
+  jmp main_exit
+
+main_body2:
+  addq $1, %r9
+  jmp main_hdr2
+
+main_exit:
+  addq -8(%rbp), %r9
+  movq %r9, %rax
+  jmp main_epilogue
+
+main_epilogue:
+  movq %rbp, %rsp
+  popq %rbp
+  ret
+```
+
+## general strategy NOTE: [assumes we've covered liveness analysis]
+
+- how do we do this kind of assignment automatically?
+
+    - computing an optimal solution turns out to be NP-hard, so we need to approximate
+
+    - trade off performance of register allocation vs performance of resulting code (performance of register allocation matters, e.g., in a JIT compiler)
+
+    - the basic idea is always the same, the details vary a lot
+
+- do codegen, but optimistically assume there is a register for each variable in the function (so-called "pseudo-registers")
+
+    - we can name these pseudo-registers the same as the variable they correspond to, so essentially a variable and a pseudo-register are the same thing
+
+- perform some variation of liveness analysis (as we saw previously for dead code elimination)
+
+    - for each program point a variable (pseudo-register) is live or dead
+
+    - from this we can extract the _live ranges_ of a variable: a live range reaches from where a variable is defined to all the places where that definition is used
+
+- two variables _interfere_ if the intersection of their live ranges is non-empty
+
+    - that is, their values are needed at the same time
+
+    - such variables cannot share a register during the interfering ranges, so they must be in separate registers
+
+- for each live range, if the set of interfering variables is greater than the set of available registers we must pick some variable to _spill_
+
+    - to spill a register means to write it out to memory, so the next time it's used it must be read back from memory
+
+- for each live range we now have an assignment of variables to registers (with some variables possibly spilled so they aren't kept in registers)
+
+- the various register allocation strategies differ in how exactly they compute the live ranges, how precise those live ranges are, and how carefully they select which variables to spill in order to minimize memory traffic
+
+    - we'll cover one (very well-known and popular) strategy: _chaitin's graph coloring_ register allocation
+
+## computing live ranges
+
+- we use a similar liveness analysis here as we did for dead code elimination, but on the x86 pseudo-assembly instead of LIR
+
+- we could compute live ranges in terms of individual instructions, but for brevity (and performance) we'll use entire blocks
+
+    - a block defines a variable if it is defined by any instruction in the block
+
+    - a block uses a variable if it is used by any instruction in the block
+
+- example (draw as CFG)
+
+```
+[1: def a]
+    ↓
+[2: def c]
+    ↓
+[3: use c] ⟶ [8: def a] ⟶ [9: def b] ⟶ [10: use a,b; def c] ⟶ [11: use a,b,c]
+    ↓                                                            ╱      ⇅
+[4: use a]                                                      ╱ [12: use c; def c]
+    ↓      ╲                                                   ╱
+[5: def c]  [6: def c]                                        ╱
+         ╲ ╱                                                 ╱
+      [7: use c] ⟵-----------------------------------------+
+```
+
+```
+variable | live ranges
+---------+---------------------------------
+       a | {1, 2, 3, 4}, {8, 9, 10, 11, 12}
+       b | {9, 10, 11, 12}
+       c | {2, 3}, {5, 7}, {6, 7}, {7, 10, 11, 12}, {7, 11, 12}
+```
+
+- if a variable's live ranges overlap then they need to be merged (the same variable can't be in two different registers at the same time)
+
+```
+variable | live ranges
+---------+---------------------------------
+       a | {1, 2, 3, 4}, {8, 9, 10, 11, 12}
+       b | {9, 10, 11, 12}
+       c | {2, 3}, {5, 6, 7, 10, 11, 12}
+```
+
+## graph coloring
+
+- we need to assign variables to registers based on their live ranges
+
+- chaitin observed that we can reduce this to the problem of _graph coloring_: given an undirected graph and a set of colors, color each node of the graph so that no edge connects nodes of the same color
+
+    - this is an NP-hard problem
+
+- for our purpose, the graph is the _interference graph_
+
+    - a node for each live range
+
+    - an edge between two live ranges if their intersection is non-empty
+
+- example
+
+```
+[a1] -- [c1]
+
+[a2] -- [c2]
+   ╲   ╱
+    [b]
+```
+
+- we have a color for each available register, i.e., "coloring a node" means to assign a register to a live range
+
+- since coloring the graph is NP-hard we rely on a heuristic to approximate the solution (it is guaranteed to be correct, but not guaranteed to be optimal)
+
+    - we will use a stack of nodes, initially empty
+
+    - for a node `n`, let `push n` mean to remove node `n` from the graph and push it onto the stack
+
+- suppose we have `k` colors, then:
+
+    1. repeat as long as possible: pick a node `n` with fewer than `k` edges and push `n`
+
+        - this node is guaranteed to be colorable: just pick a different color than its beighbors (so we need to wait until we know its neighbors' colors)
+
+    2. if there are still nodes in the graph:
+
+        - pick some node `n`, randomly or based on a heuristic cost function (to try to pick a "good" node) and push `n`
+
+        - go to step 1
+
+    3. pop off each node in turn from the stack:
+
+        - if there is some color `c` its neighbors don't have, color it `c`
+
+        - otherwise leave it uncolored
+
+- example [suppose we have 2 available registers R1 and R2]
+
+```
+push a1
+push c1
+push a2
+push b
+push c2
+--------------------
+pop c2: R1
+pop  b: R2
+pop a2: [uncolored]
+pop c1: R1
+pop a1: R2
+```
+
+- any "colored" live range means that we can put the corresponding variable in that register over that range
+
+- any "uncolored" live range means that we need to spill that variable over that range, i.e., we'll have to read it from memory and write it back to memory during that range
+
+## linear scan TODO: [FILL ME IN]
+
+# course recap
+
+- at this point you know the basics of how to implement a fully-functional compiler for a C-like language
+
+    - note that languages with more features can be translated down into something like cflat or LIR, e.g., the original C++ compiler actually translated C++ programs into C programs and used a C compiler
+
+- there are still many things left to explore about compiler development in the front-, middle-, and back-ends
+
+    - different parsing strategies and handling more complex grammars
+
+    - more powerful and complicated type systems
+
+    - more LIR optimizations
+
+    - targeting more architectures, doing back-end optimizations (peephole, instruction selection, etc)
+
+- an interesting challenge: implement a self-hosting cflat compiler
+
+    - that is, a cflat compiler written in cflat
