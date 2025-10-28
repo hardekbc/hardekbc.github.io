@@ -3061,6 +3061,26 @@ char y = **((char**)&x + 1);
 
 - [show a diagram of what we want the stack to look like after the prologue]
 
+```
+        | .                     |
+        | .                     |
+        | .                     |
+        +-----------------------+
+        | old fp                | <- fp
+        +-----------------------+
+        | gc info               |
+        +-----------------------+
+        | pointer-type locals   |
+        | .                     |
+        | .                     |
+        | .                     |
+        | non-pointer locals    |
+        | .                     |
+        | .                     |
+        | .                     | <- sp
+        +-----------------------+
+```
+
 - so when creating the prologue we should:
 
     1. emit the `main` label so `_start` has somewhere to jump
@@ -3999,8 +4019,6 @@ main_epilogue:
 - [go over `x64-info.md`]
 
 - [go over how to use `cflat` executable to go from source to lir to assembly so they can see what the grader expects for codegen]
-
-    - TODO: [come up with some concrete examples]
 
 # TODO: memory management [~2 lectures]
 ## intro
