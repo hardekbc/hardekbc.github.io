@@ -15,7 +15,7 @@
 - week 3.2: just the very beginning of 'validation::the cflat type system'
 - week 4.1: through end of 'front-end recap'
 - week 4.2: up to (not including) lowering expressions in `lower.md`
-- week 5.1: 
+- week 5.1: through 'codegen::necessary context::linker'
 - week 5.2: 
 - week 6.1: 
 - week 6.2: 
@@ -2996,10 +2996,10 @@ char y = **((char**)&x + 1);
 
 - we'll go over the conventions that our compiler will use at the appropriate places during codegen
 
-## stage 1: no structs, pointers, or functions other than main
+## stage 1: no pointers/arrays, structs, or functions other than main
 ### intro
 
-- a LIR::Program that contains only the `main` function, with no structs or externs; no variables have a pointer type
+- a LIR::Program that contains only the `main` function, with no structs or externs; no variables have a pointer or array type
 
 - relevant LIR instructions: `$arith`, `$cmp`, `$const`, `$copy`, `$branch`, `$jump`, `$ret`
 
@@ -3017,11 +3017,13 @@ char y = **((char**)&x + 1);
 
 - example: [see `examples/codegen/stage-1.{lir, s}`] [see OneNote]
 
+- the asm won't make much sense right now; we'll come back after going through the codegen info and look at it again to go through how it implements what we just talked about
+
 ### codegen summary
 
 1. create standard assembly program template (everything except `main` itself) 
 
-    - for programs in stage 1 it will always be the same
+    - for programs in stage 1 it will always be the same; the only addition later will be adding the global function pointer info
 
     - [point it out in the example above]
 
@@ -3043,7 +3045,7 @@ char y = **((char**)&x + 1);
 
     - `FP` holds the _frame pointer_ value, which points to the bottom of the current function's stack frame (i.e., the return address for the caller)
 
-    - `SP` holds the _stack pointer_ value, which points to the current top of the stack (that is, whatever the topmost value on the stack is; `SP + 1` is undefined memory)
+    - `SP` holds the _stack pointer_ value, which points to the current top of the stack (that is, whatever the topmost value on the stack is; `SP - 1` is undefined memory...remember that the stack grows _down_)
 
 - we (the compiler writers) are responsible for managing `FP` and `SP` appropriately
 
@@ -3053,11 +3055,9 @@ char y = **((char**)&x + 1);
 
 - `SP` is the current top of the stack, and so will be the bottom of the new stack frame we're creating
 
-- our new stack frame needs (1) a word containing the number of local variables that are pointers (for GC); (2) space for the local variables where the values of those locals will live
+- our new stack frame needs (1) a word containing the number of local variables that are pointers (for GC, will be 0 for now since we aren't using pointers yet); and (2) space for the local variables where the values of those locals will live
 
-    - we will put the pointer-typed locals first, right after the GC word, then all non-pointer locals---that way the GC will know how many pointers there are and where they are
-
-- but remember that when `main` returns we need to restore the stack back to what it was for its caller
+- remember that when `main` returns we need to restore the stack back to what it was for its caller
 
 - [show a diagram of what we want the stack to look like after the prologue]
 
@@ -3068,13 +3068,9 @@ char y = **((char**)&x + 1);
         +-----------------------+
         | old fp                | <- fp
         +-----------------------+
-        | gc info               |
+        | gc info: num ptrs (0) |
         +-----------------------+
-        | pointer-type locals   |
-        | .                     |
-        | .                     |
-        | .                     |
-        | non-pointer locals    |
+        | locals                |
         | .                     |
         | .                     |
         | .                     | <- sp
@@ -3097,11 +3093,9 @@ char y = **((char**)&x + 1);
 
             - remember that the stack grows _down_: the offset will be negative
 
-            - also remember that we need all pointer-typed locals to be right after the GC word, then all non-pointer locals
-
             - anytime a LIR instruction mentions a variable, the mapping will tell us where in memory that variable's value is relative to `FP` (with the stack location at `FP - (2 * <wordsize>)` being the first local, because `FP - <wordsize>` is the GC info word)
 
-            - in the rest of these notes, for variable `x` we'll use `[x]` to mean its memory location
+            - in the rest of these notes, for variable `x` we'll use `[x]` to mean its memory location on the stack and `*[x]` to mean the value at that memory location
 
         - zero initialize all local variable values (unlike C/C++, cflat defines all variable to start as 0)
 
@@ -3123,7 +3117,7 @@ char y = **((char**)&x + 1);
 
     - FIX: when adding space for GC word + locals, if there are an odd number pretend that there's one extra (it will just be space on the stack at the end of the locals block that we'll never use)
 
-- this is a simplified function prologue because there are no parameters to deal with...later we'll go over a more complete version that works for functions with parameters
+- this is a simplified function prologue because there are no parameters or pointers to deal with...later we'll go over a more complete version that always works
 
 ### the function epilogue
 
@@ -3147,15 +3141,15 @@ char y = **((char**)&x + 1);
 
 - `x = $const <num>`
 
-    - store `<num>` in `[x]`
+    - `*[x]` = `<num>`
 
 - `x = $copy y`
 
-    - load the value from `[y]` and store it in `[x]`
+    - `*[x]` = `*[y]`
 
 - `x = $arith <aop> y z`
 
-    - apply `<aop>` to the values from `[y]` and `[z]`, storing the result in `[x]`
+    - `*[x]` = `*[y] <aop> *[y]`
 
     - if `aop` is Add, Sub, or Mul then we can just use the appropriate x64 instruction
 
@@ -3167,9 +3161,9 @@ char y = **((char**)&x + 1);
 
 - `x = $cmp <rop> y z`
 
-    - compare the values from `[y]` and `[z]`, setting a condition code
+    - compare `*[y]` and `*[z]`, setting a condition code
 
-    - store 0 or 1 to `[x]` depending on `<rop>` and the condition code that was set
+    - store 0 or 1 to `*[x]` depending on `<rop>` and the condition code that was set
 
 - `$jump lbl`
 
@@ -3177,17 +3171,15 @@ char y = **((char**)&x + 1);
 
 - `$branch x lbl1 lbl2`
 
-    - compare the value from `[x]` to 0
+    - compare `*[x]` to 0
 
-    - if not equal, jump to `main_<lbl1>`
-
-    - else, jump to `main_<lbl2>`
+    - if not equal, jump to `main_<lbl1>`, else, jump to `main_<lbl2>`
 
 - `$ret x`
 
     - by convention, the return value goes in a special register (`%rax` for x86-64); the caller knows to look for the return value there
 
-    - put the value from `[x]` in `%rax`
+    - put `*[x]` into `%rax`
 
     - jump to `main_epilogue`
 
@@ -3195,496 +3187,84 @@ char y = **((char**)&x + 1);
 
 - show the example again and point out how it was generated according to these rules
 
-## TODO: stage 2: globals
-
-- we're not including the implicit global function pointers in this stage, those will come when we add other functions besides `main`
-
-- we need to add a location for the globals, but they can't be on the stack because they live through the entire program and are accessible from all functions
-
-- we put them in the static segment, which in x86 assembly is specified in the `.data` section
-
-    - previously we emitted `.data` as part of our assembly program template but didn't put anything in it
-
-    - we also need to initialize them to 0, just like function locals
-
-    - we use the `.globl` directive to declare and initialize globals
-
-- global variable locations are computed as an offset from the instruction pointer, which in x86-64 is `%rip` (this is not a pointer you manipulate directly, this is the program counter)
-
-    - for global `g`, `g(%rip)` is the memory location of `g`'s value
-
-- example: [see `examples/codegen/stage-2.{lir, s}`] [see OneNote]
-
-```
-g:int
-
-fn main() -> int {
-  let x:int
-
-  entry:
-    x = $copy 42
-    g = $copy x
-    $ret g
-}
-```
-
-```
-.data
-
-.globl g
-g: .zero 8
-
-.text
-
-.globl main
-main:
-  pushq %rbp
-  movq %rsp, %rbp
-  subq $16, %rsp
-  movq $0, -8(%rbp)
-  jmp main_entry
-
-main_entry:
-  movq $42, -8(%rbp)
-  movq -8(%rbp), %r8
-  movq %r8, g(%rip)
-  movq g(%rip), %rax
-  jmp main_epilogue
-
-main_epilogue:
-  movq %rbp, %rsp
-  popq %rbp
-  ret
-```
-
-## TODO: stage 3: extern calls
-
-- additional LIR instruction: `$call_ext`
-
-- how do we call a function? we're actually going to do it differently depending on whether it's an extern or an internal function
-
-    - we'll assume that extern calls are to functions defined in object files generated from C code (like our cflat runtime library)
-
-    - for extern functions we need to use the standard x86-64 calling convention (though it's still simpler than the full convention because (1) we know all values are 1 word, and (2) we're being naive in how we're using registers)
-
-    - for internal functions we can use a simpler convention that makes things easier
-
-    - i'll talk more about the difference later, i'll just describe the convention here
-
-- `x = $call_ext foo(op1, ...)`
-
-    - place the first 6 arguments in the registers `%rdi, %rsi, %rdx, %rcx, %r8, %r9`, in that order
-
-    - if there are more than 6 arguments, push the rest onto the stack (first arg topmost, i.e., push starting with last arg)
-
-    - `call foo`
-
-    - if any arguments were pushed to the stack, restore the stack pointer
-
-    - the callee's return value (if any) is in `%rax`, store it to `x` if relevant
-
-- there's one more bit of complexity: we have to maintain the stack alignment
-
-    - remember that the stack must be double-word aligned immediately before a `call`
-
-    - we may have pushed some arguments to the stack; if we pushed an odd number then the alignment is off
-
-    - if that happens, we need to add one more word to the stack (and remember to remove it after the call returns, along with the pushed args)
-
-- extern functions don't need to be declared in the assembly file, the assumption is that the linker will figure things out later
-
-    - but having them means we can't compile the resulting assembly as an executable, only as an object file
-
-- example 1: [see `examples/codegen/stage-3_1.{lir, s}`] [see OneNote]
-
-```
-extern foo(int) -> int
-
-fn main() -> int {
-  let x:int
-
-  entry:
-    x = $call_ext foo(42)
-    $ret x
-}
-```
-
-```
-.data
-.text
-
-.globl main
-main:
-  pushq %rbp
-  movq %rsp, %rbp
-  subq $16, %rsp
-  movq $0, -8(%rbp)
-  jmp main_entry
-
-main_entry:
-  movq $42, %rdi
-  call foo
-  movq %rax, -8(%rbp)
-  movq -8(%rbp), %rax
-  jmp main_epilogue
-
-main_epilogue:
-  movq %rbp, %rsp
-  popq %rbp
-  ret
-```
-
-- example 2: [see `examples/codegen/stage-3_2.{lir, s}`] [see OneNote]
-
-```
-extern foo(int, int, int, int, int, int, int) -> int
-
-fn main() -> int {
-  let x:int
-
-  entry:
-    x = $call_ext foo(1, 2, 3, 4, 5, 6, 7)
-    $ret x
-}
-```
-
-```
-.data
-.text
-
-.globl main
-main:
-  pushq %rbp
-  movq %rsp, %rbp
-  subq $16, %rsp
-  movq $0, -8(%rbp)
-  jmp main_entry
-
-main_entry:
-  movq $1, %rdi
-  movq $2, %rsi
-  movq $3, %rdx
-  movq $4, %rcx
-  movq $5, %r8
-  movq $6, %r9
-  pushq $7
-  subq $8, %rsp
-  call foo
-  movq %rax, -8(%rbp)
-  addq $16, %rsp
-  movq -8(%rbp), %rax
-  jmp main_epilogue
-
-main_epilogue:
-  movq %rbp, %rsp
-  popq %rbp
-  ret
-```
-
-## TODO: stage 4: internal calls
+## stage 2: pointers, arrays, structs
 ### intro
 
-- we handle internal functions and calls differently from calls to extern functions in order to make implementing functions easier
+- now we can have memory allocation (singletons or arrays); note that for the purposes of codegen array-typed variables are just pointers, so we'll say "pointers" but mean "pointers or arrays"
 
-    - otherwise when generating ISA for an instruction we have to constantly worry about where a parameter is (register vs memory) and, if it's in a register, whether we need to worry about overwriting it and thus should save it or not (e.g., if making our own call to another function)
+- same function prologue for `main` as before, but the GC info (i.e., number of pointers) will be non-zero _and_ when mapping locals to stack offsets, we need to be sure all pointer-type locals come immediately after the GC info word so that the GC can find them
 
-    - there isn't anything technically hard about using the standard method, it's just more complicated (and more efficient for the resulting executable, which is why they use it)
-
-- additional lir instructions: `$call_dir`, `$call_idr`
-
-- we'll see in this stage that, like variables, functions are an illusion of the programming language---they don't exist in machine code
-
-### calling conventions in general
-
-- for externs i just gave a procedure for calling another function and getting the result, but since the callee was extern we didn't see how the callee function behaved
-
-- now that we're dealing with internal functions where we implement both the call and the function being called let's dig in deeper
-
-- functions are an abstraction, in order to get "function-like" behavior we need to implement it
-
-    - a _calling convention_ specifies how "functions" (i.e., the code blocks that implement function behavior) interact
-
-    - the caller and callee need to agree to a protocol; the caller needs to know how to set up a function call so that the callee gets its arguments, knows where to return, and knows how to return a value
-
-    - there are various calling conventions; as the name implies it's just an agreement that both parties adhere to
-
-- we split the calling convention into the following pieces:
-
-    - _pre-call_: setting things up in the caller to pass info to the callee
-
-    - _function prologue_: setting things up in the callee to accept the info
-
-    - _function epilogue_: tearing down the callee and getting back to the caller
-
-    - _post-return_: tearing things down back in the caller and getting the return value
-
-- since there is no such thing as "function local variable", all functions use the same set of registers; part of the convention is about what to do so that functions don't overwrite each other's data
-
-    - _caller-save_ registers: the caller is responsible for saving the values in these registers (if it still needs them) before making a call; the callee can use them freely
-
-    - _callee-save_ registers: the caller is free to assume that any values in these registers will remain untouched by the callee; the callee can use them but only if it saves their values and then restores them before returning
-
-- first i'll talk about the general x86-64 calling convention, which is a bit complicated; then i'll go over our simplified version
-
-- caller: pre-call
-
-    - save any caller-save registers currently being used
-
-    - place the first 6 one-word arguments in a specific set of registers (designated by the convention as "argument passing registers")
-
-    - place any arguments greater than one word or past the first 6 one-word arguments onto the stack in a specific order (so the callee knows which value maps to which parameter)
-
-    - push the return address (the instruction immediately past this call) into the stack
-
-    - jump to the callee label
-
-- callee: function prologue
-
-    - if we're using any callee-save registers, push them onto the stack
-
-    - set the callee's frame pointer and allocate space on the stack for any locals
-
-- callee: function epilogue
-
-    - place the return value in a specific register (designated by the convention as the "return register")
-
-    - deallocate the stack frame
-
-    - restore the callee-save registers, including the frame pointer
-
-    - pop the return address from the stacl
-
-    - jump to the return address
-
-- caller: post-return
-
-    - pop any arguments placed onto the stack
-
-    - restore any caller-save registers
-
-- notice that we're using the pre-call and post-return convention for extern calls, except we're guaranteed that all arguments are only one word and we don't need to worry about caller/callee-save registers
-
-### our calling convention for internal calls
-
-- we're going to use our own calling convention that is simpler than the standard one for several reasons:
-
-    - we'll always push all arguments on the stack, never pass them in registers
-
-    - all arguments and return values are integers or pointers, i.e., 1 word
-
-    - since we're doing naive codegen, we don't need to worry about caller/callee-save registers because we never store information in a register past the end of a LIR instruction
-
-        - with one exception: calls to the cflat runtime library used to implement a single LIR instruction (like `$alloc`); we have to assume that the call may overwrite any caller-save register we're using to implement the instruction
-
-- `x = $call_dir foo(op1, ..., opN) then bb`
-
-    - push `op1` though `opN` to the stack, starting with `opN` and ending with `op1` (so it's the topmost value on the stack)
-
-    - fix stack alignment as necessary
-
-    - `call foo`
-
-    - if any arguments were pushed to the stack, restore the stack pointer
-
-    - the callee's return value (if any) is in `%rax`, store it to `x` if relevant
-
-    - jump to `bb`
-
-- `x = $call_idr fp(op1, ...) then bb`
-
-    - just like a direct call except use `call *op` where `op` is an operand denoting the value of the function pointer
-
-### revisiting the function prologue
-
-- `main` didn't have any parameters, so we didn't need to worry about them
-
-- for functions with parameters, we see that the caller pushes the corresponding arguments on the stack _before_ calling the callee; this means that all parameter values are at a _positive_ offset from the callee's frame pointer
-
-    - remember to account for the saved frame pointer: the first argument on the stack is at `FP + <wordsize>`
-
-    - remember that the args were pushed left-to-right, so the first parameter's value is the one closest to the frame pointer
-
-- when emitting a function's prologue and recording offsets for locals, we can record offsets for parameters at the same time
-
-    - remember that locals can shadow parameters, so if a local and a parameter have the same name then any reference to that name means the local
-
-- other than the offsets being positive, we can treat parameters just like locals
-
-- note that this is why we're using the simpler calling convention, otherwise some parameters would be in registers and some in the stack (and we would also have to worry about overwriting those registers if we aren't careful)
-
-### implicit function pointers
-
-- if we have functions other than `main`, then we also have global variables with the same name that are intended to be function pointers to those functions 
-
-- when emitting declarations for global variables, if the global has the same name as a function then we handle it differently:
-
-    - we need to mangle the name to avoid conflicting with the label used for the function itself; append `_` to the global's name (this means that when translating LIR instructions that use this global, we need to add the `_` as well)
-
-    - we need to initialize the value of the variable to the corresponding function's address (again using assembly directives)
-
-### examples
-
-- example 1: [see `examples/codegen/stage-4_1.{lir, s}`] [see OneNote]
+- note that since we can't allocate structs on the stack, all variables on the stack take 1 word
 
 ```
-fn main() -> int {
-  let x:int
-  entry:
-    x = $call_dir foo(40, 2) then exit
-
-  exit:
-    $ret x
-}
-
-fn foo(p: int, q: int) -> int {
-  let x:int
-  entry:
-    x = $arith add p q
-    $ret x
-}
+        | .                     |
+        | .                     |
+        | .                     |
+        +-----------------------+
+        | old fp                | <- fp
+        +-----------------------+
+        | gc info: num ptrs     |
+        +-----------------------+
+        | pointer-type locals   |
+        | .                     |
+        | .                     |
+        | .                     |
+        | non-pointer locals    |
+        | .                     |
+        | .                     |
+        | .                     | <- sp
+        +-----------------------+
 ```
 
-```
-.data
-.text
+- additional LIR instructions: `$load`, `$store`, `$alloc_single`, `$alloc_array`, `$gep`, `$gfp`
 
-.globl foo
-foo:
-  pushq %rbp
-  movq %rsp, %rbp
-  subq $16, %rsp
-  movq $0, -8(%rbp)
-  jmp foo_entry
+- unlike C/C++, cflat is a safe language; this means that we need to detect any array accesses that are out-of-bounds (as well as allocations for a non-positive amount of memory)
 
-foo_entry:
-  movq 16(%rbp), %r8
-  addq 24(%rbp), %r8
-  movq %r8, -8(%rbp)
-  movq -8(%rbp), %rax
-  jmp foo_epilogue
+- strategy for allocation:
 
-foo_epilogue:
-  movq %rbp, %rsp
-  popq %rbp
-  ret
+    - at runtime we need to know for any allocated piece of memory:
 
-.globl main
-main:
-  pushq %rbp
-  movq %rsp, %rbp
-  subq $16, %rsp
-  movq $0, -8(%rbp)
-  jmp main_entry
+        - whether it is an array or not
+        - if an array, how many elements it has and whether the elements are pointers or not
+        - if not an array, how many words it is and whether each word is a pointer or not (we'll treat non-struct singletons like a 1-field struct)
 
-main_entry:
-  pushq $2
-  pushq $40
-  call foo
-  movq %rax, -8(%rbp)
-  addq $16, %rsp
-  jmp main_exit
+    - we'll encode this information in a _header word_; all allocations must add this header word with the appropriate info, and all array accesses must check the header info to be sure the access is within bounds
 
-main_exit:
-  movq -8(%rbp), %rax
-  jmp main_epilogue
+        - the rest of the header info will be used by GC, we won't worry about the details for now
 
-main_epilogue:
-  movq %rbp, %rsp
-  popq %rbp
-  ret
-```
+    - header word format (hdr[63] is the most significant bit; hdr[0] is the least significant bit):
 
-- example 2: [see `examples/codegen/stage-4_2.{lir, s}`] [see OneNote]
+        if allocated object is an array:
+        - hdr[1] == true
+        - hdr[2] == whether array elements are arrays/pointers
+        - hdr[3:63] == number of elements in the array
+  
+        if allocated object is not an array (treat primitives as single-word structs):
+        - hdr[1] == false
+        - hdr[2:7] == number of fields (<= 56)
+        - hdr[8:63] == whether corresponding field is an array/pointer
 
-```
-foo: &(int) -> int
+        hdr[0] is reserved for the runtime GC; it is always initialized to false
+  
+    - note that because arrays can't contain structs all array elements must be 1 word, so the array size is the number of words in the array
 
-fn main() -> int {
-  let x:int, fp:&(int) -> int
+    - when something is allocated on the heap, we'll:
+    
+        - check that the allocation size is positive
+        
+        - allocate an additional word to serve as the header word (at the beginning of the allocation)
 
-  entry:
-    fp = $copy foo
-    x = $call_idr fp(42) then exit
+        - set the header word information
 
-  exit:
-    $ret x
-}
+        - return the word immediately after the header word
+        
+        - `x $alloc_array y Int`: [header | 1st element | 2nd element | ... ]; we return a pointer to the 1st element
 
-fn foo(p: int) -> int {
-  entry:
-    $ret p
-}
-```
+        - this means that for any _non-inner_ pointer we can access the header information by looking one word back from the pointer value
 
-```
-.data
+    - when we do pointer arithmetic using `$gep`, we'll check against the array size that's stored in its header and make sure that the result of the `$gep` is in-bounds
 
-.globl foo_
-foo_: .quad "foo"
-
-.text
-
-.globl foo
-foo:
-  pushq %rbp
-  movq %rsp, %rbp
-  subq $0, %rsp
-  jmp foo_entry
-
-foo_entry:
-  movq 16(%rbp), %rax
-  jmp foo_epilogue
-
-foo_epilogue:
-  movq %rbp, %rsp
-  popq %rbp
-  ret
-
-.globl main
-main:
-  pushq %rbp
-  movq %rsp, %rbp
-  subq $16, %rsp
-  movq $0, -8(%rbp)
-  movq $0, -16(%rbp)
-  jmp main_entry
-
-main_entry:
-  movq foo_(%rip), %r8
-  movq %r8, -8(%rbp)
-  subq $8, %rsp
-  pushq $42
-  call *-8(%rbp)
-  movq %rax, -16(%rbp)
-  addq $16, %rsp
-  jmp main_exit
-
-main_exit:
-  movq -16(%rbp), %rax
-  jmp main_epilogue
-
-main_epilogue:
-  movq %rbp, %rsp
-  popq %rbp
-  ret
-```
-
-## TODO: stage 5: adding pointers
-### intro
-
-- now we can have memory allocation (including arrays)
-
-    - unlike C/C++, cflat is a safe language; this means that we need to detect any array accesses that are out-of-bounds (and also allocations for a non-positive amount of memory)
-
-- additional LIR instructions: `$load`, `$store`, `$alloc`, `$gep`
-
-- strategy for arrays (any allocation can be treated as an array):
-
-    - when something is allocated on the heap, we'll check that the size is positive and then we'll allocate an additional word (the `header`) that contains the number of allocated objects; we'll put this at the beginning of the object and return a pointer to the word immediately after the header (so the address of the header is at `-WORDSIZE` offset from the returned pointer)
-
-    - when we do pointer arithmetic using `$gep`, we'll check against the number that's stored in its header and make sure that the result is in-bounds
-
-- what if the check fails?
+- what if the bounds-check fails?
 
     - we'll add some boilerplate ISA blocks to handle when there's a problem with allocation or indexing; they'll print an error message and immediately abort execution
 
@@ -3696,323 +3276,256 @@ main_epilogue:
 
 - `x = $load y`
 
-    - the value of `y` is an address in memory; the value at _that_ address is what we need to store to `x`
+    - `*[x] = **[y]`
 
-    - read the value of `y` from its location on the stack, then read the value at that address, then store it to `x`
+- `$store x y`
 
-- `$store x op`
+    - `**[x] = *[y]`
 
-    - the value of `x` is an address in memory; we want to update the value at _that_ address with the value of `op`
+- `x = $alloc_single τ`
 
-    - get the value of `op`, then read the value of `x`, then store the value of `op` at that address
+    - compute size of allocated object: <num fields> + 1 (for header word), counting non-struct types as a single-field struct
 
-- `x = $alloc op`
+    - compute header word
 
-    - we only have integers and pointers so far and they're both size `WORDSIZE`, so we're allocating `op` words _plus_ one word for the header
+    - use `_cflat_alloc(size)` to allocate memory, getting `adr`
 
-        - the original value must be greater than 0; if this check fails we'll have the executable abort by jumping to the `.invalid_alloc_length` block
+        - NOTE: anything in a caller-save register may potentially be overwritten by the call to `_cflat_alloc`
 
-    - in order to actually allocate the memory we'll call into the cflat runtime library, which has a function `_cflat_alloc` that takes a number of words to allocate and returns a pointer to the allocated memory
+    - store header word at `*adr`, set `*[x] = adr + WORDSIZE`
 
-    - so in total:
+- `x = $alloc_array amt τ`
 
-        - compare `op` with 0, if not greater-than then jump to `.invalid_alloc_length`
+    - check `*[amt]` > 0, else jump to `.invalid_alloc_length`
 
-        - compute `op + 1`, then call `_cflat_alloc` passing the result as an argument (this counts as an extern call, even though it isn't declared as such); let `ptr` be the return value of the call
+    - check `*[amt] > maximum array size (as determined by header word format), else jump to `.invalid_alloc_length`
 
-            - IMPORTANT: anything in a caller-save register may potentially be overwritten by the call to `_cflat_alloc`
-    
-        - store `op` into the location whose address is in `ptr`
+    - compute header word
 
-        - store `ptr + WORDSIZE` into `x` (i.e., the address of the first element past the header word)
+    - use `_cflat_alloc(*[amt] + 1)` to allocate memory, getting `adr`
 
-- `x = $gep y op`
+        - NOTE: anything in a caller-save register may potentially be overwritten by the call to `_cflat_alloc`
 
-    - compare `op` with 0; if less-than then jump to `.out_of_bounds`
+    - store header word at `*adr`, set `*[x] = adr + WORDSIZE`
 
-    - load value at `y - WORDSIZE` (the header word); call it `hdr`
+- `x = $gep y idx true`
 
-    - compare `op` with `hdr`; if not less-than then jump to `.out_of_bounds`
+    - because we haven't done any optimizations, the `checked` field of the `$gep` instruction will always be true (i.e., we always insert a dynamic check that the result will be in-bounds)
 
-    - store `y + (op * WORDSIZE)` into `x` (i.e., the pointer to the requested element)
+    - check that `*[idx]` > 0, else jump to `.out_of_bounds`
+
+    - retrieve the header word from `*[y] - WORDSIZE`
+
+    - check that `*[idx]` < the array's size as stored in the header word (will require some bit shifting), else jump to `.out_of_bounds`
+
+    - set `*[x] = *[y] + (*[idx] * WORDSIZE)`
+
+- `x = $gfp y st fld`
+
+    - in order to construct a pointer to a particular field of a struct, we have to know the offset of each field
+
+        - alignment is a factor, but since all fields are one word in cflat we don't need to worry about that
+
+        - C/C++ require that fields are laid out in the declared order, but cflat doesn't
+
+        - we'll order the fields alphabetically by identifier
+
+    - let `off` = the offset of `fld` in `st`
+
+    - `*[x] = *[y] + off`
 
 ### example
 
-- example: [see `examples/codegen/stage-5.{lir, s}`] [see OneNote]
+- example: [see `examples/codegen/stage-2_{1, 2, 3}.{lir, s}`] [see OneNote]
 
-```
-fn main() -> int {
-  let x:&int, y:int, z:&int
-
-  entry:
-    x = $alloc 10
-    z = $gep x 5
-    y = $load z
-    y = $arith add y 1
-    $store z y
-    $ret y
-}
-```
-
-```
-.data
-
-out_of_bounds_msg: .string "out-of-bounds array access"
-invalid_alloc_msg: .string "invalid allocation amount"
-        
-.text
-
-.globl main
-main:
-  pushq %rbp
-  movq %rsp, %rbp
-  subq $32, %rsp
-  movq $0, -8(%rbp)
-  movq $0, -16(%rbp)
-  movq $0, -24(%rbp)
-  jmp main_entry
-
-main_entry:
-  movq $10, %r8
-  cmpq $0, %r8
-  jle .invalid_alloc_length
-  movq $1, %rdi
-  imulq %r8, %rdi
-  incq %rdi
-  call _cflat_alloc
-  movq $10, %r8
-  movq %r8, 0(%rax)
-  addq $8, %rax
-  movq %rax, -8(%rbp)
-  movq $5, %r8
-  cmpq $0, %r8
-  jl .out_of_bounds
-  movq -8(%rbp), %r9
-  movq -8(%r9), %r10
-  cmpq %r10, %r8
-  jge .out_of_bounds
-  imulq $8, %r8
-  addq %r9, %r8
-  movq %r8, -24(%rbp)
-  movq -24(%rbp), %r8
-  movq 0(%r8), %r9
-  movq %r9, -16(%rbp)
-  movq -16(%rbp), %r8
-  addq $1, %r8
-  movq %r8, -16(%rbp)
-  movq -16(%rbp), %r8
-  movq -24(%rbp), %r9
-  movq %r8, 0(%r9)
-  movq -16(%rbp), %rax
-  jmp main_epilogue
-
-main_epilogue:
-  movq %rbp, %rsp
-  popq %rbp
-  ret
-
-.out_of_bounds:
-  lea out_of_bounds_msg(%rip), %rdi
-  call _cflat_panic
-
-.invalid_alloc_length:
-  lea invalid_alloc_msg(%rip), %rdi
-  call _cflat_panic
-```
-
-## TODO: stage 6: adding structs
+## stage 3: functions and calls
 ### intro
 
-- now we can have user-defined structs
+- now we want to generate code for abitrary functions (including ones with parameters) and calls to those functions
 
-- additional LIR instructions: `$gfp`
+- additional lir instruction: `$call`
 
-- we also need to tweak allocations and indexing because now we may be allocating more than one word per object
+- remember that the assembly doesn't have any inherent notion of functions or calls (the `call` and `ret` instructions are just shorthand for a series of lower-level instructions that push and pop from the stack before jumping to a label)
 
-    - which also means we need to worry about field layout
+- to implement the function abstraction, the caller and callee have to agree on a protocol that determines where the call arguments are placed and where the return value is placed
 
-### translating instructions
+    - this is called the _calling convention_
 
-- in order to construct a pointer to a particular field of a struct, we have to know the offset of each field
+    - different languages/architectures will have different protocols
 
-    - alignment is a factor, but since all fields are one word in cflat we don't need to worry about that
+    - we'll use the same protocol as C on x64, allowing us to call C functions as externs
 
-    - C/C++ require that fields are laid out in the declared order, but cflat doesn't
+- now that we have additional functions beyond `main`, we also have to adjust our template to add global declarations for each function (see examples)
 
-    - we'll order the fields alphabetically
+### general x86-64 calling convention
 
-- `x = $gfp y fld`
+- we split the calling convention into the following pieces:
 
-    - let `&st` be the type of `y` and `off` be the offset of `fld` in `st` in bytes
+    - _pre-call_: setting things up in the caller to pass info to the callee
 
-    - add `off` to the value of `y` and store it in `x`
+    - _function prologue_: setting things up in the callee to accept the info
 
-### tweaking allocation and indexing
+    - _function epilogue_: tearing down the callee and getting back to the caller
 
-- `x = $alloc op`
+    - _post-return_: tearing things down back in the caller and getting the return value
 
-    - if type of `x` is `&st` then we're allocating `(op * sizeof(st)) + 1` words
+- we handle the pre-call and post-return when emitting code for a `$call` instruction, we handle the function prologue and function epilogue when emitting code for a function
 
-    - the invalid array length check and the value in the header (number of elements) remains the same
+- there are a single set of architectural registers for the target machine, and all functions must share those registers
 
-- `x = $gep y op`
+    - this means that we need an agreement about how to avoid having one function clobber information being used by another function
 
-    - the checks on the index remain the same
+    - _caller-save_ registers: the caller is responsible for saving the values in these registers (if it still needs them) before making a call; the callee can use them freely
 
-    - if type of `y` is `&st` then we store `y + (op * WORDSIZE * sizeof(st))` into `x`
+    - _callee-save_ registers: the caller is free to assume that any values in these registers will remain untouched by the callee; the callee can use them but only if it saves their values and then restores them before returning
+
+- to call a function:
+
+    - save any used caller-save registers
+    - place first 6 integer/pointer args in the argument-passing registers
+    - place any remaining args on the stack (first arg topmost)
+    - execute `call` (push instruction address on the stack and jump to label)
+    - the return value will be in `%rax` (placed there by the callee)
+    - pop any args put on the stack
+    - restore any saved caller-save registers
+
+- function prologue:
+
+    - if using any callee-save registers, push them onto the stack
+    - allocate space on stack for locals (remember that any arguments not passed in registers are on the stack at a positive offset from `%rbp`)
+
+- function epilogue:
+
+    - place return value in `%rax`
+    - deallocate stack frame
+    - restore callee-save registers
+    - execute `ret` (pop instruction address from stack and jump to it)
+
+- the stack pointer must be double-word aligned (i.e., `%rsp` % 16 = 0)immediately before a `call` and after a `ret`
+
+### our specialized calling convention
+
+- we will use the standard calling convention with a few tweaks to simplify things for our implementation (these tweaks still conform to the convention, so we can freely call external C functions that expect the regular convention)
+
+- we won't be keeping values in registers, so we don't need to worry about saving/restoring callee-save and caller-save registers in general
+
+    - there is one exception: calling into the runtime library (e.g., `_cflat_alloc`) may overwrite caller-save registers because they are implented as extern functions in C; assume that any value in a caller-save register before such a call has been overwritten
+
+    - optimizing the code to use registers more efficiently would make codegen more difficult because we would need to worry about this for every call
+
+- we'll modify the function prologue to _also_ allocate space on the callee stack frame for the arguments passed in registers, and write their values from registers to the stack in the function prologue
+
+- in order to allow the GC to easily find/modify pointer-typed parameters, we'll also allocate space in the callee stack frame for pointer-typed parameters passed on the stack
+
+- this means that the arguments passed in registers _and_ pointer-typed arguments passed on the stack will all end up with a negative offset from the frame pointer, like locals, while non-pointer arguments passed on the stack will have positive offsets from the frame pointer
+
+- remember that the number of arguments passed in registers _and_ the number of pointer-typed arguments passed on the stack must be taken into account when adjusting the stack pointer to ensure it is double-word aligned
+
+- the final stack layout:
+
+```
+        | .                        |
+        | .                        |
+        | .                        |
+        +--------------------------+
+        | old fp                   | <- fp
+        +--------------------------+
+        | gc info: num ptrs        |
+        +--------------------------+
+        | pointer-type params      |
+        | (from regs and stack)    |
+        | .                        |
+        | .                        |
+        | pointer-type locals      |
+        | .                        |
+        | .                        |
+        | .                        |
+        | non-pointer locals       |
+        | .                        |
+        | .                        |
+        | .                        |
+        | non-ptr params from regs |
+        | .                        |
+        | .                        |
+        | .                        | <- sp
+        +--------------------------+
+```
+
+### call instruction
+
+- `[lhs =] $call f args`
+
+    - let in_regs = first 6 args, let in_stack = remaining args
+
+    - if |in_stack| is odd, adjust stack to preserve alignment
+
+    - put in_regs args into argument-passing registers
+
+    - push in_stack args onto stack (in reverse order)
+
+    - if call is indirect (i.e., `f` is a local or parameter), emit an indirect call to the value of `*[f]`
+
+    - else if call is direct, emit a direct call to `f`
+
+    - if `lhs` is not None, store the value in `%rdx` to `*[lhs]`
+
+    - if in_stack is not empty, pop args from stack (and remove additional word if one was added to preserve alignment)
+
+### final function prologue
+
+- remember the intended stack layout:
+
+```
+        | .                        |
+        | .                        |
+        | .                        |
+        +--------------------------+
+        | old fp                   | <- fp
+        +--------------------------+
+        | gc info: num ptrs        |
+        +--------------------------+
+        | pointer-type params      |
+        | (from regs and stack)    |
+        | .                        |
+        | .                        |
+        | pointer-type locals      |
+        | .                        |
+        | .                        |
+        | .                        |
+        | non-pointer locals       |
+        | .                        |
+        | .                        |
+        | .                        |
+        | non-ptr params from regs |
+        | .                        |
+        | .                        |
+        | .                        | <- sp
+        +--------------------------+
+```
+
+1. emit the function label; this is where callers will jump to
+
+2. emit instructions to:
+
+    - push `FP` onto the stack to save its old value
+
+    - set `FP` to the current value of `SP` (so `FP` is now saving the old value of `SP`)
+
+    - decrement `SP` to add space for the GC word, pointer-type parameters, and local variables (remember the stack grows _down_, that's why we decrement)
+
+    - write the number of pointer-typed locals and params to the GC word location
+
+    - copy pointer-typed arguments from registers and the stack to the space right after the GC word
+
+    - copy non-pointer arguments from the stack to right after the locals
+
+    - zero initialize all local variable values
+
+    - jump to `<function>_entry`
 
 ### example
 
-- example 1: [see `examples/codegen/stage-6_1.{lir, s}`] [see OneNote]
-
-```
-struct foo {
-  f1: int
-  f2: int
-}
-
-fn main() -> int {
-  let x:&foo, y:&int, z:&int
-
-  entry:
-    x = $alloc 1
-    y = $gfp x f1
-    z = $gfp x f2
-    $ret 0
-}
-```
-
-```
-.data
-
-out_of_bounds_msg: .string "out-of-bounds array access"
-invalid_alloc_msg: .string "invalid allocation amount"
-        
-.text
-
-.globl main
-main:
-  pushq %rbp
-  movq %rsp, %rbp
-  subq $32, %rsp
-  movq $0, -8(%rbp)
-  movq $0, -16(%rbp)
-  movq $0, -24(%rbp)
-  jmp main_entry
-
-main_entry:
-  movq $1, %r8
-  cmpq $0, %r8
-  jle .invalid_alloc_length
-  movq $2, %rdi
-  imulq %r8, %rdi
-  incq %rdi
-  call _cflat_alloc
-  movq $1, %r8
-  movq %r8, 0(%rax)
-  addq $8, %rax
-  movq %rax, -8(%rbp)
-  movq -8(%rbp), %r8
-  leaq 0(%r8), %r9
-  movq %r9, -16(%rbp)
-  movq -8(%rbp), %r8
-  leaq 8(%r8), %r9
-  movq %r9, -24(%rbp)
-  movq $0, %rax
-  jmp main_epilogue
-
-main_epilogue:
-  movq %rbp, %rsp
-  popq %rbp
-  ret
-
-.out_of_bounds:
-  lea out_of_bounds_msg(%rip), %rdi
-  call _cflat_panic
-
-.invalid_alloc_length:
-  lea invalid_alloc_msg(%rip), %rdi
-  call _cflat_panic
-```
-
-- example 2: [see `examples/codegen/stage-6_2.{lir, s}`] [see OneNote]
-
-```
-struct foo {
-  f1: int
-  f2: int
-}
-
-fn main() -> int {
-  let x:&foo, y:&foo, z:&int
-
-  entry:
-    x = $alloc 10
-    y = $gep x 5
-    z = $gfp y f2
-    $ret 0
-}
-```
-
-```
-.data
-
-out_of_bounds_msg: .string "out-of-bounds array access"
-invalid_alloc_msg: .string "invalid allocation amount"
-        
-.text
-
-.globl main
-main:
-  pushq %rbp
-  movq %rsp, %rbp
-  subq $32, %rsp
-  movq $0, -8(%rbp)
-  movq $0, -16(%rbp)
-  movq $0, -24(%rbp)
-  jmp main_entry
-
-main_entry:
-  movq $10, %r8
-  cmpq $0, %r8
-  jle .invalid_alloc_length
-  movq $2, %rdi
-  imulq %r8, %rdi
-  incq %rdi
-  call _cflat_alloc
-  movq $10, %r8
-  movq %r8, 0(%rax)
-  addq $8, %rax
-  movq %rax, -8(%rbp)
-  movq $5, %r8
-  cmpq $0, %r8
-  jl .out_of_bounds
-  movq -8(%rbp), %r9
-  movq -8(%r9), %r10
-  cmpq %r10, %r8
-  jge .out_of_bounds
-  imulq $16, %r8
-  addq %r9, %r8
-  movq %r8, -16(%rbp)
-  movq -16(%rbp), %r8
-  leaq 8(%r8), %r9
-  movq %r9, -24(%rbp)
-  movq $0, %rax
-  jmp main_epilogue
-
-main_epilogue:
-  movq %rbp, %rsp
-  popq %rbp
-  ret
-
-.out_of_bounds:
-  lea out_of_bounds_msg(%rip), %rdi
-  call _cflat_panic
-
-.invalid_alloc_length:
-  lea invalid_alloc_msg(%rip), %rdi
-  call _cflat_panic
-```
+- example: [see `examples/codegen/stage-3_{1,2,3}.{lir, s}`] [see OneNote]
 
 ## x86-64 info
 
@@ -5970,7 +5483,7 @@ fn foo(a:int, b:int, c:int) -> int {
     
     - however, figuring out what optimizations to use in what order can take a lot of trial and error, and you'll never know whether you found the best possible ordering
 
-# register allocation [SKIPPED FOR TIME]
+# register allocation [NOTE: SKIPPED FOR TIME]
 ## intro
 
 - our naive codegen strategy only uses registers as temporaries: for each instruction we read from memory to registers, did the operation, then stored the result back to memory
