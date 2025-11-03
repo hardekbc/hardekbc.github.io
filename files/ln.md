@@ -16,7 +16,7 @@
 - week 4.1: through end of 'front-end recap'
 - week 4.2: up to (not including) lowering expressions in `lower.md`
 - week 5.1: through 'codegen::necessary context::linker'
-- week 5.2: 
+- week 5.2: through 'codegen::stage 1::the function prologue' EXCEPT handling stack alignment
 - week 6.1: 
 - week 6.2: 
 - week 7.1: (holiday)
@@ -3533,7 +3533,7 @@ char y = **((char**)&x + 1);
 
 - [go over how to use `cflat` executable to go from source to lir to assembly so they can see what the grader expects for codegen]
 
-# TODO: memory management [~2 lectures]
+# memory management [~2 lectures]
 ## intro
 
 - programmers are presented with an illusion that the computer has an arbitrary amount of memory
@@ -3780,7 +3780,7 @@ free(d)          // 512
 
     - easy for the compiler and runtime
 
-    - provides low-level control over exactly when memory is deallocated
+    - provides low-level control over exactly when memory is deallocated, i.e., deallocation is predictable
 
     - no runtime overhead beyond that of the memory management data structure
 
@@ -4001,7 +4001,7 @@ c = new Foo // triggers collection, multiple pointers to same object
 
     - this is called a _major collection_
 
-    - if the nursery is much smaller than the older space then we can't use it to copy live objects during a major collection; what do we do with them?
+    - if the nursery is much smaller than the older space then we can't use it to copy live objects during a major collection like we did with semi-space; what do we do with them?
 
     - generational collection is parameterized by how the older space is treated; it could be mark-sweep, semi-space, or even another generational collector
 
@@ -4135,6 +4135,10 @@ fn foo(p:&int) -> &int {
     - in c++ this is only a heuristic, there is no guarantee that it will be correct (it's trivial to write a program that passes the compiler but violates ownership)
 
     - there is no formal notion of borrowing; we can copy the raw pointer from a unique_ptr but there are no checks for how we use those copies
+
+## cflat memory management
+
+- TODO:
 
 # TODO: IR optimization [~4 lectures]
 ## intro
