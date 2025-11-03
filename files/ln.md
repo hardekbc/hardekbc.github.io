@@ -4138,7 +4138,67 @@ fn foo(p:&int) -> &int {
 
 ## cflat memory management
 
-- TODO:
+- we will implement a semi-space GC for cflat
+
+    - it is implemented in our runtime library rather than as part of our compiler
+
+    - relevant functions: `_cflat_init_gc()`, `_cflat_alloc(num_words)`
+
+- remember that the stack layout we enforced during codegen is this:
+
+```
+        | .                        |
+        | .                        |
+        | .                        |
+        +--------------------------+
+        | old fp                   | <- fp
+        +--------------------------+
+        | gc info: num ptrs        |
+        +--------------------------+
+        | pointer-type params      |
+        | (from regs and stack)    |
+        | .                        |
+        | .                        |
+        | pointer-type locals      |
+        | .                        |
+        | .                        |
+        | .                        |
+        | non-pointer locals       |
+        | .                        |
+        | .                        |
+        | .                        |
+        | non-ptr params from regs |
+        | .                        |
+        | .                        |
+        | .                        | <- sp
+        +--------------------------+
+```
+
+- `_cflat_init_gc()`:
+
+    - extract the desired maximum heap size from the environmental variable `MAX_HEAP_WORDS`
+
+    - create the heap (using `malloc`), setting the initial `from` and `to` pointers and initializing the bump pointer to the start of `from`
+
+    - save the value of `main`'s frame pointer
+
+- `_cflat_alloc(num_words)`:
+
+    - if the bump pointer + `num_words` goes over the end of `from`, initiate a GC collection
+
+    - if the bump pointer + `num_words` still goes over the end of `from`, output an `out of memory` message to std out and exit normally (for the sake of the gradescope grader script)
+
+    - otherwise, save the value of the bump pointer as the address of the newly allocated memory, increment the bump pointer, initialize the newly allocated memory to 0, then return its address
+
+- GC collection:
+
+    - retrieve the value of the current frame pointer
+
+    - walk the stack to visit all stack frames, ending at `main`, and collect all pointer values on the stack
+
+    - trace all reachable allocated memory and copy it `to`, using forwarding pointers to ensure memory is copied only once, and rewrite all pointer values on the stack to their new addresses
+
+- for grading (and debugging) purposes, we will have the GC log messages about its behavior on std out; the grader will check that your messages are the same as mine on the same workload with the same heap size
 
 # TODO: IR optimization [~4 lectures]
 ## intro
