@@ -16,9 +16,9 @@
 - week 4.1: through end of 'front-end recap'
 - week 4.2: up to (not including) lowering expressions in `lower.md`
 - week 5.1: through 'codegen::necessary context::linker'
-- week 5.2: through 'codegen::stage 1::the function prologue' EXCEPT handling stack alignment
-- week 6.1: 
-- week 6.2: 
+- week 5.2: through 'codegen::stage 1::the function prologue'
+- week 6.1: through 'codegen::stage 2' _except_ $gep, $gfp, and going through examples
+- week 6.2: through 'codegen::stage 3::our specialized calling convention'
 - week 7.1: (holiday)
 - week 7.2: 
 - week 8.1: 
@@ -62,9 +62,9 @@
 
     - i'm going to try an experiment: generate an equivalent test suite to give to the students, distinct from the one used on gradescope, and stop having gradescope reveal the test case. the idea is that if they can pass the secondary test suite, they should be able to pass the gradescope one (maybe there will be a handful of cases where we need to step in when they pass the secondary suite but still have trouble with the gradescope suite). we'll see how it goes.
 
-- assign-1
+- after assign-1 (the lexer and parser) it might be easier for the students if for assignment test cases we use identifiers like `var<num>` instead of randomly-generated names, because it makes test cases easier to read and understand...we would have to add a command-line switch to the generator to make this possible.
 
-    - copy-pasting the failed program from the grader output doesn't copy the special characters (e.g., `\r`, `\t`, etc); the students need to be aware of this possibility
+- assign-1
 
     - we give the students the LL(1) version of the grammar so they never actually have to use the grammar refactoring rules; i think this is fair given all the other stuff they have to do, but maybe think about giving quizzes (graded or not) where they have to refactor some simple grammars
 
