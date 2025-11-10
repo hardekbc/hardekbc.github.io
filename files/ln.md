@@ -74,6 +74,10 @@
 
     - the lexing and parsing is actually pretty fast, i could easily add more test cases to each test suite
 
+- assign-4
+
+    - because we're using predefined function signatures during code generation, it's possible for students to hardcode their prologues based on what the function parameter types are. the best way to solve this is to augment generation to allow automatically generating function signatures (under some constraints about number and types of parameters), but i don't have time to do that right now. we'll just need to manually check the final submissions and deduct points if it happens (and we should warn students that we're going to do so).
+
 # course logistics
 
 - introduce myself and TAs
@@ -604,7 +608,7 @@ executable machine code + RUNTIME == execution
 
     - see `cflat-docs/syntax.md`
 
-# lexing [~1 lecture]
+# lexing
 
 - [remind students what the lexer does; show example in OneNote]
 
@@ -802,7 +806,7 @@ token stream: [TkBA(0..3), TkAB(4..7)]
 
     - it does also explain why you can't nest c-style comments: proper nesting is context-free, you can't describe it using regular expressions
 
-# parsing [~3 lectures]
+# parsing
 ## overview
 
 - we describe the syntax of our language as a context-free grammar, with tokens as the terminal symbols of our alphabet
@@ -2104,7 +2108,7 @@ F ::= [E] | (E) | ϵ
 
 - but left-factoring may re-introduce the ϵ rules, so we have to deal with them
 
-# validation [~3 lectures]
+# validation
 ## what is validation
 
 - after parsing we know that the program is syntactically correct, but that doesn't necessarily mean that it's valid
@@ -2585,7 +2589,7 @@ Program
 
     - these often require some creative thinking to get them to fit into the frontend framework we've covered here, mostly because of ambiguity in the lexemes and/or grammar or because lexemes aren't strictly regular
 
-# lowering [~2 lectures]
+# lowering
 
 - now that we have a valid AST we could directly generate ISA code from it, but most modern compilers don't do that---instead, they _lower_ the AST into a simpler, lower-level intermediate representation (LIR)
 
@@ -2806,7 +2810,7 @@ stmts: [
 ]
 ```
 
-# codegen [~4 lectures]
+# codegen
 ## intro
 
 - once we have lowered to LIR, we're in the middle-end where we would perform optimizations; however for now we're going straight to the backend in order to get a working compiler as quickly as possible
@@ -3533,7 +3537,7 @@ char y = **((char**)&x + 1);
 
 - [go over how to use `cflat` executable to go from source to lir to assembly so they can see what the grader expects for codegen]
 
-# memory management [~2 lectures]
+# memory management
 ## intro
 
 - programmers are presented with an illusion that the computer has an arbitrary amount of memory
@@ -4200,7 +4204,7 @@ fn foo(p:&int) -> &int {
 
 - for grading (and debugging) purposes, we will have the GC log messages about its behavior on std out; the grader will check that your messages are the same as mine on the same workload with the same heap size
 
-# TODO: IR optimization [~4 lectures]
+# IR optimization
 ## intro
 
 - we have a fully functional compiler, but it is fairly naive in terms of the generated machine code---we'd like to optimize the program as we're compiling it in order to produce better executables
@@ -4245,6 +4249,8 @@ fn foo(p:&int) -> &int {
 
     - there are some optimizations that are inherently target specific, and we reserve those for the backend, but mostly we try to optimize in a target-agnostic way so that we can reuse the same optimizations for all targets
 
+    - this means that we focus on LIR, because (1) the optimizations will work for any front-end language; and (2) LIR is easier to analyze and reason about for optimizers
+
 - the optimizer can also operate at a number of different scopes, ranging from small fragments of code (local optimization) to entire functions (global optimization) to set of functions (interprocedural optimization) to entire programs (whole-program optimizations)
 
     - the term "global" may seem odd since we're focusing in on one single function; the term comes from a time when local optimization was the norm and operating at an entire function scope was seen as extremely aggressive---operating on even larger scopes than that was out of the question
@@ -4253,11 +4259,11 @@ fn foo(p:&int) -> &int {
 
 - for this class
 
-    - we'll focus on local optizations and global optimizations
+    - we'll focus on global optimizations (maybe some local opts if there's time)
 
     - we'll assume there are no pointers, structs, globals, or function calls
 
-    - so the only LIR instructions we need to worry about are: `$copy`, `$arith`, `$cmp`, `$jump`, `$branch`, and `$ret`
+    - so the only LIR instructions we need to worry about are: `$const`, `$copy`, `$arith`, `$cmp`, `$jump`, `$branch`, and `$ret`
 
     - this simplifies a lot of things and is enough to give the basic idea
 
@@ -4491,7 +4497,854 @@ fn main() -> int {
 
 - many optimizations have similar considerations: just because we _can_ apply the optimization doesn't mean it's a good idea; we need to figure out in each case whether applying the optimization results in a net performance benefit or loss and act accordingly
 
-## local optimizations
+## global optimizations
+### general intro
+
+- "global" optimization means that we're optimizing one function at a time (e.g., if we see a function call we don't try to figure out what the callee actually does)
+
+- remember that optimization = analysis + transformation; we split global optimization into two pieces:
+
+    1. program analyses to determine what transformations are safe to do
+
+    2. the actual transformations that optimize the program
+
+- the analyses required for global optimization tend to be more complicated than for local optimization, and we have developed a specific theoretical framework for it called _dataflow analysis_
+
+    - compiler developers tried a lot of ad-hoc global analyses at first, but found that they were very difficult to get correct; dataflow analysis provides a handy set of tools such that, if you use them correctly, you will get a correct analysis
+
+- first we'll look at some high-level examples of optimizations we might want to perform, then we'll dig deeper into the DFA framework for program analysis that is required to enable those optimizations, finally we'll go in-depth into a specific set of DFA analyses and the optimizations they enable
+
+    - there's a lot of math that goes into showing that these analyses will terminate and give the correct answer; we won't go into that math, it's outside the scope of the class (and just to implement the analyses you don't need to know the math)
+
+    - if you want to understand the math behind it all, see my graduate course CS 260
+
+- there are _many_ more optimizations than the ones described here, these are just a sampling
+
+### high-level optimization examples
+#### constant propagation
+
+- we want to precompute constant values during compilation so we don't have to compute them at runtime
+
+- there are often constants present in source code, but even more tend to get added as the code is lowered and transformed in various ways
+
+- original code
+
+```
+x = 40
+y = x + 2
+return y
+```
+
+- becomes
+
+```
+x = 40
+y = 42
+return 42
+```
+
+#### global common subexpression elimination
+
+- we want to avoid computing the same expression multiple times if they will always have the same answer
+
+- original code
+
+```
+x = p + q
+y = p + q
+z = x + y
+return z
+```
+
+- becomes
+
+```
+x = p + q
+y = x
+z = x + y
+return z
+```
+
+#### copy propagation
+
+- we want to avoid making superfluous copies of things at runtime when possible
+
+- this is often useful as a cleanup phase after other optimizations (can also be useful after lowering)
+
+- original code (from result of GCSE)
+
+```
+x = p + q
+y = x
+z = x + y
+return z
+```
+
+- becomes
+
+```
+x = p + q
+y = x
+z = x + x
+return z
+```
+
+#### dead code elimination
+
+- we want to eliminate code whose execution at runtime is irrelevant
+
+- another one that's useful to clean up after other optimizations
+
+- EXAMPLE 1: original code (from result of constant propagation)
+
+```
+x = 40
+y = 42
+return 42
+```
+
+- becomes
+
+```
+return 42
+```
+
+- EXAMPLE 2: original code (from result of copy propagation)
+
+```
+x = p + q
+y = x
+z = x + x
+return z
+```
+
+- becomes
+
+```
+x = p + q
+z = x + x
+return z
+```
+
+### DFA intro
+
+- the above examples were trivially correct and easy to reason about, since they were all contained in a single block
+
+- to safely apply such transformations globally, we need to analyze the entire function
+
+- what does a program analysis do, exactly?
+
+    - it computes _invariants_ about program execution: things that are guaranteed to always be true
+
+    - this information is what tells us whether a transformation is safe
+
+- what invariants does it compute?
+
+    - it depends on the specific analysis
+
+    - each analysis will decide on a set of possible invariants that it's looking for
+
+- example: _sign analysis_ looks for invariants about whether a variable's value is _positive_, _negative_, or _zero_
+
+```
+fn abs(a:int, b:int) -> int { 
+  let c:int;
+  if (a < b) { c = b - a; } else { c := a - b; } 
+  return c;
+}
+```
+
+- given this function, we don't know what the values of the arguments will be, nor whether we will take the true or false branch of the conditional---but we can infer the invariant that the value returned by this function will always be non-negative; here's our reasoning:
+
+    - either `a < b` or `b < a` or `a == b`
+    
+    - if `a < b` then we take the true branch, `c` is positive
+    
+    - if `b < a` then we take the false branch, `c` is positive
+    
+    - if `a == b` then we take the false branch, `c` is zero
+    
+    - therefore `c` cannot be negative at the return statement
+
+- in this example we are reasoning about the sign of `c` (positive, negative, or zero), so the facts that we care about pertain to that; in other analyses we care about other properties (as we'll see examples of soon)
+
+- dataflow analysis provides a general framework that is independent of the particular facts we want to reason about; basically, it's a template into which we plug in different kinds of things depending on the specific analysis we're trying to perform
+
+- it's important to note that computing _exactly_ the correct set of invariants is an undecidable problem (which we can prove using the techniques you learned in 138)
+
+    - this means we can only _approximate_ the exact set of invariants
+
+    - it's critical that we never compute a _false_ invariant, therefore we allow the analysis to miss true invariants in return for guaranteeing that it never finds a false invariant
+
+    - this means that we may miss some possible optimizations that we could have safely performed, but in return we'll never perform optimizations that break the program
+
+- example: sign analysis redux
+
+```
+fn foo(a:int, b:int) -> int {
+  let c:int;
+  if a < b { c = b - a; }
+  if b < a { c = a - b; }
+  if a == b { c = 1; }
+  return c;
+}
+```
+
+- for this example we can reason about signedness again and determine that `c` must always be positive at the return statement
+
+    - however, our analysis may say only that `c` will be non-negative, or even that it may be any of positive, negative, or zero
+
+    - these are true invariants, but not as precise as they could be (being positive implies both of those things)
+
+### DFA framework
+
+- remember that DFA is a template; we define how it works while leaving certain parts unspecified (which will be filled in by each specific analysis)
+
+    - we'll describe the framework here, then give some concrete examples
+
+- DFA works at the level of the control-flow graph, like our LIR
+
+- these parts are defined by a specific analysis:
+
+    - an _abstract store_ datatype, along with an operation called _join_ that combines two abstract stores into a new abstract store
+
+        - this abstract store will contain the invariants that we're computing for the analysis being implemented
+
+        - the join operation combines the invariants from two abstract stores into a new set of invariants that over-approximate the originals, i.e., if `A ⊔ B = C` then `A ⇒ C` and `B ⇒ C` (but `C` may be less precise than `A` or `B`)
+
+    - the _initial abstract store_ `init`
+
+        - these are the invariants that hold at the entry of the function
+
+    - the _bottom_ abstract store `bot`
+
+        - this is the store that says no invariants have been computed yet
+
+    - for each instruction a function `F` that transforms an input abstract store into an output abstract store for that instruction
+
+        - sometimes we only need the non-terminals, e.g., `F_const`, `F_copy`, `F_arith`, and `F_cmp`, each taking a store as an argument and returning a store as a result
+
+        - sometimes the terminals are relevant too, e.g., `F_br`, `F_jmp`, `F_ret`
+
+        - these functions describe how an instruction modifies the computed invariants
+
+- given these parts, we can define how DFA works independent of any given analysis
+
+- for each basic block `bb` we'll define:
+
+    - `IN_bb` (the incoming abstract store for `bb`)
+    - `OUT_bb` (the outgoing abstract store for `bb`)
+
+- we initialize these as follows:
+
+    - `IN_entry` = `init`
+    - `IN_bb` = `bot` for all `bb` ̸= `entry`
+    - `OUT_bb` = `bot` for all `bb`
+
+- we create a worklist `work` of basic blocks, initialized to contain every basic block
+
+    - these are the basic blocks that remain to be processed
+
+    - it doesn't matter what order the basic blocks are processed in, the DFA framework guarantees we'll get the same answer
+
+- while the worklist isn't empty, we continually do the following:
+
+    - pop a basic block `bb` from the worklist
+
+    - `IN_bb` = `⨆ OUTₚ` s.t. `p` is a predecessor of `bb` in the CFG
+
+        - this says that the input could be coming from any of the `bb`'s predecessors, and so `IN_bb` needs to over-approximate all of the inputs
+
+    - initialize `store` to be a copy of `IN_bb`
+
+    - for each instruction `i` from 0..len(`bb`):
+
+        - `store` = `F_inst(store)`, where `F_inst` is the function relevant to instruction `i`
+
+        - note that we're updating `store` in-place; at the end of all the instructions we have the store leaving the basic block
+
+    - if `store` ̸= `OUT_bb` (i.e., the invariants have changed):
+
+        - `OUT_bb` = `store`
+
+        - for each basic block `s` that is a successor of `bb` in the CFG, add `s` to the worklist
+
+- during the worklist loop we may revisit the same basic block multiple times; this can happen because of loops
+
+- this algorithm is designed to ensure that (1) the worklist will eventually become empty; and (2) when it does, each basic block's `IN_bb` and `OUT_bb` will contain correct invariants for the entry and exit of that basic block
+
+    - we may need the invariants for a specific instruction inside `bb`, not just the entry or exit
+
+    - we can compute that by taking `IN_bb` and applying `F_inst` up to the instruction in question and stopping there
+
+- [show high-level overview of worklist algorithm in action on a CFG with diamond followed by loop]
+
+### constant propagation (constants analysis)
+
+- we want to precompute constant values during compilation so we don't have to compute them at runtime
+
+    - [show simple example again from 'high-level optimization examples']
+
+    - NOTE: for convenience in LIR we required instruction operands to be variables instead of constants; for the purposes of this optimization we'll relax that restriction
+
+- the analysis tells us what constants exist at each program point
+
+- the transformation is trivial given the analysis: for each instruction that uses variables, if the analysis says that a variable has a constant value at that point then we replace the variable with that value
+
+- to fill in the DFA framework, we need to:
+
+    - define an abstract store datatype
+
+    - define a join operation on abstract stores
+
+    - define the initial abstract store
+
+    - define the bottom abstract store
+
+    - for each `inst` in {`$const`, `$copy`, `$arith`, `$cmp`}, define `F_inst`
+
+- then we just apply the DFA worklist algorithm and we have our analysis
+
+- the abstract store datatype
+
+    - the invariants we're interested in are `variable X has constant value Y`
+
+    - our abstract store will map each variable to either:
+    
+        - a constant value
+        - an "i don't know" value (i.e., maybe it's a constant or maybe not)
+        - an "no value yet" value (i.e., the variable is undefined)
+
+    - we'll call the "i don't know value" `⊤` (TOP) and the "no value yet" `⊥` (BOTTOM) for reasons having to do with the math behind DFA (which we won't go into)
+
+    - so the abstract store is a map from variable to one of {`n ∈ 𝐙`, `⊤`, `⊥`}
+
+- joining abstract stores
+
+    - given two abstract stores, we need to compute a new abstract store that is guaranteed to be correct no matter which input store is "true"
+
+    - let's focus on some variable `x`, which each input store will map to `n ∈ 𝐙`, `⊤`, or `⊥`; we'll say `x₁` is from one store and `x₂` is from the other and `x₃` is for the new store
+
+        - if `x₁ ↦ n` and `x₂ ↦ n`, then `x₃ ↦ n`
+
+        - if `x₁ ↦ n₁` and `x₂ ↦ n₂` s.t. `n₁ ̸= n₂`, then `x₃ ↦ ⊤`
+
+        - if `x₁ ↦ ⊤` or `x₂ ↦ ⊤`, then `x₃ ↦ ⊤`
+
+        - if `x₁ ↦ ⊥` and `x₂ ↦ X`, then `x₃ ↦ X` (or vice-versa)
+
+    - we do this for each variable in the input stores to get the complete output store
+
+- example
+
+```
+[a ↦ 1, b ↦ 2, c ↦ ⊤, d ↦ ⊥] ⊔
+[a ↦ 1, b ↦ 3, c ↦ 0, d ↦ 4]
+=
+[a ↦ 1, b ↦ ⊤, c ↦ ⊤, d ↦ 4]
+```
+
+- initial abstract store
+
+    - what is guaranteed to be true at the entry of the function? we zero-initialize all locals; we don't know the parameter values
+
+    - `init` = `[x ↦ ⊤, y ↦ 0]` for `x ∈ params`, `y ∈ locals`
+
+- bottom abstract store
+
+    - this is used for all the `IN` and `OUT` stores that we haven't computed yet
+
+    - `bot` = `[x ↦ ⊥]` for `x ∈ locals ∪ params`
+
+- `x = $const n`: `store[x] = n`
+
+- `x = $copy y`: `store[x] = store[y]`
+
+- `x = $arith add y z`: `store[x] = store[y] @+ store[z]`
+
+    - where `@+` is the abstract version of `add` and is defined as:
+
+```
+@+ | ⊥ | c₂ | ⊤
+---+---+----+---
+⊥  | ⊥   ⊥   ⊥
+c₁ | ⊥ c₁+c₂ ⊤
+⊤  | ⊥   ⊤   ⊤
+```
+
+- `x = $cmp lte y z`: `store[x] = store[y] @≤ store[z]`
+
+    - where `@≤` is the abstract version of `lte` and is defined as:
+
+```
+@≤ | ⊥ | c₂ | ⊤
+---+---+----+---
+⊥  | ⊥   ⊥   ⊥
+c₁ | ⊥ c₁≤c₂ ⊤
+⊤  | ⊥   ⊤   ⊤
+```
+
+- given the computed constants, we can trivially transform the program to use the constants instead of variables where possible
+
+- for this analysis we can actually be a bit more clever with `$branch`: if the branch condition is a constant then we know which label we'll jump to and we can ignore the other one (i.e., not put it on the worklist)
+
+- for convenience i'm allowing constants as operands
+
+- example [see OneNote]
+
+```
+fn foo(p:int, q:int) -> _ {
+  let x:int, y:int
+  entry:
+    $jump hdr
+
+  hdr:
+    x = $cmp lte y q
+    $branch x body exit
+
+  body:
+    p = $const 4
+    q = $const 3
+    y = $arith add p q
+    $jump hdr
+
+  exit:
+    $ret y
+}
+```
+
+- exercise [see OneNote]
+
+```
+fn foo() -> int {
+  let x:int, y:int, z:int, _t1:int, _t2:int
+  entry:
+    x = $const 1
+    y = $const 2
+    $jump hdr
+
+  hdr:
+    _t1 = $cmp lte 0 x
+    $branch _t1 body exit
+
+  body:
+    _t2 = $cmp eq x 1
+    $branch _t2 tt ff
+
+  tt:
+    z = $const 42
+    $jump end
+
+  ff:
+    z = $arith add 40 y
+    $jump end
+
+  end:
+    x = $copy z
+    $jump hdr
+
+  exit:
+    $ret z
+}
+```
+
+### global common subexpression elimination (available expressions) [NOTE: SKIP FOR TIME]
+
+- we want to determine what expressions we've already computed that we can reuse at later program points, avoiding having to compute them again
+
+    - [show example below on OneNote; notice in the example that `p * 4` is guaranteed to have been computed along all paths to the assignment to `z` and for each path to have the same value as when it was computed (though that value is different for each path)]
+
+- the analysis tells us what expressions are available at each program point
+
+    - they are guaranteed to have been computed along all paths to this program point
+
+    - for each path the value is guaranteed to be the same at this program point
+
+- the transformation must then insert copies to take advantage of the available expressions
+
+- as before, to fill in the DFA framework, we need to:
+
+    - define an abstract store datatype
+
+    - define a join operation on abstract stores
+
+    - define the initial abstract store
+
+    - define the bottom abstract store
+
+    - for each `inst` in {`$const`, `$copy`, `$arith`, `$cmp`}, define `F_inst`
+
+- then we just apply the DFA worklist algorithm and we have our analysis
+
+- the abstract store datatype
+
+    - the invariants we're interested in are `expression E is available` (where "available" means what we specified above)
+
+    - since we're analyzing LIR, an expression `E` is either `<aop> op1 op2` or `<rop> op1 op2`
+
+    - so our abstract store will be a set of available expressions
+
+- joining abstract stores
+
+    - given two abstract stores, we need to compute a new abstract store that is guaranteed to be correct no matter which input store is "true"
+
+    - this is just set intersection, i.e., an expression is guaranteed to be available if it was available in both input stores
+
+- initial abstract store
+
+    - at the entry to the function we haven't computed any expressions yet
+
+    - `init` = `{}`
+
+- bottom abstract store
+
+    - we optimistically set `bot` = the set of all expressions used in the function
+
+    - this is safe because the analysis will remove expressions as necessary (because join is set intersection)
+
+- `x = $const n` and `x = $copy y`
+
+    - this may change the value of `x`, so update `store` to remove any expressions using `x`
+
+- `x = $arith <aop> y z` and `x = $cmp <rop> y z`
+
+    - the expression `<aop>/<rop> y z` has been computed, so add it to `store`
+
+    - this may change the value of `x`, so update `store` to remove any expressions using `x` (this may include the expression we just added)
+
+- for convenience i'm allowing constants as operands
+
+- example [see OneNote]
+
+```
+fn foo(p:int) -> int {
+  let x:int, y:int, z:int, t:int
+  entry:
+    x = $arith mul p 4
+    t = $cmp lte 0 p
+    $branch t bb1 exit
+
+  bb1:
+    p = $arith add 1 p
+    y = $arith mul p 4
+    $jump exit
+
+  exit:
+    z = $arith mul p 4
+    $ret z
+}
+```
+
+- exercise [see OneNote]
+
+```
+fn foo(a:int, b:int) -> int {
+  let x:int, y:int, z:int, t:int
+  entry:
+    x = $arith add a b
+    y = $arith mul a b
+    $jump hdr
+
+  hdr:
+    z = $arith add a b
+    t = $cmp lt z y
+    $branch t body exit
+
+  body:
+    a = $arith add a 1
+    x = $arith add a b
+    $jump hdr
+
+  exit:
+    $ret x
+}
+```
+
+- once we've computed the available expressions we need to transform the program to take advantage of them
+
+    - there are various schemes; we'll use a simple one that works but may leave redundancies that other optimizations need to clean up (like copy propagation and dead code elimination)
+
+    - for each expression `e ∈ E` create a fresh variable `Vₑ`
+
+    - for each instance of `e` in an `$arith` or `$cmp`, if `e` is available at that point replace the `$arith` or `$cmp` with `$copy Vₑ`
+
+    - for each definition `x = e` s.t. `e` was replaced with `$copy Vₑ` somewhere, insert a copy `Vₑ = $copy x` immediately afterward
+
+        - notice we don't check whether _that specific_ definition needs to be available, so this may insert extraneous copies that need to be cleaned up later
+
+- example [same as above example]; SOLUTION:
+
+```
+fn foo(p:int) -> int {
+  let x:int, y:int, z:int, _t1:int, V₁:int
+  entry:
+    x = $arith mul p 4
+    V₁ = $copy x
+    _t1 = $cmp lte 0 p
+    $branch _t1 bb1 exit
+
+  bb1:
+    p = $arith add 1 p
+    y = $arith mul p 4
+    V₁ = $copy y
+    $jump exit
+
+  exit:
+    z = $copy V₁
+    $ret z
+}
+```
+
+- exercise [same as above exercise]; SOLUTION:
+
+```
+fn foo(a:int, b:int) -> int {
+  let x:int, y:int, z:int, t:int, V₁
+  entry:
+    x = $arith add a b
+    V₁ = $copy x
+    y = $arith mul a b
+    $jump hdr
+
+  hdr:
+    z = $copy V₁
+    V₁ = $copy z // THIS IS EXTRANEOUS; WE COULD JUST USE x instead of V₁
+    t = $cmp lt z y
+    $branch t body exit
+
+  body:
+    a = $arith add a 1
+    x = $arith add a b
+    V₁ = $copy x
+    $jump hdr
+
+  exit:
+    $ret x
+}
+```
+
+### dead code elimination (liveness) [NOTE: SKIP FOR TIME]
+
+- we want to remove code that computes something that is never used (we call this _dead code_)
+
+    - [show simple example again from 'high-level global optimization examples']
+
+    - this is a very useful optimization for cleaning up after other optimizations, like the ones above
+
+- the analysis is going to tell us what variables may be _live_ at each program point; a variable is live if it may be used at some later program point
+
+    - any variable that is not live at a program point must be dead (i.e., definitely won't be used at some later program point)
+
+    - liveness requires us to look into the future at what will happen later in the program; how do we know whether a variable will be used or not?
+
+    - we reverse the CFG: all edges are flipped, we treat basic blocks as if the terminal is the starting point, and we start with the function exit (the `$ret`) instead of the function entry (we'll assume that there is only one `$ret`; if necessary we can transform the function CFG to enforce that this is true)
+
+    - this means at a particular program point we've already seen the later program points and so we know what is live or dead at this program point
+
+    - we can use the same DFA framework as before, just on the reversed CFG---`IN` is for the terminal instruction of a basic block, `OUT` is for the top of a basic block
+
+- the transformation is trivial given the analysis: for each instruction that defines a variable `x`, if the analysis says that `x` is not live at this point then we remove the instruction
+
+- there is a more generalized and powerful analysis we could use called _faint variables analysis_ that could potentially eliminate even more code because it takes transitive deadness into account, but we'll stick with the simpler liveness analysis
+
+    - note in the example below that `b` is considered live at the `$arith` because it is later used as the operand of a `$copy`, even though it is a copy into a dead variable, and thus `a` is considered live at the first `$copy` and so only the final `$copy` can be removed; a more careful analysis would show that `a` and `b` are effectively dead and all the instructions besides `$ret` could be removed
+
+- for convenience i'm allowing constants as operands
+
+```
+a = $copy 1
+b = $arith add a 1
+a = $copy b
+$ret 2
+```
+
+- as before, to fill in the DFA framework, we need to:
+
+    - define an abstract store datatype
+
+    - define a join operation on abstract stores
+
+    - define the initial abstract store (for the reversed CFG)
+
+    - define the bottom abstract store
+
+    - for each `inst` in {`$const`, `$copy`, `$arith`, `$cmp`, `$branch`, `$ret`}, define `F_inst` (remembering that we're going backwards)
+
+        - notice that we're including `$branch` and `$ret`, because they can use variables as operands
+
+- then we just apply the DFA worklist algorithm and we have our analysis
+
+- the abstract store datatype
+
+    - the invariants we're interested in are `variable x may be live at this point` (where "live" means what we defined above)
+
+    - so the abstract store will be a set of variables that are live at a given program point
+
+- joining abstract stores
+
+    - given two abstract stores, we need to compute a new abstract store that is guaranteed to be correct no matter which input store is "true"
+
+    - this is just set union, i.e., a variable may be live if it is live in either input store
+
+- initial abstract store (i.e., at the exit of the function because we reversed the CFG)
+
+    - at the exit of the function nothing is live
+
+    - `init` = `{}`
+
+- bottom abstract store
+
+    - we assume nothing is live: `bot` = `{}`
+
+- `x = $const n`: update `store` to remove `x`
+
+- `x = $copy y`: update `store` to remove `x` and include `y`
+
+- `x = $arith <aop> y z` and `x = $cmp <rop> y z`: update `store` to remove `x` and include `y`, `z`
+
+- `$branch x bb1 bb2`: update `store` to include `x`
+
+- `$ret x`: update `store` to include `x`
+
+- given the analysis, we can trivially transform the program to remove any instruction that assigns to a dead variable
+
+- for convenience i'm allowing constants as operands
+
+- example/exercise [see OneNote]
+
+```
+fn foo(a:int, b:int) -> int {
+  let x:int, y:int, z:int
+
+  entry:
+    x = $const 0
+    $jump hdr
+
+  hdr:
+    y = $cmp lt x a
+    $branch y body exit
+
+  body:
+    b = $const 2
+    y = $arith add a x
+    z = $arith mul a x
+    x = $arith add x 1
+    $jump hdr
+
+  exit:
+    z = $arith add a z
+    $ret z
+}
+```
+
+### copy propagation (reaching defs) [NOTE: SKIP FOR TIME]
+
+- we want to avoid superfluous copies
+
+    - [show simple example again from 'high-level global optimization examples']
+
+    - this transformation doesn't actually remove copies, it just makes them obsolete; a later optimization (like dead code elimination) can then remove the obsolete copies
+
+    - the analysis and transformation are actually a lot like constant propagation; with a little tweaking we could do them both at once
+
+- the analysis tells us what copies _reach_ each program point
+
+    - a copy `x = $copy y` reaches a program point PP iff (1) it is guaranteed to be computed along all paths to PP; and (2) neither `x` nor `y` are assigned to along any path from the copy to PP
+
+    - if these are true then it means `x` and `y` must have the same value at PP and so we are allowed to replace `x` with `y`, making the copy `x = $copy y` obsolete
+
+- the transformation is trivial given the analysis: for each instruction that uses a variable `x`, if the analysis says that a copy `x = $copy y` reaches that point then we replace `x` with `y`
+
+- as before, to fill in the DFA framework, we need to:
+
+    - define an abstract store datatype
+
+    - define a join operation on abstract stores
+
+    - define the initial abstract store
+
+    - define the bottom abstract store
+
+    - for each `inst` in {`$const`, `$copy`, `$arith`, `$cmp`}, define `F_inst`
+
+- then we just apply the DFA worklist algorithm and we have our analysis
+
+- the abstract store datatype
+
+    - the invariants we're interested in are `"x = $copy y" reaches this point` (where "reaches" means what we specified above)
+
+    - so our abstract store will be a set of copies that reach the current program point
+
+- joining abstract stores
+
+    - given two abstract stores, we need to compute a new abstract store that is guaranteed to be correct no matter which input store is "true"
+
+    - this is just set intersection, i.e., a copy is guaranteed to reach this point if it reached it in both input stores
+
+- initial abstract store
+
+    - at the entry to the function we haven't computed any copies yet
+
+    - `init` = `{}`
+
+- bottom abstract store
+
+    - we optimistically set `bot` = the set of all copies in the function
+
+    - this is safe because the analysis will remove copies as necessary (because join is set intersection)
+
+- `x = $copy y`
+
+    - update `store` to remove any copy to or from `x` (note the _or from_ part)
+
+    - update `store` to include this copy
+
+- `x = $const n`, `x = $arith <aop> y z`, `x = $cmp <rop> y z`
+
+    - update `store` to remove any copy to or from `x`
+
+- given the computed copies, we can trivially transform the program to use the copies where possible
+
+- example/exercise [see OneNote]
+
+```
+fn foo(a:int, b:int, c:int) -> int {
+  let x:int, y:int, z:int
+
+  entry:
+    x = $copy a
+    y = $copy b
+    z = $copy c
+    $branch a tt exit
+
+  tt:
+    y = $arith add x y
+    a = $copy y
+    b = $cmp eq a z
+    y = $copy b
+    $jump exit
+
+  exit:
+    x = $arith add y z
+    $ret x
+}
+```
+
+## order of optimizations
+
+- an important thing to know is that the _order_ of optimizations can make a big difference in how effective they are
+
+- we saw, for example, that GCSE left a lot of copy assignments and dead variables, which can then be cleaned up by other optimizations like copy propagation and dead code elimination; it turns out that many optimizations modify the code in such a way that they enable other optimizations, and this can even be cyclic (A enables B which enables A again)
+
+- so what's the best order? this isn't an easy question to answer, and heavily depends on the code being optimized
+
+    - the optimization levels in a compiler such as `gcc` or `clang` (`-O1`, `-O2`, `-O3`, etc) are just convenient flags that specify a series of optimizations determined by the compiler developers to "usually" do a pretty good job
+    
+    - you (the compiler user) can actually specify the exact set of optimizations that you want to apply and what order you want to apply them in, and if you do it right you can often get even faster code than by using the default compiler flags
+    
+    - however, figuring out what optimizations to use in what order can take a lot of trial and error, and you'll never know whether you found the best possible ordering
+
+## local optimizations [NOTE: SKIP FOR TIME]
 ### intro
 
 - local optimizations operate on basic blocks; we iterate through each block (in arbitrary order) and apply the local optimizations to optimize each block in isolation from each other
@@ -4661,893 +5514,7 @@ d = 42
 i = d
 ```
 
-## global optimizations
-### general intro
-
-- we have looked at analysis and optimization at the basic block level (local optimization), but the limited scope means that we can miss many optimization opportunities; let's widen our scope to entire functions, i.e., global optimization
-
-- remember that optimization = analysis + transformation; we split global optimization into two pieces:
-
-    1. program analyses to determine what transformations are safe to do
-
-    2. the actual transformations that optimize the program
-
-- the analyses required for global optimization tend to be more complicated than for local optimization, and we have developed a specific theoretical framework for it called _dataflow analysis_
-
-    - compiler developers tried a lot of ad-hoc global analyses at first, but found that they were very difficult to get correct; dataflow analysis provides a handy set of tools such that, if you use them correctly, you will get a correct analysis
-
-- first we'll look at some high-level examples of optimizations we might want to perform
-
-- then we'll dig deeper into the DFA framework for program analysis that is required to enable those optimizations
-
-    - there's a lot of math that goes into showing that these analyses will terminate and give the correct answer; we won't go into that math, it's outside the scope of the class (and just to implement the analyses you don't need to know the math)
-
-    - if you want to understand the math behind it all, see my graduate course CS 260
-
-- finally we'll go in-depth into a specific set of DFA analyses and the optimizations they enable
-
-- there are _many_ more optimizations than the ones described here, these are just a sampling
-
-### high-level optimization examples
-#### constant propagation
-
-- we want to precompute constant values during compilation so we don't have to compute them at runtime
-
-- there are often constants present in source code, but even more tend to get added as the code is lowered and transformed in various ways
-
-- original code
-
-```
-entry:
-  x = $copy 40
-  y = $arith add x 2
-  $ret y
-```
-
-- becomes
-
-```
-entry:
-  x = $copy 40
-  y = $arith add 40 2
-  $ret 42
-```
-
-#### global common subexpression elimination
-
-- we want to avoid computing the same expression multiple times if they will always have the same answer
-
-- original code
-
-```
-entry:
-  x = $arith add p q
-  y = $arith add p q
-  z = $arith add x y
-  $ret z
-```
-
-- becomes
-
-```
-entry:
-  x = $arith add p q
-  y = $copy x
-  z = $arith add x y
-  $ret z
-```
-
-#### copy propagation
-
-- we want to avoid making superfluous copies of things at runtime when possible
-
-- this is often useful as a cleanup phase after other optimizations (can also be useful after lowering)
-
-- original code (from result of GCSE)
-
-```
-entry:
-  x = $arith add p q
-  y = $copy x
-  z = $arith add x y
-  $ret z
-```
-
-- becomes
-
-```
-entry:
-  x = $arith add p q
-  y = $copy x
-  z = $arith add x x
-  $ret z
-```
-
-#### dead code elimination
-
-- we want to eliminate code whose execution at runtime is irrelevant
-
-- another one that's useful to clean up after other optimizations
-
-- original code (from result of constant propagation)
-
-```
-entry:
-  x = $copy 40
-  y = $arith add 40 2
-  $ret 42
-```
-
-- becomes
-
-```
-entry:
-  $ret 42
-```
-
-- original code (from result of copy propagation)
-
-```
-entry:
-  x = $arith add p q
-  y = $copy x
-  z = $arith add x x
-  $ret z
-```
-
-- becomes
-
-```
-entry:
-  x = $arith add p q
-  z = $arith add x x
-  $ret z
-```
-
-### DFA intro
-
-- the above examples were trivially correct and easy to reason about, since they were all contained in a single block
-
-- to safely apply such transformations globally, we need to analyze the entire function
-
-- what does a program analysis do, exactly?
-
-    - it computes _invariants_ about program execution: things that are guaranteed to always be true
-
-    - this information is what tells us whether a transformation is safe
-
-- what invariants does it compute?
-
-    - it depends on the specific analysis
-
-    - each analysis will decide on a set of possible invariants that it's looking for
-
-- example: _sign analysis_ looks for invariants about whether a variable's value is _positive_, _negative_, or _zero_
-
-```
-fn abs(a:int, b:int) -> int { 
-  let c:int;
-  if (a < b) { c = b - a; } else { c := a - b; } 
-  return c;
-}
-```
-
-- given this function, we don't know what the values of the arguments will be, nor whether we will take the true or false branch of the conditional---but we can infer the invariant that the value returned by this function will always be non-negative; here's our reasoning:
-
-    - either `a < b` or `b < a` or `a == b`
-    
-    - if `a < b` then we take the true branch, `c` is positive
-    
-    - if `b < a` then we take the false branch, `c` is positive
-    
-    - if `a == b` then we take the false branch, `c` is zero
-    
-    - therefore `c` cannot be negative at the return statement
-
-- in this example we are reasoning about the sign of `c` (positive, negative, or zero), so the facts that we care about pertain to that; in other analyses we care about other properties (as we'll see examples of soon)
-
-- dataflow analysis provides a general framework that is independent of the particular facts we want to reason about; basically, it's a template into which we plug in different kinds of things depending on the specific analysis we're trying to perform
-
-- it's important to note that computing _exactly_ the correct set of invariants is an undecidable problem (which we can prove using the techniques you learned in 138)
-
-    - this means we can only _approximate_ the exact set of invariants
-
-    - it's critical that we never compute a _false_ invariant, therefore we allow the analysis to miss true invariants in return for guaranteeing that it never finds a false invariant
-
-    - this means that we may miss some possible optimizations that we could have safely performed, but in return we'll never perform optimizations that break the program
-
-- example: sign analysis redux
-
-```
-fn foo(a:int, b:int) -> int {
-  let c:int;
-  if a < b { c = b - a; }
-  if b < a { c = a - b; }
-  if a == b { c = 1; }
-  return c;
-}
-```
-
-- for this example we can reason about signedness again and determine that `c` must always be positive at the return statement
-
-    - however, our analysis may say only that `c` will be non-negative, or even that it may be any of positive, negative, or zero
-
-    - these are true invariants, but not as precise as they could be (being positive implies both of those things)
-
-### DFA framework
-
-- remember that DFA is a template; we define how it works while leaving certain parts unspecified (which will be filled in by each specific analysis)
-
-    - we'll describe the framework here, then give a number of concrete examples
-
-- these parts are defined by a specific analysis:
-
-    - an _abstract store_ datatype, along with an operation called _join_ that combines two abstract stores into a new abstract store
-
-        - this abstract store will contain the invariants that we're computing for the analysis being implemented
-
-        - the join operation combines the invariants from two abstract stores into a new set of invariants that over-approximate the originals, i.e., if `A ⊔ B = C` then `A ⇒ C` and `B ⇒ C` (but `C` may be less precise than `A` or `B`)
-
-    - the _initial abstract store_ `init`
-
-        - these are the invariants that hold at the entry of the function
-
-    - the _bottom_ abstract store `bot`
-
-        - this is the store that says no invariants have been computed yet
-
-    - for each LIR instruction a function `F` that transforms an input abstract store into an output abstract store for that instruction
-
-        - sometimes we only need the non-terminals `F_copy`, `F_arith`, and `F_cmp`, each taking a store as an argument and returning a store as a result
-
-        - sometimes the terminals are relevant too: `F_br`, `F_jmp`, `F_ret`
-
-        - these functions describe how an instruction modifies the computed invariants
-
-- given these parts, we can define how DFA works independent of any given analysis
-
-- for each basic block `bb` we'll define:
-
-    - `IN_bb` (the incoming abstract store for `bb`)
-    - `OUT_bb` (the outgoing abstract store for `bb`)
-
-- we initialize these as follows:
-
-    - `IN_entry` = `init`
-    - `IN_bb` = `bot` for all `bb` ̸= `entry`
-    - `OUT_bb` = `bot` for all `bb`
-
-- we create a worklist `work` of basic blocks, initialized to contain every basic block
-
-    - these are the basic blocks that remain to be processed
-
-    - it doesn't matter what order the basic blocks are processed in, the DFA framework guarantees we'll get the same answer
-
-    - this means the worklist can be a set, queue, stack, etc (it's probably easiest to make it a stack implemented using a vector)
-
-- while the worklist isn't empty, we continually do the following:
-
-    - pop a basic block `bb` from the worklist
-
-    - `IN_bb` = `⨆ OUTₚ` s.t. `p` is a predecessor of `bb` in the CFG
-
-        - this says that the input could be coming from any of the `bb`'s predecessors, and so `IN_bb` needs to over-approximate all of the inputs
-
-    - let `store` = `IN_bb` (IMPORTANT: this is a copy)
-
-    - for each instruction `i` from 0..len(`bb`):
-
-        - `store` = `F_inst(store)`, where `F_inst` is the function relevant to instruction `i`
-
-        - note that we're updating `store` in-place; at the end of all the instructions we have the store leaving the basic block
-
-    - if `store` ̸= `OUT_bb` (i.e., the invariants have changed):
-
-        - `OUT_bb` = `store`
-
-        - for each basic block `s` that is a successor of `bb` in the CFG, add `s` to the worklist
-
-- during the worklist loop we may revisit the same basic block multiple times; this can happen because of loops
-
-- this algorithm is designed to ensure that (1) the worklist will eventually become empty; and (2) when it does, each basic block's `IN_bb` and `OUT_bb` will contain correct invariants for the entry and exit of that basic block
-
-    - we may need the invariants for a specific instruction inside `bb`, not just the entry or exit
-
-    - we can compute that by taking `IN_bb` and applying `F_inst` up to the instruction in question and stopping there
-
-- [show high-level overview of worklist algorithm in action on some CFG]
-
-### constant propagation (constants analysis)
-
-- we want to precompute constant values during compilation so we don't have to compute them at runtime
-
-    - [show simple example again]
-
-- the analysis tells us what constants exist at each program point
-
-- the transformation is trivial given the analysis: for each instruction that uses variables, if the analysis says that a variable has a constant value at that point then we replace the variable with that value
-
-    - then we can apply local constant folding as discussed earlier
-
-- to fill in the DFA framework, we need to:
-
-    - define an abstract store datatype
-
-    - define a join operation on abstract stores
-
-    - define the initial abstract store
-
-    - define the bottom abstract store
-
-    - for each `inst` in {`$copy`, `$arith`, `$cmp`}, define `F_inst`
-
-- then we just apply the DFA worklist algorithm and we have our analysis
-
-- the abstract store datatype
-
-    - the invariants we're interested in are `variable X has constant value Y`
-
-    - our abstract store will map each variable to either:
-    
-        - a constant value
-        - an "i don't know" value (i.e., maybe it's a constant or maybe not)
-        - an "no value yet" value (i.e., the variable is undefined)
-
-    - we'll call the "i don't know value" `⊤` (TOP) and the "no value yet" `⊥` (BOTTOM) for reasons having to do with the math behind DFA (which we won't go into)
-
-    - so the abstract store is a map from variable to one of {`n ∈ 𝐙`, `⊤`, `⊥`}
-
-- joining abstract stores
-
-    - given two abstract stores, we need to compute a new abstract store that is guaranteed to be correct no matter which input store is "true"
-
-    - let's focus on some variable `x`, which each input store will map to `n ∈ 𝐙`, `⊤`, or `⊥`; we'll say `x₁` is from one store and `x₂` is from the other and `x₃` is for the new store
-
-        - if `x₁ ↦ n` and `x₂ ↦ n`, then `x₃ ↦ n`
-
-        - if `x₁ ↦ n₁` and `x₂ ↦ n₂` s.t. `n₁ ̸= n₂`, then `x₃ ↦ ⊤`
-
-        - if `x₁ ↦ ⊤` or `x₂ ↦ ⊤`, then `x₃ ↦ ⊤`
-
-        - if `x₁ ↦ ⊥` and `x₂ ↦ X`, then `x₃ ↦ X` (or vice-versa)
-
-    - we do this for each variable in the input stores to get the complete output store
-
-- example
-
-```
-[a ↦ 1, b ↦ 2, c ↦ ⊤, d ↦ ⊥] ⊔
-[a ↦ 1, b ↦ 3, c ↦ 0, d ↦ 4]
-=
-[a ↦ 1, b ↦ ⊤, c ↦ ⊤, d ↦ 4]
-```
-
-- initial abstract store
-
-    - what is guaranteed to be true at the entry of the function? we zero-initialize all locals; we don't know the parameter values
-
-    - `init` = `[x ↦ ⊤, y ↦ 0]` for `x ∈ params`, `y ∈ locals`
-
-- bottom abstract store
-
-    - this is used for all the `IN` and `OUT` stores that we haven't computed yet
-
-    - `bot` = `[x ↦ ⊥]` for `x ∈ locals`
-
-- `x = $copy op`
-
-    - given `store`, update with new value of `x`
-
-    - `store[x]` = [
-        `n` if `op` is `n`;
-        `store[y]` if `op` is `y`
-      ]
-
-- `x = $arith <aop> op1 op2`
-
-    - given `store`, update with new value of `x`
-
-    - for `add` (other operations left as exercise)
-
-```
- + | ⊥ | c₂ | ⊤
----+---+----+---
-⊥  | ⊥   ⊥   ⊥
-c₁ | ⊥ c₁+c₂ ⊤
-⊤  | ⊥   ⊤   ⊤
-```
-
-- `x = $cmp <rop> op1 op2`
-
-    - given `store`, update with new value of `x`
-
-    - for `lte` (other operations left as exercise)
-
-```
- ≤ | ⊥ | c₂ | ⊤
----+---+----+---
-⊥  | ⊥   ⊥   ⊥
-c₁ | ⊥ c₁≤c₂ ⊤
-⊤  | ⊥   ⊤   ⊤
-```
-
-- given the computed constants, we can trivially transform the program to use the constants instead of variables where possible
-
-- for this analysis we can actually be a bit more clever with `$branch`: if the branch condition is a constant then we know which label we'll jump to and we can ignore the other one (i.e., not put it on the worklist)
-
-- example [see OneNote]
-
-```
-fn foo(p:int, q:int) -> _ {
-  let x:int, y:int
-  entry:
-    $jump hdr
-
-  hdr:
-    x = $cmp lte y q
-    $branch x body exit
-
-  body:
-    p = $copy 4
-    q = $copy 3
-    y = $arith add p q
-    $jump hdr
-
-  exit:
-    $ret
-}
-```
-
-- exercise [see OneNote]
-
-```
-fn foo() -> int {
-  let x:int, y:int, z:int, _t1:int, _t2:int
-  entry:
-    x = $copy 1
-    y = $copy 2
-    $jump hdr
-
-  hdr:
-    _t1 = $cmp lte 0 x
-    $branch _t1 body exit
-
-  body:
-    _t2 = $cmp eq x 1
-    $branch _t2 tt ff
-
-  tt:
-    z = $copy 42
-    $jump end
-
-  ff:
-    z = $arith add 40 y
-    $jump end
-
-  end:
-    x = $copy z
-    $jump hdr
-
-  exit:
-    $ret z
-}
-```
-
-### global common subexpression elimination (available expressions)
-
-- we want to determine what expressions we've already computed that we can reuse at later program points, avoiding having to compute them again
-
-    - [show example below on OneNote; notice in the example that `p * 4` is guaranteed to have been computed along all paths to the assignment to `z` and for each path to have the same value as when it was computed (though that value is different for each path)]
-
-- the analysis tells us what expressions are available at each program point
-
-    - they are guaranteed to have been computed along all paths to this program point
-
-    - for each path the value is guaranteed to be the same at this program point
-
-- the transformation must then insert copies to take advantage of the available expressions
-
-- as before, to fill in the DFA framework, we need to:
-
-    - define an abstract store datatype
-
-    - define a join operation on abstract stores
-
-    - define the initial abstract store
-
-    - define the bottom abstract store
-
-    - for each `inst` in {`$copy`, `$arith`, `$cmp`}, define `F_inst`
-
-- then we just apply the DFA worklist algorithm and we have our analysis
-
-- the abstract store datatype
-
-    - the invariants we're interested in are `expression E is available` (where "available" means what we specified above)
-
-    - since we're analyzing LIR, an expression `E` is either `<aop> op1 op2` or `<rop> op1 op2`
-
-    - so our abstract store will be a set of available expressions
-
-- joining abstract stores
-
-    - given two abstract stores, we need to compute a new abstract store that is guaranteed to be correct no matter which input store is "true"
-
-    - this is just set intersection, i.e., an expression is guaranteed to be available if it was available in both input stores
-
-- initial abstract store
-
-    - at the entry to the function we haven't computed any expressions yet
-
-    - `init` = `{}`
-
-- bottom abstract store
-
-    - we optimistically set `bot` = the set of all expressions used in the function
-
-    - this is safe because the analysis will remove expressions as necessary (because join is set intersection)
-
-- `x = $copy op`
-
-    - this may change the value of `x`, so update `store` to remove any expressions using `x`
-
-- `x = $arith <aop> op1 op2`
-
-    - the expression `<aop> op1 op2` has been computed, so add it to `store`
-
-    - this may change the value of `x`, so update `store` to remove any expressions using `x` (this may include the expression we just added)
-
-- `x = $cmp <rop> op1 op2`
-
-    - same as for `$arith`
-
-- example [see OneNote]
-
-```
-fn foo(p:int) -> int {
-  let x:int, y:int, z:int, t:int
-  entry:
-    x = $arith mul p 4
-    t = $cmp lte 0 p
-    $branch t bb1 exit
-
-  bb1:
-    p = $arith add 1 p
-    y = $arith mul p 4
-    $jump exit
-
-  exit:
-    z = $arith mul p 4
-    $ret z
-}
-```
-
-- exercise [see OneNote]
-
-```
-fn foo(a:int, b:int) -> int {
-  let x:int, y:int, z:int, t:int
-  entry:
-    x = $arith add a b
-    y = $arith mul a b
-    $jump hdr
-
-  hdr:
-    z = $arith add a b
-    t = $cmp lt z y
-    $branch t body exit
-
-  body:
-    a = $arith add a 1
-    x = $arith add a b
-    $jump hdr
-
-  exit:
-    $ret x
-}
-```
-
-- once we've computed the available expressions we need to transform the program to take advantage of them
-
-    - there are various schemes; we'll use a simple one that works but may leave redundancies that other optimizations need to clean up (like copy propagation and dead code elimination)
-
-    - for each expression `e ∈ E` create a fresh variable `Vₑ`
-
-    - for each instance of `e` in an `$arith` or `$cmp`, if `e` is available at that point replace the `$arith` or `$cmp` with `$copy Vₑ`
-
-    - for each definition `x = e` s.t. `e` was replaced with `$copy Vₑ` somewhere, insert a copy `Vₑ = $copy x` immediately afterward
-
-        - notice we don't check whether _that specific_ definition needs to be available, so this may insert extraneous copies that need to be cleaned up later
-
-- example [same as above example]; SOLUTION:
-
-```
-fn foo(p:int) -> int {
-  let x:int, y:int, z:int, _t1:int, V₁:int
-  entry:
-    x = $arith mul p 4
-    V₁ = $copy x
-    _t1 = $cmp lte 0 p
-    $branch _t1 bb1 exit
-
-  bb1:
-    p = $arith add 1 p
-    y = $arith mul p 4
-    V₁ = $copy y
-    $jump exit
-
-  exit:
-    z = $copy V₁
-    $ret z
-}
-```
-
-- exercise [same as above exercise]; SOLUTION:
-
-```
-fn foo(a:int, b:int) -> int {
-  let x:int, y:int, z:int, t:int, V₁
-  entry:
-    x = $arith add a b
-    V₁ = $copy x
-    y = $arith mul a b
-    $jump hdr
-
-  hdr:
-    z = $copy V₁
-    V₁ = $copy z         // THIS IS EXTRANEOUS; WE COULD JUST USE x instead of V₁
-    t = $cmp lt z y
-    $branch t body exit
-
-  body:
-    a = $arith add a 1
-    x = $arith add a b
-    V₁ = $copy x
-    $jump hdr
-
-  exit:
-    $ret x
-}
-```
-
-### dead code elimination (liveness)
-
-- we want to remove code that computes something that is never used (we call this _dead code_)
-
-    - [show simple example again]
-
-    - this is a very useful optimization for cleaning up after other optimizations, like the ones above
-
-- the analysis is going to tell us what variables may be _live_ at each program point; a variable is live if it may be used at some later program point
-
-    - any variable that is not live at a program point must be dead (i.e., definitely won't be used at some later program point)
-
-    - liveness requires us to look into the future at what will happen later in the program; how do we know whether a variable will be used or not?
-
-    - we reverse the CFG: all edges are flipped, we treat basic blocks as if the terminal is the starting point, and we start with the function exit (the `$ret`) instead of the function entry
-
-    - this means at a particular program point we've already seen the later program points and so we know what is live or dead at this program point
-
-    - we can use the same DFA framework as before, just on the reversed CFG---`IN` is for the terminal instruction of a basic block, `OUT` is for the top of a basic block
-
-- the transformation is trivial given the analysis: for each instruction that defines a variable `x`, if the analysis says that `x` is not live at this point then we remove the instruction
-
-- there is a more generalized and powerful analysis we could use called _faint variables analysis_ that could potentially eliminate even more code because it takes transitive deadness into account, but we'll stick with the simpler liveness analysis
-
-    - note in the example below that `b` is considered live at the `$arith` because it is later used as the operand of a `$copy`, even though it is a copy into a dead variable, and thus `a` is considered live at the first `$copy` and so only the final `$copy` can be removed; a more careful analysis would show that `a` and `b` are effectively dead and all the instructions besides `$ret` could be removed
-
-```
-a = $copy 1
-b = $arith add a 1
-a = $copy b
-$ret 2
-```
-
-- as before, to fill in the DFA framework, we need to:
-
-    - define an abstract store datatype
-
-    - define a join operation on abstract stores
-
-    - define the initial abstract store (for the reversed CFG)
-
-    - define the bottom abstract store
-
-    - for each `inst` in {`$copy`, `$arith`, `$cmp`, `$branch`, `$ret`}, define `F_inst` (remembering that we're going backwards)
-
-        - notice that we're including `$branch` and `$ret`, because they can use variables as operands
-
-- then we just apply the DFA worklist algorithm and we have our analysis
-
-- the abstract store datatype
-
-    - the invariants we're interested in are `variable x may be live at this point` (where "live" means what we defined above)
-
-    - so the abstract store will be a set of variables that are live at a given program point
-
-- joining abstract stores
-
-    - given two abstract stores, we need to compute a new abstract store that is guaranteed to be correct no matter which input store is "true"
-
-    - this is just set union, i.e., a variable may be live if it is live in either input store
-
-- initial abstract store (i.e., at the exit of the function because we reversed the CFG)
-
-    - at the exit of the function nothing is live
-
-    - `init` = `{}`
-
-- bottom abstract store
-
-    - we assume nothing is live: `bot` = `{}`
-
-- `x = $copy op`
-
-    - update `store` to remove `x`
-
-    - if `op` = `y` then update `store` to include `y`
-
-- `x = $arith <aop> op1 op2`
-
-    - update `store` to remove `x`
-
-    - if `op1` or `op2` = `y` then update `store` to include `y`
-
-- `x = $cmp <rop> op1 op2`
-
-    - same as `$arith`
-
-- `$branch x bb1 bb2`
-
-    - update `store` to include `x`
-
-- `$ret x`
-
-    - update `store` to include `x`
-
-- given the analysis, we can trivially transform the program to remove any instruction that assigns to a dead variable
-
-- example/exercise [see OneNote]
-
-```
-fn foo(a:int, b:int) -> int {
-  let x:int, y:int, z:int
-
-  entry:
-    x = $copy 0
-    $jump hdr
-
-  hdr:
-    y = $cmp lt x a
-    $branch y body exit
-
-  body:
-    b = $copy 2
-    y = $arith add a x
-    z = $arith mul a x
-    x = $arith add x 1
-    $jump hdr
-
-  exit:
-    z = $arith add a z
-    $ret z
-}
-```
-
-### copy propagation (reaching defs)
-
-- we want to avoid superfluous copies
-
-    - [show simple example again]
-
-    - this transformation doesn't actually remove copies, it just makes them obsolete; a later optimization (like dead code elimination) can then remove the obsolete copies
-
-    - the analysis and transformation are actually a lot like constant propagation; with a little tweaking we could do them both at once
-
-- the analysis tells us what copies _reach_ each program point
-
-    - a copy `x = $copy y` reaches a program point PP iff (1) it is guaranteed to be computed along all paths to PP; and (2) neither `x` nor `y` are assigned to along any path from the copy to PP
-
-    - if these are true then it means `x` and `y` must have the same value at PP and so we are allowed to replace `x` with `y`, making the copy `x = $copy y` obsolete
-
-- the transformation is trivial given the analysis: for each instruction that uses a variable `x`, if the analysis says that a copy `x = $copy y` reaches that point then we replace `x` with `y`
-
-- as before, to fill in the DFA framework, we need to:
-
-    - define an abstract store datatype
-
-    - define a join operation on abstract stores
-
-    - define the initial abstract store
-
-    - define the bottom abstract store
-
-    - for each `inst` in {`$copy`, `$arith`, `$cmp`}, define `F_inst`
-
-- then we just apply the DFA worklist algorithm and we have our analysis
-
-- the abstract store datatype
-
-    - the invariants we're interested in are `"x = $copy y" reaches this point` (where "reaches" means what we specified above)
-
-    - note that we only care when the operand is a variable; if it were a constant then it would have been caught by constant propagation
-
-    - so our abstract store will be a set of copies that reach the current program point
-
-- joining abstract stores
-
-    - given two abstract stores, we need to compute a new abstract store that is guaranteed to be correct no matter which input store is "true"
-
-    - this is just set intersection, i.e., a copy is guaranteed to reach this point if it reached it in both input stores
-
-- initial abstract store
-
-    - at the entry to the function we haven't computed any copies yet
-
-    - `init` = `{}`
-
-- bottom abstract store
-
-    - we optimistically set `bot` = the set of all copies in the function
-
-    - this is safe because the analysis will remove copies as necessary (because join is set intersection)
-
-- `x = $copy op`
-
-    - update `store` to remove any copy to or from `x` (note the _or from_ part)
-
-    - if `op` = `y`, update `store` to include this copy
-
-- `x = $arith <aop> op1 op2`
-
-    - update `store` to remove any copy to or from `x`
-
-- `x = $cmp <rop> op1 op2`
-
-    - same as `$arith`
-
-- given the computed copies, we can trivially transform the program to use the copies where possible
-
-- example/exercise [see OneNote]
-
-```
-fn foo(a:int, b:int, c:int) -> int {
-  let x:int, y:int, z:int
-
-  entry:
-    x = $copy a
-    y = $copy b
-    z = $copy c
-    $branch a tt exit
-
-  tt:
-    y = $arith add x y
-    a = $copy y
-    b = $cmp eq a z
-    y = $copy b
-    $jump exit
-
-  exit:
-    x = $arith add y z
-    $ret x
-}
-```
-
-## order of optimizations
-
-- the last thing to mention is that the _order_ of optimizations can make a big difference in how effective they are
-
-- we saw for GCSE that our optimization left a lot of copy assignments and dead variables, which can then be cleaned up by other optimizations like copy propagation and dead code elimination; it turns out that many optimizations modify the code in such a way that they enable other optimizations, and this can even be cyclic (A enables B which enables A again)
-
-- so what's the best order? this isn't an easy question to answer, and heavily depends on the code being optimized
-
-    - the optimization levels in a compiler such as `gcc` or `clang` (`-O1`, `-O2`, `-O3`, etc) are just convenient flags that specify a series of optimizations determined by the compiler developers to "usually" do a pretty good job
-    
-    - you (the compiler user) can actually specify the exact set of optimizations that you want to apply and what order you want to apply them in, and if you do it right you can often get even faster code than by using the default compiler flags
-    
-    - however, figuring out what optimizations to use in what order can take a lot of trial and error, and you'll never know whether you found the best possible ordering
-
-# register allocation [NOTE: SKIPPED FOR TIME]
+# register allocation [NOTE: SKIP FOR TIME]
 ## intro
 
 - our naive codegen strategy only uses registers as temporaries: for each instruction we read from memory to registers, did the operation, then stored the result back to memory
