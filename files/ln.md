@@ -3515,13 +3515,13 @@ char y = **((char**)&x + 1);
 
     - set `FP` to the current value of `SP` (so `FP` is now saving the old value of `SP`)
 
-    - decrement `SP` to add space for the GC word, pointer-type parameters, and local variables (remember the stack grows _down_, that's why we decrement)
+    - decrement `SP` to add space for the GC word, in-reg parameters, pointer-type in-stack parameters, and local variables (remember the stack grows _down_, that's why we decrement)
 
     - write the number of pointer-typed locals and params to the GC word location
 
     - copy pointer-typed arguments from registers and the stack to the space right after the GC word
 
-    - copy non-pointer arguments from the stack to right after the locals
+    - copy non-pointer arguments from regs to right after the locals
 
     - zero initialize all local variable values
 
