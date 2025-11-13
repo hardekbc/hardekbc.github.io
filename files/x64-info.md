@@ -112,8 +112,8 @@ cmov{C} S, D : move S to D if the condition code is {C}
     - `idiv`: `S` cannot be `I`
     - `cmp`: `S1` cannot be `I`
     - `cmov`: S must be `R` or `M`, `D` must be `R`
-    - `shl`: S must be `I` or `%cl`.  If S is `I`, it must be representable by 8 bits but only the lowest 6 bits are used.
-    - `shr`: S must be `I` or `%cl`.  If S is `I`, it must be representable by 8 bits but only the lowest 6 bits are used.
+    - `shl`: S must be `I` or `%cl` reg.  If S is `I`, it must be representable by 8 bits but only the lowest 6 bits are used.
+    - `shr`: S must be `I` or `%cl` reg.  If S is `I`, it must be representable by 8 bits but only the lowest 6 bits are used.
 
 ## general x86-64 calling convention
 
@@ -141,20 +141,6 @@ cmov{C} S, D : move S to D if the condition code is {C}
 - the stack pointer must be double-word aligned (i.e., `%rsp` % 16 = 0) immediately before a `call` and after a `ret`
 
     - this matters when pushing args onto the stack before a call and when popping them off the stack when the call returns; we may need to push an extra word before the call to keep the stack aligned, and remember to pop the extra word when the call returns
-
-## our specialized calling convention
-
-- we will use the standard calling convention with a few tweaks to simplify things for our implementation (these tweaks still conform to the convention, so we can freely call external functions)
-
-- we won't be keeping values in registers, so we don't need to worry about saving/restoring callee-save and caller-save registers in general
-
-- because of the above item, we'll modify the function prologue to _also_ allocate space on the stack for the arguments passed in registers and write their values to the stack, so that subsequent instructions can find them there
-
-- in order for the runtime garbage collector to be able to find all pointers on the stack, we'll also allocate space on the stack for any pointer-type arguments and copy them into the callee's stack frame
-
-- this means that the arguments passed in registers _and_ any pointer-type arguments passed on the stack will end up with a negative offset from the frame pointer, like locals, while non-pointer arguments passed on the stack will have positive offsets from the frame pointer
-
-    - remember that the number of arguments saved to the callee's stack frame must be taken into account when adjusting the stack pointer to ensure it is double-word aligned
 
 ## compilation
 
