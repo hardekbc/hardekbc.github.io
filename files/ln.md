@@ -20,7 +20,7 @@
 - week 6.1: through 'codegen::stage 2' _except_ $gep, $gfp, and going through examples
 - week 6.2: through 'codegen::stage 3::our specialized calling convention'
 - week 7.1: (holiday)
-- week 7.2: 
+- week 7.2: through 'codegen'
 - week 8.1: 
 - week 8.2: 
 - week 9.1: 
@@ -4141,6 +4141,7 @@ fn foo(p:&int) -> &int {
     - there is no formal notion of borrowing; we can copy the raw pointer from a unique_ptr but there are no checks for how we use those copies
 
 ## cflat memory management
+### overview
 
 - we will implement a semi-space GC for cflat
 
@@ -4180,7 +4181,7 @@ fn foo(p:&int) -> &int {
 
 - `_cflat_init_gc()`:
 
-    - extract the desired maximum heap size from the environmental variable `MAX_HEAP_WORDS`
+    - extract the desired heap size from the environmental variable `CFLAT_HEAP_WORDS`
 
     - create the heap (using `malloc`), setting the initial `from` and `to` pointers and initializing the bump pointer to the start of `from`
 
@@ -4194,15 +4195,52 @@ fn foo(p:&int) -> &int {
 
     - otherwise, save the value of the bump pointer as the address of the newly allocated memory, increment the bump pointer, initialize the newly allocated memory to 0, then return its address
 
-- GC collection:
+- naive GC collection:
 
     - retrieve the value of the current frame pointer
 
-    - walk the stack to visit all stack frames, ending at `main`, and collect all pointer values on the stack
+    - set `bump_ptr` to the beginning of `to_space`
 
-    - trace all reachable allocated memory and copy it `to`, using forwarding pointers to ensure memory is copied only once, and rewrite all pointer values on the stack to their new addresses
+    - walk the stack to visit all stack frames, ending at `main`, and collect all pointer values on the stack (the "root set")
+    
+        - "walk the stack" means begin with the current stack frame and find all pointers in it, then retrieve the value of the old fp (which the current fp is pointing to) to get to the stack frame immediately above this one; repeat until we get to the `main` function's stack frame (whose value we saved in `_cflat_init_gc`)
+
+    - trace all reachable allocated memory and copy them into `to_space` (incrementing `bump_ptr` and leaving forwarding pointers to ensure memory is copied only once) and rewrite all previous pointer values to their new addresses
+
+    - switch the `from_space` and `to_space` pointers
 
 - for grading (and debugging) purposes, we will have the GC log messages about its behavior on std out; the grader will check that your messages are the same as mine on the same workload with the same heap size
+
+### copying algorithm
+
+- naively we could recursively trace all the pointers as we copy objects, so an entire "pointer chain" is copied at once---but this involves a lot of recursive calls, which is really slow (and if we're doing GC then we don't have a lot of memory, so we don't want to use more stack space anyway)
+
+- a more optimized method is known as "cheney's algorithm", and requires no recursion at all:
+
+```
+set bump_ptr = to_space pointer
+
+walk the stack; for each pointer ptr on the stack pointing to an object obj in the heap:
+  copy obj into to_space // just copy obj itself, no recursion (i.e., don't worry about any pointers inside obj)
+  increment bump_ptr by size of obj
+  leave forwarding pointer at old location of obj
+  update ptr to new location of obj
+
+set scan_ptr = to_space pointer
+
+while scan_ptr != bump_ptr:
+  let obj be the object pointed to by scan_ptr
+  for each pointer ptr in object, pointing to some object obj':
+    copy obj' into to_space
+    increment bump_ptr by size of obj'
+    leave forwarding pointer at old location of obj'
+    update ptr to new location of obj'
+  increment scan_ptr by size of obj
+
+switch from_space and to_space pointers
+```
+
+- [SHOW AN EXAMPLE]
 
 # IR optimization
 ## intro
