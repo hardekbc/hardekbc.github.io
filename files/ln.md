@@ -4092,7 +4092,18 @@ for i in 0..8 {
 
     - linear logic recognizes that cake is a finite and consumable resource; we can deduce `A, A ⥰ B ⊢ B` but not `A, A ⥰ B ⊢ A ∧ B`
 
-- what does this have to do with types? memory is also a finite and consumable resource, and we can use linear logic to reason about it
+- what does this have to do with types?
+
+    - consider the logic formula above and add variables and expressions:
+
+        - `x : A, y : A ⥰ B ⊢ e : A ∧ B` INVALID
+        - `x : A, y : A ⥰ B ⊢ e : B`     VALID
+
+    - now they look a lot like the typing judgements that we used in type checking, and (conceptually, at least) we can check them the same way
+
+    - if the resource we're tracking is heap memory, then this allows the type checker to reason about how memory is being used
+
+- memory is also a finite and consumable resource, and we can use linear logic (and hence linear type systems) to reason about it
 
     - a given heap object can only be pointed to by one pointer, e.g., `x = new Foo`
 
@@ -4110,6 +4121,7 @@ fn foo(p:&int) -> &int {
   b = new int;
   *b = *a;
   return b;
+  // we're guaranteed by the type system that there cannot be any other pointers to the object pointed to by `a`
   // object pointed to by `a` is deallocated here
   // object pointed to by `b` is not
 }
@@ -4133,6 +4145,8 @@ fn foo(p:&int) -> &int {
     - a pointer can retain ownership, but allow other pointers to temporarily borrow access to the object
 
     - the key is that the type system can guarantee that these borrows never outlive the owning pointer
+
+    - this is the basic idea behind the rust programming language
 
 - note that modern c++ has the notion of "unique_ptr", which expresses a similar idea (unique ownership of an object, allowing it to be automatically reclaimed when the owning pointer goes out of scope)
 
