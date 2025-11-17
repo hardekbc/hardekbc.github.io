@@ -4207,6 +4207,8 @@ fn foo(p:&int) -> &int {
 
     - trace all reachable allocated memory and copy them into `to_space` (incrementing `bump_ptr` and leaving forwarding pointers to ensure memory is copied only once) and rewrite all previous pointer values to their new addresses
 
+        - note that the forwarding pointer is left in the header word, with the least-significant bit set; because of alignment requirements, a pointer can never be odd so to retrieve the forwarding pointer we can just mask out the last bit (_not_ shift it, just mask it)
+
     - switch the `from_space` and `to_space` pointers
 
 - for grading (and debugging) purposes, we will have the GC log messages about its behavior on std out; the grader will check that your messages are the same as mine on the same workload with the same heap size
