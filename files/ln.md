@@ -21,8 +21,8 @@
 - week 6.2: through 'codegen::stage 3::our specialized calling convention'
 - week 7.1: (holiday)
 - week 7.2: through 'codegen'
-- week 8.1: 
-- week 8.2: 
+- week 8.1: through 'memory management::manual memory management'
+- week 8.2: through 'memory management::automatic memory management::tracing' (but skipping generational examples)
 - week 9.1: 
 - week 9.2: (holiday)
 - week 10.1: 
@@ -4199,7 +4199,7 @@ fn foo(p:&int) -> &int {
 
     - create the heap (using `malloc`), setting the initial `from` and `to` pointers and initializing the bump pointer to the start of `from`
 
-    - save the value of `main`'s frame pointer
+    - save the value of `_start`'s frame pointer (i.e., the function that called `main`)
 
 - `_cflat_alloc(num_words)`:
 
@@ -4217,7 +4217,9 @@ fn foo(p:&int) -> &int {
 
     - walk the stack to visit all stack frames, ending at `main`, and collect all pointer values on the stack (the "root set")
     
-        - "walk the stack" means begin with the current stack frame and find all pointers in it, then retrieve the value of the old fp (which the current fp is pointing to) to get to the stack frame immediately above this one; repeat until we get to the `main` function's stack frame (whose value we saved in `_cflat_init_gc`)
+        - "walk the stack" means begin with the current stack frame and find all pointers in it, then retrieve the value of the old fp (which the current fp is pointing to) to get to the stack frame immediately above this one; repeat until we get to the `main` function's stack frame. we saved `_start`'s frame pointer because then we can use a while loop to walk the stack, with the ending condition being that the current stack pointer is the same as `_start`'s frame pointer
+
+        - remember when iterating through the pointers on the stack that if we start at the word after the gc info, we need to _decrement_ the pointer into the stack to get the next pointer on the stack
 
     - trace all reachable allocated memory and copy them into `to_space` (incrementing `bump_ptr` and leaving forwarding pointers to ensure memory is copied only once) and rewrite all previous pointer values to their new addresses
 
