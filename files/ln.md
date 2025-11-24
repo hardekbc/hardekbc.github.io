@@ -3198,6 +3198,8 @@ char y = **((char**)&x + 1);
 
 - same function prologue for `main` as before, but the GC info (i.e., number of pointers) will be non-zero _and_ when mapping locals to stack offsets, we need to be sure all pointer-type locals come immediately after the GC info word so that the GC can find them
 
+    - IMPORTANT NOTE: for the purposes of the function prologue, we treat "inner" pointers as if they were non-pointer locals.
+
 - note that since we can't allocate structs on the stack, all variables on the stack take 1 word
 
 ```
@@ -3526,6 +3528,8 @@ char y = **((char**)&x + 1);
     - zero initialize all local variable values
 
     - jump to `<function>_entry`
+
+- IMPORTANT NOTE: for the purposes of the function prologue, we treat "inner" pointers as if they were non-pointer locals.
 
 ### example
 
