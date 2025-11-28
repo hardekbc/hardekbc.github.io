@@ -23,7 +23,7 @@
 - week 7.2: through 'codegen'
 - week 8.1: through 'memory management::manual memory management'
 - week 8.2: through 'memory management::automatic memory management::tracing' (but skipping generational examples)
-- week 9.1: 
+- week 9.1: through 'memory management'
 - week 9.2: (holiday)
 - week 10.1: 
 - week 10.2: 
