@@ -1,9 +1,5 @@
 # Fall 2025 notes
 
-## TODO:
-
-- at end of quarter, send out AI survey form (create gradescope assignment for them to submit it)
-
 ## lecture timing
 
 - week 0.2 (quarter starts on thursday): up to (not including) 'compiler overview::things we're leaving out'
@@ -5008,7 +5004,7 @@ fn foo() -> int {
 }
 ```
 
-### global common subexpression elimination (available expressions) [NOTE: SKIP FOR TIME]
+### global common subexpression elimination (available expressions)
 
 - we want to determine what expressions we've already computed that we can reuse at later program points, avoiding having to compute them again
 
@@ -5183,7 +5179,7 @@ fn foo(a:int, b:int) -> int {
 }
 ```
 
-### dead code elimination (liveness) [NOTE: SKIP FOR TIME]
+### dead code elimination (liveness)
 
 - we want to remove code that computes something that is never used (we call this _dead code_)
 
@@ -5297,7 +5293,7 @@ fn foo(a:int, b:int) -> int {
 }
 ```
 
-### copy propagation (reaching defs) [NOTE: SKIP FOR TIME]
+### copy propagation (reaching defs)
 
 - we want to avoid superfluous copies
 
@@ -5404,7 +5400,7 @@ fn foo(a:int, b:int, c:int) -> int {
     
     - however, figuring out what optimizations to use in what order can take a lot of trial and error, and you'll never know whether you found the best possible ordering
 
-## local optimizations [NOTE: SKIP FOR TIME]
+## local optimizations
 ### intro
 
 - local optimizations operate on basic blocks; we iterate through each block (in arbitrary order) and apply the local optimizations to optimize each block in isolation from each other
@@ -5574,7 +5570,7 @@ d = 42
 i = d
 ```
 
-# register allocation [NOTE: SKIP FOR TIME]
+# register allocation
 ## intro
 
 - our naive codegen strategy only uses registers as temporaries: for each instruction we read from memory to registers, did the operation, then stored the result back to memory
@@ -6024,7 +6020,9 @@ main_epilogue:
   ret
 ```
 
-## general strategy NOTE: [assumes we've covered liveness analysis]
+## general strategy
+
+- NOTE: [assumes we've covered liveness analysis]
 
 - how do we do this kind of assignment automatically?
 
