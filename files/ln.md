@@ -21,8 +21,8 @@
 - week 8.2: through 'memory management::automatic memory management::tracing' (but skipping generational examples)
 - week 9.1: through 'memory management'
 - week 9.2: (holiday)
-- week 10.1: 
-- week 10.2: 
+- week 10.1: through 'IR optimization' (heavily redacted and abstracted)
+- week 10.2: student Q&A
 
 ## assignment timing
 
