@@ -52,6 +52,8 @@
 
 ## misc notes
 
+- the late penalties i'm applying may not be high enough; i'm getting several students who submit everything the last day and still get a B+. is this something i should care about?
+
 - this quarter i'm replacing the lir optimization assignment with a garbage collection assignment, and so moved the lecure material around accordingly (still covering the material, but later and less in-depth from last time in spring'24)
 
 - gradescope is truncating some of the test cases in its output when a student's submission is incorrect...not at the end, but in the middle (it says "truncating" somewhere in the output). it isn't clear what the character limit is that will cause this to happen; i need to investigate and try to figure out a way to get the student the failing test case without truncation.
