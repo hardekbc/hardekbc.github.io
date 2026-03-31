@@ -106,9 +106,9 @@
         - legal proof vs scientific proof vs mathematical proof
         - mathematical ==> based on logic
 
-- what is a formal proof?
+- what is a formal proof? (as opposed to non-formal but rigorous proof)
 
-    - formalize statements in logic
+    - formalize statements symbolically in logic
     - use logical rules of deduction for each proof step
 
 - why formalize proofs when mathematicians usually don't?
