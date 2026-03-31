@@ -1,10 +1,8 @@
-# intro
+# intro to course
 
-- course logistics
+- introduce myself, TAs / ULAs
 
-    - introduce TAs / ULAs
-
-    - full information will be in the course syllabus; this is an overview
+- course logistics (full information will be in the course syllabus; this is an overview)
 
     - we'll have a course slack
 
@@ -27,22 +25,22 @@
         - final: 40%
 
         - quizzes will be roughly one every two weeks, but exact times will depend on the pace of the lectures
-            - make-up quizzes only with note from doctor or dean of students
+            - make-up quizzes only with note from doctor or the office of the dean of students
 
         - assignments are a chance to practice and get help (quizzes/final are for evaluating mastery)
             - one day late = 20% penalty; no credit after that
             - we'll be releasing solutions
 
-        - please ask questions and correct my mistakes!
-
-            - questions are good: they let me know when i need to do a better job of explaining things and slow the pace of the lecture if it's going too fast
-
-            - i'm only human, and sometimes when i'm writing things down my wires get crossed and i make mistakes...i'd much prefer that they're caught right away instead of going into people's notes and causing confusion later
-
     - we have a textbook for this course (given in the syllabus)
 
         - not available in the university bookstore; have to acquire elsewhere
         - i don't teach from it, but it's useful as a study aide (covers the same material)
+
+    - please ask questions and correct my mistakes!
+
+        - questions are good: they let me know when i need to do a better job of explaining things and slow the pace of the lecture if it's going too fast
+
+        - i'm only human, and sometimes when i'm writing things down my wires get crossed and i make mistakes...i'd much prefer that they're caught right away instead of going into people's notes and causing confusion later
 
 - how to succeed in this course
 
@@ -58,10 +56,14 @@
         - office hours
         - slack
 
+- QUESTIONS?
+
+# intro to material
+
 - this course is about two things
 
     - logic and reasoning (i.e., proofs)
-    - fundamental mathematical concepts used in many fields of CS
+    - fundamental mathematical concepts and tools used in many fields of CS
     - the material is mathematical in nature, but extremely applicable to CS
 
 - motivate why we care about logic and proof
@@ -74,7 +76,7 @@
         f(30) = 971, yes
         at f(40), the answer is no (1681 = 41²)
 
-    - ∫_(0..∞) (sin(t) / t)(sin(t / 101) / (t / 101))dt = π/2
+    - ∫_(0..∞) (sin(t) / t) ⬝ (sin(t / 101) / (t / 101))dt = π/2
         add product (sin(t / 201) / (t / 201)), still π/2
         ∀n ∈ ℕ, ∫_(0..∞) (Π_(m = 1..n), sin(t / 100n+1) / (t / 100n+1))dt ?= π/2
         no, pattern breaks at n = 7.4 × 10⁴³
@@ -84,7 +86,7 @@
         f(24) = 24 → 12 → 6 → 3 → 10 → (same as above)
         ∀n ∈ ℕ, f(n) converges to 1?
         the is the collatz conjecture, and no one knows the answer
-            we've tried n past 10¹⁸ and it's always worked so far...
+            - we've tried n past 10¹⁸ and it's always worked so far...
 
     - like testing vs verification for programs
 
@@ -102,6 +104,7 @@
     - a convincing argument
     - what this means is subjective and depends on the audience
         - legal proof vs scientific proof vs mathematical proof
+        - mathematical ==> based on logic
 
 - what is a formal proof?
 
