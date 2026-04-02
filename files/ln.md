@@ -1,3 +1,23 @@
+# SECOND LECTURE ANNOUNCEMENTS
+
+- i miscounted, there are 9 weekly assignments not 8
+
+- for the 5 weekly quizzes
+
+    - they aren't supposed to be a surprise; my initial plan is Th of week 2, 4, 6, 8, 10
+    - this may change if the pace isn't what i expect
+    - i will drop your lowest quiz grade
+
+- first assignment going out today, due next Tuesday; first quiz next Thursday
+
+    - give them the option, either:
+        - give 24 hours for late assignments, post solutions Th morning
+        - don't give any late credit, post solutions immediately after it is due
+
+    - assignment must be done using LaTeX
+        - more information in syllabus
+        - TAs will give a quick tutorial in section
+
 # intro to course
 
 - introduce myself, TAs / ULAs
@@ -149,7 +169,7 @@
         - informal reasoning is based on formal reasoning, we just don't write down all the definitions and steps
         - evaluating an argument requires understanding of logic and proof techniques
 
-# propositional and predicate logic
+# propositional logic
 
 - we'll start with propositional logic
 
@@ -188,38 +208,206 @@
     - an important aspect of these arguments is that the _content_ of the argument doesn't matter, only the _form_
     - [redo examples using propositional variables]
 
-- combining propositions into larger propositions
+- NOTE: STOPPED HERE LAST LECTURE
 
-    - logical connectives: ∧ ∨ → ¬ (and more...)
-    - [redo examples using connectives]
+- NOTE FOR STUDENTS:
+    - we're learning a new language, so we're going to be introducing a lot of new terms and definitions
+    - be sure to write them all down
+    - you'll become familiar with them by using them over and over (that's what the assignments are for)
 
-- this means that we can study logical reasoning without caring about the content of what we are arguing about
+- last time we showed that the contents of an argument aren't really relevant to determining whether it is a _valid_ argument (recall the definition of validity)
 
-    - it is an important skill to be able to translate informal arguments into formal symbols and vice-versa
+    - we can abstract from the contents by using propositional variables
+    - [show previous examples but using variables]
+
+- we still have some english in there, but english is ambiguous and imprecise; we will replace that english using symbols for various logical connectives (i.e., ways to combine propositions into larger propositions)
+
+    - ∧ conjunction ("and"), operands called "conjuncts"
+    - ∨ disjunction ("or"), operands called "disjuncts"
+    - → implication ("implies", "if..then"), left of → is the "antecedent", right is the "consequent"
+    - ¬ negation ("not")
+    - these are the standard ones, there are more
+
+- EXAMPLE: show previous examples completely symbolically
+
+- it is an important skill to be able to translate informal arguments into formal symbols and vice-versa
 
 - EXERCISES
 
     - [translate from english to symbols]
 
-        1. Either John went to the store, or we’re out of eggs.
-        2. Joe is going to leave home and not come back.
-        3. Either Bill is at work and Jane isn’t, or Jane is at work and Bill isn’t.
+        1. Joe is going to leave home and not come back.
+        2. Either Bill is at work and Jane isn’t, or Jane is at work and Bill isn’t.
+        3. If today is Sunday, then I don’t have to go to work today.
 
-        1. P = john went to store; Q = out of eggs ==> P ∨ Q
-        2. P = joe leaving home; Q = joe coming back ==> P ∧ ¬Q
-        3. B = bill at work; J = jane at work ==> (B ∧ ¬J) ∨ (¬B ∧ J)
+        1. L = joe leaving home; B = joe coming back ==> L ∧ ¬B
+        2. B = bill at work; J = jane at work ==> (B ∧ ¬J) ∨ (¬B ∧ J)
+        3. S = today is Sunday; W = I have to work today ==> S → ¬W
 
     - [translate from symbols to english]
 
         1. (¬S ∧ L) ∨ S, where S stands for “John is smart” and L stands for “John is lucky.”
         2. ¬S ∧ (L ∨ S), where S and L have the same meanings as before.
-        3. ¬(S ∧ L) ∨ S, with S and L still as before.
+        3. (R ∨ S) → C, where R = it's raining, S = it's snowing, C = game is canceled
         
         1. Either John isn’t smart and he is lucky, or he’s smart.
         2. John isn’t smart, and either he’s lucky or he’s smart.
-        3. Either John isn’t both smart and lucky, or John is smart.
+        3. if it is raining or snowing, then the game is canceled
 
 - in logic we have to be precise about exactly what things mean; in particular we want to be very clear about what the logical connectives mean
 
-    - we define them using _truth tables_
-    - [give truth tables for ∧ ∨ → ¬]
+    - does "P or Q" mean that exactly one is true, or at least one?
+    - is "if P then Q" true or false when P is false but Q is true?
+
+    - we define what the symbols mean using _truth tables_
+        - [give truth tables for ∧ ∨ → ¬]
+        - note that ∨ means _at least one_ is true, i.e., "inclusive or" (vs "exclusive or")
+        - note that → is true whenever the antecedent is false
+
+    - note that there are actually 16 possible binary connectives
+        - four possible combinations of truth values
+        - two possible truth value outcomes
+        - 4² = 16
+
+    - we don't have symbols for all of them because we don't need them
+    - ∧ ∨ ¬ is actually sufficient to express all possibilities (e.g., A → B === ¬A ∨ B [show via truth table])
+    - we have a few more common ones like ↔ and ⊕, but they are just a convenience
+        - A ↔ B ("A iff B") === (A → B) ∧ (B → A) === (¬A ∨ B) ∧ (¬B ∨ A)
+        - A ⊕ B ("A xor B") === (A ∧ ¬B) ∨ (¬A ∧ B) [show via truth table]
+
+- EXERCISES: write out a truth table for the given expressions
+
+    1. (¬S ∧ L) ∨ S
+    2. ¬(B ∧ C)
+
+- we can use truth tables to determine validity (recall the definition of valid)
+
+    - example (valid):
+
+      P ∨ Q
+      ¬Q
+      -----
+      P
+
+    - example (invalid):
+
+      P → Q
+      Q
+      -----
+      P
+
+- EXERCISES: determine validity of the following arguments
+
+    1. (¬S ∧ L) ∨ S
+       S
+       ------------ (invalid)
+       ¬L 
+
+    2. ¬(B ∧ C) 
+       L ∨ C
+       -------- (valid)
+       L ∨ ¬B
+
+- important: we can study logical reasoning symbolically without caring about the content of what we are arguing about
+
+- summary of what we've done so far
+
+    - take prose expressions and arguments and represent them symbolically and precisely
+    - reason about their truth values using truth tables
+
+- CS CONNECTION: 
+    - let T be represented by 1 and F by 0
+    - we can see that combinational hardware circuits are computing propositional logic
+    - learn more about this in CS 64 and CS 154
+
+- some more vocabulary:
+
+    - [in addition to proposition, premise, conclusion, validity]
+
+    - tautology = an expression that evaluated to T no matter what the values of the variables are
+        - example: A ∨ ¬A
+
+    - contradiction = an expression that evaluated to F no matter what the values of the variables are
+        - example: A ∧ ¬A
+
+    - satisfiable = an expression that can evaluate to T for at least some variable values
+        - an expression is either satisfiable or a contradiction
+
+- EXERCISES: determine whether tautology, satisfiable, or contradiction
+
+    - P ∨ (Q ∨ ¬P)  [tautology]
+    - P ∧ ¬(Q ∨ ¬Q) [contradiction]
+    - P ∨ ¬(Q ∨ ¬Q) [satisfiable]
+
+- we can manipulate logical expressions similar to algebraic expressions; here are some laws (verifiable via truth table)
+
+    - commutative
+        - A ∧ B === B ∧ A
+        - A ∨ B === B ∨ A
+
+    - associative
+        - (A ∧ B) ∧ C === A ∧ (B ∧ C)
+        - (A ∨ B) ∨ C === A ∨ (B ∨ C)
+
+    - identity
+        - A ∧ A === A
+        - A ∨ A === A
+
+    - domination
+        - False ∧ A === False
+        - True ∨ A === True
+
+    - tautology, contradiction
+        - A ∧ True === A   (where True is any tautology)
+        - A ∨ False === A  (where False is any contradiction)
+
+    - distributive
+        - A ∧ (B ∨ C) === (A ∧ B) ∨ (A ∧ C)
+        - A ∨ (B ∧ C) === (A ∨ B) ∧ (A ∨ C)
+
+    - absorption
+        - A ∨ (A ∧ B) === A
+        - A ∧ (A ∨ B) === A
+
+    - double negation
+        - ¬¬A === A
+
+    - de morgan's
+        - ¬(A ∧ B) === ¬A ∨ ¬B
+        - ¬(A ∨ B) === ¬A ∧ ¬B
+
+    - contrapositive
+        - A → B === ¬B → ¬A
+
+- EXAMPLES
+
+    - ¬(P ∨ ¬Q)
+      ¬P ∧ ¬¬Q   [by de morgan]
+      ¬P ∧ Q     [by double negation] 
+
+    - ¬(Q ∧ ¬P) ∨ P
+      (¬Q ∨ ¬¬P) ∨ P [by de morgan]
+      (¬Q ∨ P) ∨ P   [by double negation]
+      ¬Q ∨ (P ∨ P)   [by associativity]
+      ¬Q ∨ P         [by identity]
+
+- EXERCISE: simplify the following expression as much as possible
+
+    - ¬(P ∨ (Q ∨ ¬R)) ∧ Q
+
+    SOLUTION
+      (¬P ∧ ¬(Q ∨ ¬R)) ∧ Q      [by de morgan]
+      (¬P ∧ (¬Q ∨ ¬¬R)) ∧ Q     [by de morgan]
+      (¬P ∧ (¬Q ∨ R)) ∧ Q       [by double negation]
+      ¬P ∧ ((¬Q ∨ R) ∧ Q)       [by associativity]
+      ¬P ∧ (Q ∧ (¬Q ∨ R))       [by commutativity]
+      ¬P ∧ ((Q ∧ ¬Q) ∨ (Q ∧ R)) [by distributivity]
+      ¬P ∧ (Q ∧ R)              [by contradiction]
+
+# predicate logic
+
+- TODO:
+
+# sets
+
+- TODO:
