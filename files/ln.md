@@ -232,7 +232,7 @@
 
 - it is an important skill to be able to translate informal arguments into formal symbols and vice-versa
 
-- EXERCISES
+- EXERCISE 1
 
     - [translate from english to symbols]
 
@@ -275,7 +275,7 @@
         - A ↔ B ("A iff B") === (A → B) ∧ (B → A) === (¬A ∨ B) ∧ (¬B ∨ A)
         - A ⊕ B ("A xor B") === (A ∧ ¬B) ∨ (¬A ∧ B) [show via truth table]
 
-- EXERCISES: write out a truth table for the given expressions
+- EXERCISE 2: write out a truth table for the given expressions
 
     1. (¬S ∧ L) ∨ S
     2. ¬(B ∧ C)
@@ -296,7 +296,7 @@
       -----
       P
 
-- EXERCISES: determine validity of the following arguments
+- EXERCISE 3: determine validity of the following arguments
 
     1. (¬S ∧ L) ∨ S
        S
@@ -333,7 +333,7 @@
     - satisfiable = an expression that can evaluate to T for at least some variable values
         - an expression is either satisfiable or a contradiction
 
-- EXERCISES: determine whether tautology, satisfiable, or contradiction
+- EXERCISE 4: determine whether tautology, satisfiable, or contradiction
 
     - P ∨ (Q ∨ ¬P)  [tautology]
     - P ∧ ¬(Q ∨ ¬Q) [contradiction]
@@ -391,7 +391,7 @@
       ¬Q ∨ (P ∨ P)   [by associativity]
       ¬Q ∨ P         [by identity]
 
-- EXERCISE: simplify the following expression as much as possible
+- EXERCISE 5: simplify the following expression as much as possible
 
     - ¬(P ∨ (Q ∨ ¬R)) ∧ Q
 
