@@ -412,6 +412,10 @@
 
 - TODO:
 
+# proofs (here? or later? or even before predicate logic?)
+
+- TODO:
+
 # sets
 
 - TODO:
