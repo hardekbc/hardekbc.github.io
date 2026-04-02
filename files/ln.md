@@ -238,11 +238,11 @@
 
         1. Joe is going to leave home and not come back.
         2. Either Bill is at work and Jane isn’t, or Jane is at work and Bill isn’t.
-        3. If today is Sunday, then I don’t have to go to work today.
+        3. I will go to the game if you give me a ticket or money to buy a ticket.
 
         1. L = joe leaving home; B = joe coming back ==> L ∧ ¬B
         2. B = bill at work; J = jane at work ==> (B ∧ ¬J) ∨ (¬B ∧ J)
-        3. S = today is Sunday; W = I have to work today ==> S → ¬W
+        3. G = go to game; T = ticket; M = money ==> (T ∨ M) → G
 
     - [translate from symbols to english]
 
@@ -270,10 +270,14 @@
         - 4² = 16
 
     - we don't have symbols for all of them because we don't need them
-    - ∧ ∨ ¬ is actually sufficient to express all possibilities (e.g., A → B === ¬A ∨ B [show via truth table])
-    - we have a few more common ones like ↔ and ⊕, but they are just a convenience
-        - A ↔ B ("A iff B") === (A → B) ∧ (B → A) === (¬A ∨ B) ∧ (¬B ∨ A)
-        - A ⊕ B ("A xor B") === (A ∧ ¬B) ∨ (¬A ∧ B) [show via truth table]
+
+        - ∧ ∨ ¬ is actually sufficient to express all possibilities
+            - e.g., A → B === ¬A ∨ B
+            - [show via truth table]
+
+        - we have a few other common ones like ↔ and ⊕, but they are just a convenience
+            - A ↔ B ("A iff B") === (A → B) ∧ (B → A) === (¬A ∨ B) ∧ (¬B ∨ A)
+            - A ⊕ B ("A xor B") === (A ∧ ¬B) ∨ (¬A ∧ B) [show via truth table]
 
 - EXERCISE 2: write out a truth table for the given expressions
 
