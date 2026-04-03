@@ -208,7 +208,7 @@
     - an important aspect of these arguments is that the _content_ of the argument doesn't matter, only the _form_
     - [redo examples using propositional variables]
 
-- NOTE: STOPPED HERE LAST LECTURE
+- [LECTURE 1 STOPPED HERE]
 
 - NOTE FOR STUDENTS:
     - we're learning a new language, so we're going to be introducing a lot of new terms and definitions
@@ -300,7 +300,7 @@
       -----
       P
 
-- EXERCISE 3: determine validity of the following arguments
+- EXERCISE 3: determine validity of the following arguments [SKIPPED]
 
     1. (¬S ∧ L) ∨ S
        S
@@ -337,7 +337,7 @@
     - satisfiable = an expression that can evaluate to T for at least some variable values
         - an expression is either satisfiable or a contradiction
 
-- EXERCISE 4: determine whether tautology, satisfiable, or contradiction
+- EXERCISE 4: determine whether tautology, satisfiable, or contradiction [SKIPPED]
 
     - P ∨ (Q ∨ ¬P)  [tautology]
     - P ∧ ¬(Q ∨ ¬Q) [contradiction]
@@ -382,6 +382,8 @@
 
     - contrapositive
         - A → B === ¬B → ¬A
+
+- [LECTURE 2 STOPPED HERE]
 
 - EXAMPLES
 
