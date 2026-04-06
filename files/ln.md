@@ -1,3 +1,17 @@
+# RETROSPECTIVE
+
+- cs40 won't be taught again, so these notes are more for applying to cs42 in the future
+
+- i think it's a mistake to rely entirely on lectures; what i should have done is assigned reading, then reviewed important points in lecture (and given examples and exercises)
+
+- think about whether it would be better to have weekly or semi-weekly assignments, in terms of how much material we can cover and interaction with quizzes
+
+- think about whether a series of in-class quizzes is the right thing to do
+
+- assignment 1 Q3(c) is missing parentheses to disambiguate between the ∨ and ∧ 
+
+- can/should i make the assignments completely online with gradescope?
+
 # SECOND LECTURE ANNOUNCEMENTS
 
 - i miscounted, there are 9 weekly assignments not 8
@@ -17,6 +31,8 @@
     - assignment must be done using LaTeX
         - more information in syllabus
         - TAs will give a quick tutorial in section
+
+    - DECISION: the class was split, i made the executive decision to not allow late submissions so that i can immediately give the solution
 
 # intro to course
 
@@ -383,7 +399,7 @@
     - contrapositive
         - A → B === ¬B → ¬A
 
-- [LECTURE 2 STOPPED HERE]
+- [LECTURE 2 STOPPED HERE; SKIPPED THE EXAMPLES AND EXERCISE BELOW]
 
 - EXAMPLES
 
@@ -397,12 +413,12 @@
       ¬Q ∨ (P ∨ P)   [by associativity]
       ¬Q ∨ P         [by identity]
 
-- EXERCISE 5: simplify the following expression as much as possible
+- EXERCISE 5: simplify the following expression as much as possible [USED FOR ASSIGN1]
 
-    - ¬(P ∨ (Q ∨ ¬R)) ∧ Q
+    - ¬(P ∨ (Q ∧ ¬R)) ∧ Q
 
     SOLUTION
-      (¬P ∧ ¬(Q ∨ ¬R)) ∧ Q      [by de morgan]
+      (¬P ∧ ¬(Q ∧ ¬R)) ∧ Q      [by de morgan]
       (¬P ∧ (¬Q ∨ ¬¬R)) ∧ Q     [by de morgan]
       (¬P ∧ (¬Q ∨ R)) ∧ Q       [by double negation]
       ¬P ∧ ((¬Q ∨ R) ∧ Q)       [by associativity]
@@ -410,14 +426,204 @@
       ¬P ∧ ((Q ∧ ¬Q) ∨ (Q ∧ R)) [by distributivity]
       ¬P ∧ (Q ∧ R)              [by contradiction]
 
+# sets and set operations
+
+- before we continue with logic, we'll take a brief detour to talk about _sets_
+
+    - sets underly many mathematical concepts we'll be discussing in this course
+    - including predicate logic, which makes propositional logic more powerful
+
+- DEFINITION: a set is an unordered collection of objects without repetition
+
+    - {1, 2, 3} = {3, 2, 1}
+    - {blue, apple, willow} = {apple, willow, blue, willow}
+
+- sets can contain other sets: {1, {1}, {{1}}}
+
+- sets can be finite or infinite (we'll talk a lot more about infinite sets later in the course)
+
+    - {0, 1, 2, ...}       = the set of natural numbers
+    - {..., -1, 0, 1, ...} = the set of integers
+
+- if an object is contained within a set, we say that it is an _element of_ that set
+
+    - 1 ∈ {1, 2, 3}
+    - 4 ̸∈ {1, 2, 3}
+
+- there are several sets that are so common in mathematics that they have their own symbols
+
+    - the empty set:   Φ or {}
+    - natural numbers: ℕ (also ℕ⁺)
+    - integers:        ℤ (also ℤ⁺, ℤ⁻) [from "Zahlen", german for "numbers"]
+    - rationals:       ℚ (ditto)      [from "quotient"]
+    - reals:           ℝ (ditto)
+    - complex:         ℂ (ditto)
+
+- two sets are _disjoint_ if they have no elements in common
+
+    - {1, 2} and {3, 4} are disjoint
+    - {1, 2} and {2, 3} are not disjoint
+
+- we can compare two sets using the _subset_ relation
+
+    - if all elements in A are also in B, then A ⊆ B
+    - if A ⊆ B and B ⊆ A then A = B
+
+    - {1, 2} ⊆ {1, 2, 3}
+    - {1, 2} ⊆ {1, 2}
+    - {} ⊆ X for any set X
+
+    - ⊆ is like ≤ except that for some pairs of sets, neither set is a subset of the other
+    - {1, 2} ̸⊆ {1, 3} and {1, 3} ̸⊆ {1, 2}
+
+- notation convention
+
+    - a common convention is to make variables representing sets upper-case letters and variables representing elements of sets lower-case letters
+    - it's just a convention, not a rule
+    - obviously doesn't completely work when we have sets that contain other sets
+
+- notice that a ∈ A and A ⊆ B are propositions, they are either true or false
+
+- how can we define our own sets? there are two basic ways:
+
+    - _enumeration_: list all of the elements
+        
+        - what if the set is infinite (or just really big)? 
+        - then list enough elements to establish a pattern, e.g., {1, 3, 5, 7, ...}
+        - note that this can still be ambiguous
+
+    - _set comprehension_: use propositions to describe a membership test
+
+        - {x | x is a positive odd integer}
+        - "the set of elements x _such that_ x is a positive odd integer"
+        - more symbolically: {x | x ∈ ℤ⁺ ∧ x is odd}
+            - we'll see how to define `odd` logically later, we'll need predicate logic for that
+        - note that `x` isn't special, we could use any variable
+
+- by default a set can contain _any_ kind of object; if we want to restrict ourselves to only certain kinds of objects then we need to define a _universe of discourse_
+
+- DEFINITION: a universe of discourse is the set containing all objects that are relevant to whatever we're doing
+
+    - notation: often we use `U` to represent a generic universe of discourse
+
+- let A = {x | x² < 9}; what are the elements of A?
+
+    - if U = ℕ then A = {0, 1, 2}
+    - if U = ℤ then A = {-2, -1, 0, 1, 2}
+    - if U = ℝ then A = (-3..3)
+
+- we can specify the universe of discourse directly in a set comprehension
+
+    - {x ∈ ℕ | x² < 9}
+    - {x ∈ ℤ | x² < 9}
+    - {x ∈ ℝ | x² < 9}
+
+- EXERCISE 6 (HTPI S1.3 exercise 7): list the elements of the following sets
+
+    - {x ∈ ℝ | 2x² + x - 1 = 0}   [-1, 0.5]
+    - {x ∈ ℝ⁺ | 2x² + x - 1 = 0}  [0.5]
+    - {x ∈ ℤ | 2x² + x - 1 = 0}   [-1]
+    - {x ∈ ℕ | 2x² + x - 1 = 0}   []
+
+- we can apply various operations on sets to get new sets
+
+    - intersection: A ∩ B = all elements that are in both A and in B
+        - x ∈ A ∩ B ↔ x ∈ A ∧ x ∈ B
+        - {1, 2, 3} ∩ {1, 2, 4} = {1, 2}
+        - {1, 2} ∩ {a, b} = {} (note that A and B are disjoint iff A ∩ B = {})
+        - {x ∈ ℤ | x² < 9} ∩ ℕ = {0, 1, 2}
+        - if X = {A, B, ...} whose elements are sets, ⋂ X = A ∩ B ∩ ...
+
+    - union: A ∪ B = all elements that are in either A or B
+        - x ∈ A ∪ B ↔ x ∈ A ∨ x ∈ B
+        - {1, 2, 3} ∪ {1, 2, 5} = {1, 2, 3, 4}
+        - {1, 2} ∪ {a, b} = {1, 2, a, b}
+        - {x ∈ ℤ | x² < 9} ∪ ℕ = {-2, -1, 0, 1, 2, 3, ...}
+        - if X = {A, B, ...} whose elements are sets, ⋃ X = A ∪ B ∪ ...
+
+    - complement: ¬A = all elements in U that aren't in A
+        - sometimes written as an overline instead of ¬ 
+        - requires a universe of discourse
+        - x ∈ ¬A ↔ ¬ x ∈ A
+        - U = ℕ: ¬{1, 2, 3} = {x | x = 0 ∨ x > 3}
+        - U = ℕ: ¬{} = ℕ 
+        - U = ℕ: ¬ℕ = {}
+
+    - set difference: A \ B = all elements in A that aren't in B
+        - x ∈ A \ B ↔ x ∈ A ∧ ¬ x ∈ B
+        - {1, 2, 3} \ {1, 2, 4} = {3}
+        - {1, 2} \ {a, b} = {1, 2}
+        - {1, 2} \ {1, 2, 3} = {}
+
+    - powerset: 𝒫(A) = the set of all subsets of A
+        - X ∈ 𝒫(A) ↔ X ⊆ A
+        - 𝒫({1, 2}) = {{}, {1}, {2}, {1, 2}}
+        - 𝒫({}) = {}
+        - {} ∈ 𝒫(A) for all sets A
+
+- EXERCISE 7 (HTPI S1.4 example 1.4.2): let A = {1, 2, 3, 4, 5} and B = {2, 4, 6, 8, 10}; list the elements of the following sets:
+
+    - A ∩ B               = {2, 4}
+    - A ∪ B               = {1, 2, 3, 4, 5, 6, 8, 10}
+    - A \ B               = {1, 3, 5}
+    - (A ∪ B) \ (A ∩ B)   = {1, 3, 5, 6, 8, 10}
+    - (A \ B) ∪ (B \ A)   = {1, 3, 5, 6, 8, 10}
+
+- given the connection between set operations and propositional logic, it shouldn't be surprising that they share many laws
+
+    - U is like True
+    - {} is like False
+    - ∩ is like ∧ 
+    - ∪ is like ∨ 
+    - ¬ is like ¬ 
+
+    - any propositional law using only True, False, and these connectives applies also to sets
+
+- NOTE: HMWK FROM HTPI 
+
+    - S1.4 examples 1.4.3, 1.4.4
+    - S1.4 exercises 1, 2, 5, 7, 9, 11, 13
+
 # predicate logic
+ 
+- TODO: (HTPI 1.3, 2.1, 2.2)
 
-- TODO:
+    - predicates
+    - truth sets
+        - tautologies
+        - contradictions
+    - quantifiers
+        - forall
+        - exists
+        - bounded quantifiers
+    - order of ∀ and ∃ matters
+    - order of ∀/∀ or ∃/∃ doesn't
+    - negation of quantifiers
 
-# proofs (here? or later? or even before predicate logic?)
+# proof methods
 
-- TODO:
+- TODO: (HTPI 3)
 
-# sets
+# relations
 
-- TODO:
+- TODO: (HTPI 4)
+
+# functions
+
+- TODO: (HTPI 5)
+
+# induction
+
+- TODO: (HTPI 6)
+
+# number theory
+
+- TODO: (HTPI 7)
+
+# infinite sets
+
+- TODO: (HTPI 8)
+
+# combinatorics
+
+- TODO: (LaP 20)
