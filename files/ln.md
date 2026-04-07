@@ -557,7 +557,7 @@
 
     - powerset: 𝒫(A) = the set of all subsets of A
         - X ∈ 𝒫(A) ↔ X ⊆ A
-        - 𝒫({1, 2}) = {{}, {1}, {2}, {1, 2}}
+        - 𝒫({1, 2}) = { {}, {1}, {2}, {1, 2} }
         - 𝒫({}) = {}
         - {} ∈ 𝒫(A) for all sets A
 
