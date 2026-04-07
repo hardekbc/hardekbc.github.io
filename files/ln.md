@@ -585,20 +585,129 @@
     - S1.4 exercises 1, 2, 5, 7, 9, 11, 13
 
 # predicate logic
- 
-- TODO: (HTPI 1.3, 2.1, 2.2)
 
-    - predicates
-    - truth sets
-        - tautologies
-        - contradictions
-    - quantifiers
-        - forall
-        - exists
-        - bounded quantifiers
-    - order of ∀ and ∃ matters
-    - order of ∀/∀ or ∃/∃ doesn't
-    - negation of quantifiers
+- propositional logic is useful, but limited: it cannot relate different propositions that are about the same thing
+
+    - A = `x > 10`; B = `x > 20`
+    - if we prove B, that doesn't help us prove A
+
+- predicate logic extends propositional logic to give us more expressive power
+
+- a _predicate_ is a function from an object to a proposition
+
+    - `P(x) = x > 10`   <-- predicate
+    - P(0) = 0 > 10     <-- proposition
+    - P(20) = 20 > 10   <-- proposition
+
+    - `Q(x) = x has been to the moon` <-- predicate
+    - Q(buzz aldrin)                  <-- proposition
+    - Q(ben hardekopf)                <-- proposition
+
+- notice that the body of a predicate is a proposition _except_ that it contains a variable standing for some argument
+
+- a predicate should have some universe of discourse U that says what kinds of objects can be given as arguments
+
+    - a predicate may be over integers, or sets, or people, or colors, or any other universe of discourse
+    - e.g., P's universe of discourse is ℕ, and Q's is people
+
+- a predicate can't have a truth table because it isn't a proposition (it has no truth value by itself)
+
+    - e.g., what is the truth value of `x > 10`? it depends on the value of x
+    - instead it has a _truth set_
+    - the set of objects that, given as an argument, yield a true proposition
+
+- EXAMPLE
+
+    - truth set of P = {11, 12, 13, ...}
+    - truth set of Q = {buzz aldrin, neil armstrong, ...}
+
+- sometimes we want to talk about _how many_ objects in U make a predicate true; we can do so using _quantifiers_
+
+    - `∀x, P(x)` means "for all objects o ∈ U, P(o) is true"
+    - `∃x, P(x)` means "there exists at least one object o ∈ U s.t. P(o) is true"
+
+    - U can be implicit, but we can also make it explicit similar to set comprehensions
+        - ∀x ∈ ℕ, P(x)
+        - ∃x ∈ ℕ, P(x)
+
+    - a predicate wrapped in a quantifier is a proposition (i.e., it has a truth value)
+    - note that the quantifier extends as far as possible: `∀x, P(x) ∧ Q(x)` = `∀x, (P(x) ∧ Q(x))`
+
+- EXAMPLE
+
+    - ∀x ∈ ℕ, x ≥ 0    [true]
+    - ∀x ∈ ℤ, x ≥ 0    [false]
+    - ∃x ∈ ℕ, x = 2    [true]
+    - ∃x ∈ ℕ, x < 0    [false]
+
+- EXERCISE (HTPI example 2.1.2): translate the following propositions into symbolic forms using quantifiers
+
+    1. Someone didn't do the homework.
+    2. Everything in that store is either overpriced or poorly made.
+    3. Nobody's perfect.
+    4. Susan likes everyone who dislikes Joe.
+
+- another view of quantifiers
+
+    - we can think of ∀ as a series of conjunctions over all objects in U
+    - we can think if ∃ as a series of disjunctions over all objects in U
+
+    - `∀x ∈ {1, 2, 3}, P(x)` == P(1) ∧ P(2) ∧ P(3)
+    - `∃x ∈ {1, 2, 3}, P(x)` == P(1) ∨  P(2) ∨ P(3)
+
+    - if U is infinite then we can't actually write out the conjunctions or disjunctions, that's why we need the quantifiers
+
+- we can have multiple quantifiers in a row, either the same or mixed
+
+    - ∀x ∈ ℕ, ∀y ∈ ℕ, x > y → (x - 1) ≥ y
+    - ∃x ∈ ℕ, ∃y ∈ ℕ, x ≤ y
+    - ∀x ∈ N, ∃y ∈ ℕ, x + 1 = y
+
+- for multiple of the same quantifier, order doesn't matter and we often collapse them into a single quantifier
+
+    - `∀x ∈ ℕ, y ∈ ℕ, x > y → (x - 1) ≥ y` = `∀y ∈ ℕ, x ∈ ℕ, x > y → (x - 1) ≥ y`
+    - `∃x ∈ ℕ, y ∈ ℕ, x ≤ y` = `∃x ∈ ℕ, y ∈ ℕ, x ≤ y`
+
+- if the quantifiers are mixed, order _does_ matter
+
+    - ∀x ∈ N, ∃y ∈ ℕ, x + 1 = y  [true]
+    - ∃y ∈ ℕ, ∀x ∈ N, x + 1 = y  [false]
+
+- CALL-BACKS
+
+    - earlier we said propositional can't express that `P = x > 10` and `Q = x > 20` are related
+        - ∀m,n,x ∈ ℤ, m > n ∧ x > m → x > n
+
+    - earlier we wanted to say "x is odd" symbolically but couldn't
+        - Odd(x) = ∃k ∈ ℕ, 2k + 1 = x
+
+- quantifier laws
+
+    - we can push negation through a quantifier in a way similar to de morgan's law
+        - pushing negation through ∀ flips to ∃ and through ∃ flips to ∀
+        - ¬ (∀x ∈ N, ∃y ∈ ℕ, x + 1 = y) = ∃x ∈ ℕ, ∀y ∈ ℕ, ¬ (x + 1 = y)   [or: x + 1 ≠ y]
+
+    - ∀ distributes over conjunction (which makes sense because it is a series of conjunctions)
+        - `∀x, P(x) ∧ Q(x)` = `(∀x, P(x)) ∧ (∀x, Q(x))`
+
+    - ∃ distributes over disjunction (which makes sense because it is a series of disjunctions)
+        - `∃x, P(x) ∨ Q(x)` = `(∃x, P(x)) ∨ (∃x, Q(x))`
+
+- EXERCISE (HTPI example 2.2.1): negate each statement
+
+    - A ⊆ B
+        - ∀x, x ∈ A → x ∈ B
+        - soln: ∃ x, x ∈ A ∧ x ̸∈ B
+    - Everyone has a relative they don't like.
+        - ∀x, ∃y, R(x,y) ∧ ¬L(x,y)
+        - soln: ∃x, ∀y, R(x,y) → L(x,y)
+
+- NOTE: HMWK FROM HTPI
+
+    - S2.1 examples 2.1.3, 2.1.4
+    - S2.1 exercises 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+    - S2.2 examples 2.2.2, 2.2.3
+    - S2.2 exercises 1, 2, 7, 8, 9, 10, 11, 12, 13, 14, 15
 
 # proof methods
 
