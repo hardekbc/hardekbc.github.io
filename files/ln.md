@@ -8,7 +8,10 @@
 
 - think about whether a series of in-class quizzes is the right thing to do
 
-- assignment 1 Q3(c) is missing parentheses to disambiguate between the ∨ and ∧ 
+- assignment 1 
+
+    - Q1(c) could be read as an imperative or a proposition (maybe add !)
+    - Q3(c) is missing parentheses to disambiguate between the ∨ and ∧ 
 
 - can/should i make the assignments completely online with gradescope?
 
@@ -369,11 +372,11 @@
         - (A ∧ B) ∧ C === A ∧ (B ∧ C)
         - (A ∨ B) ∨ C === A ∨ (B ∨ C)
 
-    - identity
+    - idempotent
         - A ∧ A === A
         - A ∨ A === A
 
-    - domination
+    - identity
         - False ∧ A === False
         - True ∨ A === True
 
@@ -642,10 +645,15 @@
 
 - EXERCISE (HTPI example 2.1.2): translate the following propositions into symbolic forms using quantifiers
 
-    1. Someone didn't do the homework.
+    1. Someone didn't do the homework. 
+        - soln: `∃x, ¬H(x)`
     2. Everything in that store is either overpriced or poorly made.
+        - soln: `∀x ∈ StoreItems, Overpriced(x) ∨ Poorly-made(x)`
+        -   or: `∀x, InStore(x) → Overpriced(x) ∨ Poorly-made(x)`
     3. Nobody's perfect.
+        - soln: `¬∃x, Perfect(x)`
     4. Susan likes everyone who dislikes Joe.
+        - soln: `∀x, ¬Likes(x, Joe) → Likes(Susan, x)`
 
 - another view of quantifiers
 
@@ -676,16 +684,16 @@
 - CALL-BACKS
 
     - earlier we said propositional can't express that `P = x > 10` and `Q = x > 20` are related
-        - ∀m,n,x ∈ ℤ, m > n ∧ x > m → x > n
+        - `∀m,n,x ∈ ℤ, m > n ∧ x > m → x > n`
 
     - earlier we wanted to say "x is odd" symbolically but couldn't
-        - Odd(x) = ∃k ∈ ℕ, 2k + 1 = x
+        - `Odd(x) = ∃k ∈ ℕ, 2k + 1 = x`
 
 - quantifier laws
 
     - we can push negation through a quantifier in a way similar to de morgan's law
         - pushing negation through ∀ flips to ∃ and through ∃ flips to ∀
-        - ¬ (∀x ∈ N, ∃y ∈ ℕ, x + 1 = y) = ∃x ∈ ℕ, ∀y ∈ ℕ, ¬ (x + 1 = y)   [or: x + 1 ≠ y]
+        - `¬ (∀x ∈ N, ∃y ∈ ℕ, x + 1 = y)` = `∃x ∈ ℕ, ∀y ∈ ℕ, ¬ (x + 1 = y)` [or: `x + 1 ≠ y`]
 
     - ∀ distributes over conjunction (which makes sense because it is a series of conjunctions)
         - `∀x, P(x) ∧ Q(x)` = `(∀x, P(x)) ∧ (∀x, Q(x))`
@@ -696,11 +704,11 @@
 - EXERCISE (HTPI example 2.2.1): negate each statement
 
     - A ⊆ B
-        - ∀x, x ∈ A → x ∈ B
-        - soln: ∃ x, x ∈ A ∧ x ̸∈ B
+        - `∀x, x ∈ A → x ∈ B`
+        - soln: `∃ x, x ∈ A ∧ x ̸∈ B`
     - Everyone has a relative they don't like.
-        - ∀x, ∃y, R(x,y) ∧ ¬L(x,y)
-        - soln: ∃x, ∀y, R(x,y) → L(x,y)
+        - `∀x, ∃y, R(x,y) ∧ ¬L(x,y)`
+        - soln: `∃x, ∀y, R(x,y) → L(x,y)`
 
 - NOTE: HMWK FROM HTPI
 
@@ -710,8 +718,258 @@
     - S2.2 exercises 1, 2, 7, 8, 9, 10, 11, 12, 13, 14, 15
 
 # proof methods
+## intro
 
-- TODO: (HTPI 3)
+- we've looked at propositional and predicate logic and how to precisely specify definitions and properties
+
+- we've also seen how to prove statements and arguments for propositional logic using truth tables
+
+- the truth table-based approach doesn't scale or generalize
+
+    - as we add more variables, tables become exponentially larger
+    - tables don't work for predicate logic at all (infinite sets)
+
+- we're going to look now at how to prove logical statements without regard to truth tables or any other external means
+
+    - we'll rely on laws of reasoning that allow us to manipulate statements symbolically
+
+    - remember that sometimes it's appropriate to formulate and prove something purely symbolically, and other times it's appropriate to formulate and prove them non-formally but still rigorously
+
+    - regardless of which approach we use, we're still following the same laws of reasoning that we'll talk about now
+
+    - i'll be presenting the rules themselves symbolically because it's easier to list and categorize them that way, but the proofs will mainly be non-formal (but still rigorous, i.e., following the rules)
+
+- an important thing to keep in mind:
+
+    - there is no mechanical process by which we can take a statement and create a proof for that statement (we talked about this fact last class)
+
+    - non-trivial proofs will take some thought and creativity to figure out the right approach; often it requires some trial-and-error, hitting dead ends and backtracking to try a different approach
+
+    - i'll be giving you the tools you need, but learning how to apply those tools the right way takes practice
+
+- what are we trying to prove, and what is a proof exactly?
+
+    - a theorem is a list of assumptions (the "hypotheses" or "givens") and a conclusion (or "goal")
+    
+        - these are all propositions (including quantified propositions)
+
+    - a theorem is _true_ if, whenever all the givens are true, so is the goal
+
+    - a proof is a valid deductive argument that shows how the goal must necessarily follow from the givens
+
+- EXAMPLE (HTPI example 3.1.1)
+
+    Let `x` and `y` be integers. Suppose `x > 3` and `y < 2`. Then `x² - 2y > 5`.
+
+    Symbolically:
+    `∀x,y ∈ ℤ, x > 3 ∧ y < 2 → x² - 2y > 5`
+
+    Given:
+    - x,y ∈ ℤ 
+    - x > 3
+    - y < 2
+    
+    ⊢ x² - 2y > 5
+
+    Proof:
+    - x² - 2y is smallest when x² is smallest and 2y is largest
+    - x² is smallest when x is smallest (for positive x)
+    - the smallest value of x is 4
+    - 2y is largest when y is largest
+    - the largest value of y is 1
+    - 4² - 2(1) = 16 - 2 = 14 > 5
+    - all larger values of x and smaller values of y must increase x² - 2y
+    - ∴ x² - 2y > 5
+
+- notice in the example proof that i didn't justify the statements that `x² - 2y` is smallest when `x²` is smallest and `2y` is largest, or that `x²` is smallest when `x` is smallest, or that `2y` is largest when `y` is largest
+
+    - i took them as known algebraic facts that i don't have to justify
+
+    - if i were doing the proof from scratch then i would need to actually prove those statements
+
+    - so when is justification necessary and when is it not?
+
+        - it depends on your audience and the context you're doing the proof in
+        - it's a judgement call you need to make
+        - you also have to be careful, e.g., if we allow `x` to be negative then the statement about `x²` is actually wrong
+
+- we can also prove that a theorem is false by providing a _counterexample_, i.e., an example where the assumptions are all true but the conclusion is false
+
+    Let `x` and `y` be integers. Suppose `x > 3`. Then `x² - 2y > 5`.
+
+    Symbolically:
+    `∀x,y ∈ ℤ, x > 3 → x² - 2y > 5`
+
+    COUNTER-EXAMPLE: x = 4 and y = 8
+
+## conjunction as goal
+
+- TODO: (HTPI 3.4)
+
+## conjunction as given
+
+- TODO: (HTPI 3.4)
+
+## disjunction as goal
+
+- TODO: (HTPI 3.5)
+
+## disjunction as given
+
+- TODO: (HTPI 3.5)
+
+## implication as goal
+
+- to prove a goal P → Q, assume P is true and then prove Q
+
+    - assuming P is true means adding it to your list of givens
+
+    - Givens:
+      - ⋮
+      ⊢ P → Q
+
+      === APPLY RULE ===
+
+      Givens:
+      - ⋮
+      - P
+      ⊢ Q
+
+    - this rule doesn't tell you how to complete the proof, it only gives you one step along the way...the next steps would be determined by the form of Q and/or the form of the new given P
+
+- why does this rule work?
+
+    - remember that P → Q is automatically true whenever P is false, so we don't care about that case
+
+    - the only time P → Q can be false is if P is true but Q is false
+
+    - so if we assume P is true and can prove that Q is also true, then P → Q must be true
+
+- EXAMPLE (HTPI example 3.1.2)
+
+    Let `a` and `b` be real numbers. Prove that if `0 < a < b` then `a² < b²`.
+
+    Symbolically:
+    ∀a,b ∈ ℝ, 0 < a ∧ a < b → a² < b²
+
+    Givens:
+    - a,b ∈ ℝ 
+    
+    ⊢ 0 < a < b → a² < b²
+
+    [APPLY RULE]
+
+    Givens:
+    - a,b ∈ ℝ 
+    - 0 < a < b
+    
+    ⊢ a² < b²
+
+    the form of the goal suggests multiplying `0 < a < b` by `a` and (separately) by `b`. since a and b must be positive, we can do the multiplications without swapping the inequality.
+
+    Givens:
+    - a,b ∈ ℝ 
+    - 0 < a < b
+    - 0 < a² < ab
+    - 0 < ab < b²
+    
+    ⊢ a² < b²
+
+    Since a² < ab and ab < b², a² < b².
+
+    === IN PROSE FORM ===
+
+    suppose `0 < a < b`. multiplying `0 < a < b` by `a` (which is positive) yields `0 < a² < ab`. multiplying `0 < a < b` by `b` (which is also positive) yields `0 < ab < b²`. therefore `a² < ab < b²`, so `a² < b²`.
+
+- notice about the the prose proof:
+
+    - it follows the same rule ("suppose `0 < a < b`..."), but you have to be aware of what is going on and why it works...it doesn't spell it out explicitly
+
+    - it doesn't explain why it does what it does, there is no description of the though process behind the proof; only the final argument
+
+    - the purpose of a proof is to provide an argument, not explain how that argument was arrived at; maybe the prover tried a number of different things before hitting on the one that worked, but those other tries aren't included in the final proof
+
+- for your proofs, they should usually include more "scratch work" and explanation than you would see in a math paper or textbook proof
+
+    - this allows us to follow what you were thinking and award partial credit if applicable
+
+- also notice that we can use the propositional laws to rewrite goals before proving them
+
+    - ⊢ P → Q ≡ ¬Q → ¬P
+    - then apply our rule
+
+- EXAMPLE (HTPI example 3.1.3)
+
+    Suppose `a`, `b`, and `c` are real numbers and `a > b`. Prove that if `ac ≤ bc` then `c ≤ 0`.
+
+    Symbolically:
+        `∀a,b,c ∈ ℝ, a > b → ac ≤ bc → c ≤ 0`
+
+    Givens:
+    - a,b,c ∈ ℝ 
+    ⊢ a > b → ac ≤ bc → c ≤ 0
+
+    [APPLY RULE]
+
+    Givens:
+    - a,b,c ∈ ℝ 
+    - a > b
+    ⊢ ac ≤ bc → c ≤ 0
+
+    [CONTRAPOSITIVE OF GOAL]
+
+    Givens:
+    - a,b,c ∈ ℝ 
+    - a > b
+    ⊢ c > 0 → ac > bc
+
+    [APPLY RULE]
+
+    Givens:
+    - a,b,c ∈ ℝ 
+    - a > b
+    - c > 0
+    ⊢ ac > bc
+
+    since `c` is positive, we can multiple `a > b` by `c` without swapping the inequality, yielding the goal
+
+    === PROSE PROOF ===
+
+    We prove the contrapositive. suppose c > 0. then we can multiply `a > b` by `c` and conclude that `ac > bc`. therefore if `ac ≤ bc` then `c ≤ 0`.
+
+- how did we know to use the contrapositive instead of proving the theorem directly? we tried both ways, and the second one works.
+
+## implication as given
+
+- TODO: (HTPI 3.2?)
+
+## biconditionals
+
+- TODO: (HTPI 3.4)
+
+## negation as goal
+
+- TODO: (HTPI 3.2)
+
+## negation as given
+
+- TODO: (HTPI 3.2)
+
+## ∀ as goal
+
+- TODO: (HTPI 3.3)
+
+## ∀ as given
+
+- TODO: (HTPI 3.3)
+
+## ∃ as goal
+
+- TODO: (HTPI 3.3)
+
+## ∃ as given
+
+- TODO: (HTPI 3.3)
 
 # relations
 
