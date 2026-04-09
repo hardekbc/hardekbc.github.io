@@ -582,11 +582,6 @@
 
     - any propositional law using only True, False, and these connectives applies also to sets
 
-- NOTE: HMWK FROM HTPI 
-
-    - S1.4 examples 1.4.3, 1.4.4
-    - S1.4 exercises 1, 2, 5, 7, 9, 11, 13
-
 # predicate logic
 
 - propositional logic is useful, but limited: it cannot relate different propositions that are about the same thing
@@ -712,10 +707,10 @@
 
 - NOTE: HMWK FROM HTPI
 
-    - S2.1 examples 2.1.3, 2.1.4
-    - S2.1 exercises 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
-    - S2.2 examples 2.2.2, 2.2.3
-    - S2.2 exercises 1, 2, 7, 8, 9, 10, 11, 12, 13, 14, 15
+    - S2.1 examples 2.1.4
+    - S2.1 exercises 2, 3, (8,9,10)
+    - S2.2 examples 2.2.3
+    - S2.2 exercises (8,10), (11,12,14)
 
 # proof methods
 ## intro
