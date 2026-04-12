@@ -705,13 +705,6 @@
         - `∀x, ∃y, R(x,y) ∧ ¬L(x,y)`
         - soln: `∃x, ∀y, R(x,y) → L(x,y)`
 
-- NOTE: HMWK FROM HTPI
-
-    - S2.1 examples 2.1.4
-    - S2.1 exercises 2, 3, (8,9,10)
-    - S2.2 examples 2.2.3
-    - S2.2 exercises (8,10), (11,12,14)
-
 # proof methods
 ## intro
 
@@ -742,6 +735,8 @@
 
     - i'll be giving you the tools you need, but learning how to apply those tools the right way takes practice
 
+- NOTE: STOPPED HERE LAST LECTURE
+
 - what are we trying to prove, and what is a proof exactly?
 
     - a theorem is a list of assumptions (the "hypotheses" or "givens") and a conclusion (or "goal")
@@ -752,35 +747,49 @@
 
     - a proof is a valid deductive argument that shows how the goal must necessarily follow from the givens
 
-- EXAMPLE (HTPI example 3.1.1)
+    - sometimes a theorem is called a "lemma" or "corollary"; these are all really the same thing, just with different connotations
 
-    Let `x` and `y` be integers. Suppose `x > 3` and `y < 2`. Then `x² - 2y > 5`.
+        - "lemma" implies the theorem isn't interesting for its own sake, only as a helper for proving some other theorem
 
-    Symbolically:
-    `∀x,y ∈ ℤ, x > 3 ∧ y < 2 → x² - 2y > 5`
+        - "corollary" implies that the prove is a trivial application of an already-proved theorem
 
-    Given:
-    - x,y ∈ ℤ 
-    - x > 3
-    - y < 2
-    
-    ⊢ x² - 2y > 5
+        - when in doubt, just use "theorem"
 
-    Proof:
-    - x² - 2y is smallest when x² is smallest and 2y is largest
-    - x² is smallest when x is smallest (for positive x)
-    - the smallest value of x is 4
-    - 2y is largest when y is largest
-    - the largest value of y is 1
-    - 4² - 2(1) = 16 - 2 = 14 > 5
-    - all larger values of x and smaller values of y must increase x² - 2y
-    - ∴ x² - 2y > 5
+- EXAMPLE (adapted from HTPI example 3.1.1)
 
-- notice in the example proof that i didn't justify the statements that `x² - 2y` is smallest when `x²` is smallest and `2y` is largest, or that `x²` is smallest when `x` is smallest, or that `2y` is largest when `y` is largest
+```
+Let x and y be integers. Suppose x ≥ 3 and y ≤ 2. Then x² - 2y ≥ 5.
+
+Symbolically:
+∀x,y ∈ ℤ, x ≥ 3 ∧ y ≤ 2 → x² - 2y ≥ 5
+
+Given:
+- x ∈ ℤ
+- y ∈ ℤ 
+- x ≥ 3
+- y ≤ 2
+⊢ x² - 2y ≥ 5
+
+Proof:
+- x² - 2y is smallest when x² is smallest and 2y is largest
+- x² is smallest when x is smallest (for positive x)
+- the smallest value of x is 3
+- 2y is largest when y is largest
+- the largest value of y is 2
+- 3² - 2(2) = 9 - 4 = 5, which is ≥ 5
+- all larger values of x and smaller values of y must increase x² - 2y
+- QED
+```
+
+- notice that the theorem is given without using logical symbols; we needed to translate it (in our heads, if not explicitly) into logic to see exactly what we're proving
+
+    - this is common in non-formal proofs; the reader is expected to understand what the underlying logic is without it being made explicit
+
+    - in this class we will constantly refer to the logical formulation of a statement because it makes it much more clear how to approach proving it (at least until the ideas become familiar enough that it isn't necessary anymore)
+
+- also notice in the example proof that i didn't justify the statements that `x² - 2y` is smallest when `x²` is smallest and `2y` is largest, or that `x²` is smallest when `x` is smallest, or that `2y` is largest when `y` is largest
 
     - i took them as known algebraic facts that i don't have to justify
-
-    - if i were doing the proof from scratch then i would need to actually prove those statements
 
     - so when is justification necessary and when is it not?
 
@@ -788,49 +797,46 @@
         - it's a judgement call you need to make
         - you also have to be careful, e.g., if we allow `x` to be negative then the statement about `x²` is actually wrong
 
-- we can also prove that a theorem is false by providing a _counterexample_, i.e., an example where the assumptions are all true but the conclusion is false
+- we can prove that a theorem is false by providing a _counterexample_, i.e., an example where the assumptions are all true but the conclusion is false
 
-    Let `x` and `y` be integers. Suppose `x > 3`. Then `x² - 2y > 5`.
+```
+Let x and y be integers. Suppose x ≥ 3 and y ≤ 2. Then x² - 2y > 5.
 
-    Symbolically:
-    `∀x,y ∈ ℤ, x > 3 → x² - 2y > 5`
+Symbolically:
+`∀x,y ∈ ℤ, x ≥ 3 ∧ y ≤ 2 → x² - 2y > 5`
 
-    COUNTER-EXAMPLE: x = 4 and y = 8
+COUNTER-EXAMPLE: x = 3 and y = 2
+```
 
-## conjunction as goal
+- i'll be giving you a bunch of rules for how to prove things that use different logical connectives, both as goals (things to prove) and as givens (things we can assume are true)
 
-- TODO: (HTPI 3.4)
+- for each one i'll give example proofs that demonstrate how to apply these rules
 
-## conjunction as given
+- the end goal is for you to be able to write your own proofs
 
-- TODO: (HTPI 3.4)
+    - this only comes with practice
 
-## disjunction as goal
+    - for the next assignment and quiz you won't need to write proofs from scratch, but for all assignments/quizzes after that you may be required to
 
-- TODO: (HTPI 3.5)
-
-## disjunction as given
-
-- TODO: (HTPI 3.5)
-
-## implication as goal
+## implication
+### as goal
 
 - to prove a goal P → Q, assume P is true and then prove Q
 
     - assuming P is true means adding it to your list of givens
 
-    - Givens:
-      - ⋮
-      ⊢ P → Q
+```
+Givens:
+  ⋮
+⊢ P → Q
 
-      === APPLY RULE ===
+[APPLY → GOAL RULE]
 
-      Givens:
-      - ⋮
-      - P
-      ⊢ Q
-
-    - this rule doesn't tell you how to complete the proof, it only gives you one step along the way...the next steps would be determined by the form of Q and/or the form of the new given P
+Givens:
+  ⋮
+  P
+⊢ Q
+```
 
 - why does this rule work?
 
@@ -840,47 +846,75 @@
 
     - so if we assume P is true and can prove that Q is also true, then P → Q must be true
 
+- EXAMPLE (propositional)
+
+```
+Prove that P → (P → P).
+
+Givens: none
+⊢ P → (P → P)
+
+[APPLY → GOAL RULE]
+
+Givens:
+- P
+⊢ P → P
+
+[APPLY → GOAL RULE]
+
+Givens:
+- P
+⊢ P
+
+QED
+```
+
 - EXAMPLE (HTPI example 3.1.2)
 
-    Let `a` and `b` be real numbers. Prove that if `0 < a < b` then `a² < b²`.
+```
+Let a and b be real numbers. Prove that if 0 < a < b then a² < b².
 
-    Symbolically:
-    ∀a,b ∈ ℝ, 0 < a ∧ a < b → a² < b²
+Symbolically:
+∀a,b ∈ ℝ, 0 < a < b → a² < b²
 
-    Givens:
-    - a,b ∈ ℝ 
-    
-    ⊢ 0 < a < b → a² < b²
+Givens:
+- a,b ∈ ℝ 
+⊢ 0 < a < b → a² < b²
 
-    [APPLY RULE]
+[APPLY → GOAL RULE]
 
-    Givens:
-    - a,b ∈ ℝ 
-    - 0 < a < b
-    
-    ⊢ a² < b²
+Givens:
+- a,b ∈ ℝ 
+- 0 < a < b
+⊢ a² < b²
 
-    the form of the goal suggests multiplying `0 < a < b` by `a` and (separately) by `b`. since a and b must be positive, we can do the multiplications without swapping the inequality.
+[the form of the goal suggests multiplying `0 < a < b` by `a` and (separately) 
+by `b`. since a and b must be positive, we can do the multiplications without
+swapping the inequality.]
 
-    Givens:
-    - a,b ∈ ℝ 
-    - 0 < a < b
-    - 0 < a² < ab
-    - 0 < ab < b²
-    
-    ⊢ a² < b²
+Givens:
+- a,b ∈ ℝ 
+- 0 < a < b
+- 0 < a² < ab
+- 0 < ab < b²
+⊢ a² < b²
 
-    Since a² < ab and ab < b², a² < b².
+Since a² < ab and ab < b², a² < b². QED
 
-    === IN PROSE FORM ===
+=== PROSE PROOF ===
 
-    suppose `0 < a < b`. multiplying `0 < a < b` by `a` (which is positive) yields `0 < a² < ab`. multiplying `0 < a < b` by `b` (which is also positive) yields `0 < ab < b²`. therefore `a² < ab < b²`, so `a² < b²`.
+suppose 0 < a < b. multiplying 0 < a < b by a (which is positive) yields 
+0 < a² < ab. multiplying 0 < a < b by b (which is also positive) yields 
+0 < ab < b². therefore a² < ab < b², so a² < b².
+```
 
 - notice about the the prose proof:
 
     - it follows the same rule ("suppose `0 < a < b`..."), but you have to be aware of what is going on and why it works...it doesn't spell it out explicitly
 
-    - it doesn't explain why it does what it does, there is no description of the though process behind the proof; only the final argument
+    - it doesn't explain why it does what it does, there is no description of the thought process behind the proof; only the final argument
+
+    - the prose proof is much shorter and less detailed than the scratch proof
 
     - the purpose of a proof is to provide an argument, not explain how that argument was arrived at; maybe the prover tried a number of different things before hitting on the one that worked, but those other tries aren't included in the final proof
 
@@ -888,104 +922,1288 @@
 
     - this allows us to follow what you were thinking and award partial credit if applicable
 
+    - you don't necessarily need to always translate into symbolic form and show exactly which rules you're applying at each step (but again it can help, especially when you're getting started)
+
+        - i'm showing how the givens and goals evolve at each step because i want to make it very easy to follow what's happening
+
+        - if we were using a proof assistant like lean, it would take care of this for us automatically
+
 - also notice that we can use the propositional laws to rewrite goals before proving them
 
-    - ⊢ P → Q ≡ ¬Q → ¬P
+    - ⊢ P → Q ≡ ⊢ ¬Q → ¬P
     - then apply our rule
 
 - EXAMPLE (HTPI example 3.1.3)
 
-    Suppose `a`, `b`, and `c` are real numbers and `a > b`. Prove that if `ac ≤ bc` then `c ≤ 0`.
+```
+Suppose a, b, and c are real numbers and a > b. Prove that if ac ≤ bc then c ≤ 0.
 
-    Symbolically:
-        `∀a,b,c ∈ ℝ, a > b → ac ≤ bc → c ≤ 0`
+Symbolically:
+∀a,b,c ∈ ℝ, a > b → ac ≤ bc → c ≤ 0
 
-    Givens:
-    - a,b,c ∈ ℝ 
-    ⊢ a > b → ac ≤ bc → c ≤ 0
+Givens:
+- a,b,c ∈ ℝ 
+- a > b
+⊢ ac ≤ bc → c ≤ 0
 
-    [APPLY RULE]
+[CONTRAPOSITIVE OF GOAL]
 
-    Givens:
-    - a,b,c ∈ ℝ 
-    - a > b
-    ⊢ ac ≤ bc → c ≤ 0
+Givens:
+- a,b,c ∈ ℝ 
+- a > b
+⊢ c > 0 → ac > bc
 
-    [CONTRAPOSITIVE OF GOAL]
+[APPLY RULE]
 
-    Givens:
-    - a,b,c ∈ ℝ 
-    - a > b
-    ⊢ c > 0 → ac > bc
+Givens:
+- a,b,c ∈ ℝ 
+- a > b
+- c > 0
+⊢ ac > bc
 
-    [APPLY RULE]
+[since c is positive, we can multiple a > b by c without swapping the inequality,
+yielding the goal]
 
-    Givens:
-    - a,b,c ∈ ℝ 
-    - a > b
-    - c > 0
-    ⊢ ac > bc
+Givens:
+- a,b,c ∈ ℝ 
+- a > b
+- c > 0
+- ac > bc
+⊢ ac > bc
 
-    since `c` is positive, we can multiple `a > b` by `c` without swapping the inequality, yielding the goal
+QED
 
-    === PROSE PROOF ===
+=== PROSE PROOF ===
 
-    We prove the contrapositive. suppose c > 0. then we can multiply `a > b` by `c` and conclude that `ac > bc`. therefore if `ac ≤ bc` then `c ≤ 0`.
+We prove the contrapositive. suppose c > 0. then we can multiply a > b by c 
+and conclude that ac > bc. therefore if ac ≤ bc then c ≤ 0. QED
+```
 
 - how did we know to use the contrapositive instead of proving the theorem directly? we tried both ways, and the second one works.
 
-## implication as given
+### as given
 
-- TODO: (HTPI 3.2?)
+- to use a given P → Q, you can use a given P to derive a new given Q
 
-## biconditionals
+    - if there is no given P, you may have to prove it first in order to make it a given
 
-- TODO: (HTPI 3.4)
+    - as with the → goal you can apply logical laws to givens: if you have a given ¬Q, then you can rewrite P → Q as ¬Q → ¬P and then use ¬Q to conclude ¬P
 
-## negation as goal
+```
+Givens:
+- P → Q
+- P
+⊢ …
 
-- TODO: (HTPI 3.2)
+[APPLY → GIVEN RULE]
 
-## negation as given
+Givens:
+- P → Q
+- P
+- Q
+⊢ …
+```
 
-- TODO: (HTPI 3.2)
+- why does this rule work? because we know that P → Q can only be true if, whenever P is true, Q must also be true. since we know that P → Q is true and P is true (because they are givens), Q must also be true
 
-## ∀ as goal
+- EXAMPLE
 
-- TODO: (HTPI 3.3)
+```
+suppose A → B and B → C and A. Prove C.
 
-## ∀ as given
+Givens:
+- A → B
+- B → C
+- A
+⊢ C
 
-- TODO: (HTPI 3.3)
+[APPLY → GIVEN RULE]
 
-## ∃ as goal
+Givens:
+- A → B
+- B → C
+- A
+- B
+⊢ C
 
-- TODO: (HTPI 3.3)
+[APPLY → GIVEN RULE]
 
-## ∃ as given
+Givens:
+- A → B
+- B → C
+- A
+- B
+- C
+⊢ C
 
-- TODO: (HTPI 3.3)
+QED
 
-# relations
+=== PROSE PROOF ===
 
-- TODO: (HTPI 4)
+since A → B and A, then B. since B → C and B, then C. QED
+```
 
-# functions
+## negation
+### as goal (v1)
 
-- TODO: (HTPI 5)
+- to prove a goal ⊢ ¬P, first try to use logical laws to reexpress the goal as something positive
 
-# induction
+    - negatives can be hard to work with; if we can get rid of the negative the result will often be easier
 
-- TODO: (HTPI 6)
+- EXAMPLE (HTPI example 3.2.1)
 
-# number theory
+```
+Suppose A ∩ C ⊆ B and a ∈ C. Prove that a ̸∈ A \ B.
 
-- TODO: (HTPI 7)
+Symbolically:
+A ∩ C ⊆ B ∧ a ∈ C → a ̸∈ A \ B
 
-# infinite sets
+Givens:
+- A ∩ C ⊆ B
+- a ∈ C
+⊢ a ̸∈ A \ B
 
-- TODO: (HTPI 8)
+[REWRITE GOAL]
 
-# combinatorics
+Givens:
+- A ∩ C ⊆ B
+- a ∈ C
+⊢ ¬ (a ∈ A ∧ a ̸∈ B)
+=> ⊢ a ̸∈ A ∨ a ∈ B
+=> ⊢ a ∈ A → a ∈ B
 
-- TODO: (LaP 20)
+[APPLY → GOAL RULE]
+
+Givens:
+- A ∩ C ⊆ B
+- a ∈ C
+- a ∈ A
+⊢ a ∈ B
+
+[since a ∈ A and a ∈ C, a ∈ A ∩ C by definition of ∩]
+
+Givens:
+- A ∩ C ⊆ B
+- a ∈ C
+- a ∈ A
+- a ∈ A ∩ C
+⊢ a ∈ B
+
+[definition of ⊆]
+
+Givens:
+- A ∩ C ⊆ B
+- a ∈ C
+- a ∈ A
+- a ∈ A ∩ C
+- a ∈ B
+⊢ a ∈ B
+
+QED
+
+=== PROSE PROOF ===
+
+suppose a ∈ A. then since a ∈ C, a ∈ A ∩ C. but then since A ∩ C ⊆ B, it follows
+that a ∈ B. thus, it cannot be the case that a ∈ A but a ̸∈ B, so a ̸∈ A \ B.
+```
+
+### as goal (v2)
+
+- if we cannot remove the negation, the solution is usually to do proof by contradiction
+
+- proof by contradiction: if trying to prove P, assume ¬P and derive a contradiction; thus P
+
+    - note that if our goal is ¬P, then we assume P (i.e., ¬¬P)
+
+    - what is a contradiction in proof terms? proving that some proposition Q is true and proving that Q is false at the same time
+
+    - note that the contradiction doesn't have to be about P itself, it may involve something that we derive from P
+
+- why does this rule work?
+
+    - we know that a proposition is either true or false
+
+    - if it being false yields a contradiction, then it cannot be false
+
+    - therefore it must be true
+
+```
+Givens:
+  ⋮
+⊢ ¬P
+
+[APPLY PROOF BY CONTRADICTION]
+
+Givens:
+  ⋮
+  P
+⊢ False
+```
+
+- EXAMPLE (HTPI example 3.2.2)
+
+```
+let x, y be integers, x² + y = 13, and y ≠ 4. prove x ≠ 3.
+
+Symbolically:
+∀x,y ∈ ℤ, x² + y = 13 ∧ y ≠ 4 → x ≠ 3
+
+Givens:
+- x ∈ ℤ 
+- y ∈ ℤ 
+- x² + y = 13
+- y ≠ 4
+⊢ x ≠ 3
+
+[we can't remove the negation in the goal, so use proof by contradiction]
+
+Givens:
+- x ∈ ℤ 
+- y ∈ ℤ 
+- x² + y = 13
+- y ≠ 4
+- x = 3
+⊢ False
+
+[we need to derive a contradiction...first substitute 3 for x]
+
+Givens:
+- x ∈ ℤ 
+- y ∈ ℤ 
+- 3² + y = 13
+- y ≠ 4
+- x = 3
+⊢ False
+
+[then solve for y]
+
+Givens:
+- x ∈ ℤ 
+- y ∈ ℤ 
+- y = 4
+- y ≠ 4
+- x = 3
+⊢ False
+
+QED
+
+=== PROSE PROOF ===
+
+we will prove by contradiction that x ≠ 3. suppose x = 3. then substituting for 
+x in x² + y = 13 yields 9 + y = 13, which means y = 4. but this contradicts our
+assumption that y ≠ 4. hence x ≠ 3.
+```
+
+- proof by contradiction lets us remove a negated goal by making it a non-negated given, but it leaves us with a very vague goal: derive _some_ contradiction
+
+    - it's up to us to figure out what contradiction that might be
+
+### as given
+
+- as with goals, it is often useful to re-express a negated given in a positive form if possible
+
+- if doing a proof by contradiction, it's a good idea to look carefully at the list of givens and try to find something of the form ¬Q (for some Q), and then try to derive Q as a contradiction
+
+    - if there is no ¬Q, maybe there is a way to derive ¬Q (e.g., if we have the given P → ¬Q, then we could prove P to get ¬Q)
+
+### more on proof by contradiction
+
+- we introduced proof by contradiction as a way to prove a negated goal, but we can actually use it for any goal
+
+    - this is part of the "creativity" requirement for proving things---there isn't any obvious sign that proof by contradiction would be useful, you just have to figure it out by trial and error or intuition
+
+- EXAMPLE (HTPI example 3.2.3)
+
+```
+suppose A \ B ⊆ C and x is anything. prove that if x ∈ A \ C then x ∈ B.
+
+Symbolic:
+A \ B ⊆ C → ∀x, x ∈ A \ C → x ∈ B
+
+Givens:
+- A \ B ⊆ C
+- object x
+⊢ x ∈ A \ C → x ∈ B
+
+[APPLY → GOAL RULE]
+
+Givens:
+- A \ B ⊆ C
+- object x
+- x ∈ A \ C
+⊢ x ∈ B
+
+[the form of the goal doesn't use any logical connectives, so it isn't clear 
+what to do...so we try proof by contradiction]
+
+Givens:
+- A \ B ⊆ C
+- object x
+- x ∈ A \ C
+- x ̸∈ B
+⊢ False
+
+[REWRITE GIVEN]
+
+Givens:
+- A \ B ⊆ C
+- object x
+- x ∈ A
+- x ̸∈ C
+- x ̸∈ B
+⊢ False
+
+[x ∈ A and x ̸∈ B means x ∈ A \ B]
+
+Givens:
+- A \ B ⊆ C
+- object x
+- x ∈ A
+- x ̸∈ C
+- x ̸∈ B
+- x ∈ A \ B
+⊢ False
+
+[then by the first given, x ∈ C...which contradicts x ̸∈ C]
+
+Givens:
+- A \ B ⊆ C
+- object x
+- x ∈ A
+- x ̸∈ C
+- x ̸∈ B
+- x ∈ A \ B
+- x ∈ C
+⊢ False
+
+QED
+
+=== PROSE PROOF ===
+
+suppose x ∈ A \ C. this means x ∈ A and x ̸∈ C. we will prove x ∈ B by
+contradiction. suppose x ̸∈ B. then x ∈ A \ B, and since A \ B ⊆ C then 
+x ∈ C. but this contradicts the fact x ̸∈ C. therefore x ⁠∈ B.
+```
+
+## ∀
+### as goal
+
+- to prove a goal `∀x, P(x)`, assume that there is an _arbitrary_ value `x` (i.e., that you don't know anything about) and prove `P(x)`
+
+    - note that you can't re-use a variable name that is already being used to refer to something in the proof...it must be a _fresh_ name
+
+    - notice that the proof example in the intro used the `∀ GOAL` rule
+
+```
+Givens:
+  ⋮
+⊢ ∀x ∈ S, P(x)
+
+[APPLY ∀ GOAL RULE]
+
+Givens:
+  ⋮
+- x ∈ S
+⊢ P(x)
+```
+
+- why does this rule work? because if we can prove `P(x)` for an arbitrary `x` then it doesn't matter which `x` we pick, `P(x)` must be true
+
+- EXAMPLE (HTPI example 3.3.2)
+
+```
+prove that if A ∩ B = A then A ⊆ B.
+
+Symbolically:
+A ∩ B = A → A ⊆ B
+
+Givens: none
+⊢ A ∩ B = A → A ⊆ B
+
+[APPLY → GOAL RULE]
+
+Givens:
+- A ∩ B = A
+⊢ A ⊆ B
+
+[REWRITE GOAL]
+
+Givens:
+- A ∩ B = A
+⊢ ∀x, x ∈ A → x ∈ B
+
+[APPLY ∀ GOAL RULE with `a`]
+
+Givens:
+- A ∩ B = A
+- object a
+⊢ a ∈ A → a ∈ B
+
+[APPLY → GOAL RULE]
+
+Givens:
+- A ∩ B = A
+- object a
+- a ∈ A
+⊢ a ∈ B
+
+[since A ∩ B = A, we can substitute A ∩ B for A anywhere in the proof]
+
+Givens:
+- A ∩ B = A
+- object a
+- a ∈ A ∩ B
+⊢ a ∈ B
+
+[REWRITE LAST GIVEN]
+
+Givens:
+- A ∩ B = A
+- object a
+- a ∈ A ∧ a ∈ B
+⊢ a ∈ B
+
+[APPLY ∧ GIVEN RULE]
+
+Givens:
+- A ∩ B = A
+- object a
+- a ∈ A
+- a ∈ B
+⊢ a ∈ B
+
+QED
+
+=== PROSE PROOF ===
+
+suppose A ∩ B = A and x ∈ A. then since A ∩ B = A, x ∈ A ∩ B, so x ∈ B. since
+x was an arbitrary element of A, A ⊆ B.
+```
+
+- notice that the prose proof didn't explicitly say "let x be an arbitrary element of A"; this is such a common and expected thing to do that people often don't feel it's worth calling out
+
+- also notice that the prose proof didn't say things like "every element of `A \ C`" or "all elements of `A \ C`", it just talked about `x` (while not making any assumptions about _which_ element of `A \ C` `x` stands for)
+
+### as given
+
+- to use `∀x, P(x)` as a given, select a value for x and plug it in
+
+```
+Givens:
+- ∀x, P(x)
+- object a
+⊢ …
+
+[APPLY ∀ GIVEN RULE]
+
+Givens:
+- P(a)
+- object a
+⊢ …
+```
+
+- why does this rule work? we know P(x) is true for all x, so it must be true for any x
+
+- EXAMPLE
+
+```
+suppose A ⊆ B and a ∈ A. prove a ∈ B.
+
+Givens:
+- A ⊆ B
+- a ∈ A
+⊢ a ∈ B
+
+[REWRITE GIVEN]
+
+Givens:
+- ∀x, x ∈ A → x ∈ B
+- a ∈ A
+⊢ a ∈ B
+
+[APPLY ∀ GIVEN RULE USING a]
+
+Givens:
+- a ∈ A → a ∈ B
+- a ∈ A
+⊢ a ∈ B
+
+[APPLY → GIVEN RULE]
+
+Givens:
+- a ∈ A → a ∈ B
+- a ∈ A
+- a ∈ B
+⊢ a ∈ B
+
+QED
+```
+
+- we used this rule implicitly in some of our earlier proofs
+
+## ∃
+### as goal
+
+- to prove a goal `∃x, P(x)`, pick a specific value for x that makes P(x) true
+
+    - note that unlike ∀, where we deliberately did not specify a value for x, for ∃ we give a specific value
+
+    - it may require some thought and creativity to figure out what value to choose for x...sometimes it's a value that's already in the givens, but sometimes it's not
+
+    - a possible strategy: ask yourself, "if P(x) is true what must x be?" and work backwards
+
+```
+Givens:
+  ⋮
+⊢ ∃x, P(x)
+
+[APPLY ∃ GOAL RULE WITH VALUE 'a']
+
+Givens:
+  ⋮
+⊢ P(a)
+```
+
+- why does this rule work? because ∃ means there is at least one value for x that makes P(x) true...so to prove it all we need to do is fine one such value
+
+- EXAMPLE (HTPI example 3.3.3)
+
+```
+prove that for every real number x, if x > 0 then there is a real number y such
+that y(y + 1) = x.
+
+Symbolically:
+∀x ∈ ℝ, x > 0 → ∃y ∈ ℝ, y(y + 1) = x
+
+Givens: none
+⊢ ∀x ∈ ℝ, x > 0 → ∃y ∈ ℝ, y(y + 1) = x
+
+[APPLY ∀ GOAL and → GOAL RULES]
+
+Givens:
+- x ∈ ℝ 
+- x > 0
+⊢ ∃y ∈ ℝ, y(y + 1) = x
+
+[use the quadratic formula to solve for y: y(y + 1) = x ==> y² + y - x = 0 ==> 
+y = (-1 +/- sqrt(1 + 4x))/2. note that the sqrt is defined because x > 0. also
+note that we have two possible solutions...we only need one for the proof.]
+
+[APPLY ∃ GOAL RULE USING (-1 + sqrt(1 + 4x))/2]
+
+Givens:
+- x ∈ ℝ 
+- x > 0
+- y = (-1 + sqrt(1 + 4x))/2
+⊢ y(y + 1) = x
+
+[do algebra]
+
+Givens:
+- x ∈ ℝ 
+- x > 0
+- y = (-1 + sqrt(1 + 4x))/2
+⊢ x = x
+
+QED
+
+=== PROSE PROOF ===
+
+suppose x ∈ ℝ and x > 0. let y = (-1 + sqrt(1 + 4x))/2. then y(y + 1) = ... = x.
+```
+
+### as given
+
+- to use a given `∃x, P(x)`, introduce a fresh new variable to stand for some arbitrary value of x and plug it in
+
+```
+Givens:
+- ∃x, P(x)
+⊢ …
+
+[APPLY ∃ GIVEN RULE]
+
+Givens:
+- object a
+- P(a)
+⊢ …
+```
+
+- why does this rule work? 
+
+    - we know that there is some value for x such that P(x), but we don't know what it is
+
+    - so we make a variable that stands for that unknown value of x and plug it in
+
+    - since it's a fresh arbitrary variable, the only thing we know about it is P(x)
+
+- EXAMPLE
+
+```
+suppose (∃x, x ∈ A) and A ⊆ B. prove ∃x, x ∈ B.
+
+Givens:
+- ∃x, x ∈ A
+- A ⊆ B
+⊢ ∃x, x ∈ B
+
+[APPLY ∃ GIVEN RULE]
+
+Givens:
+- object a
+- a ∈ A
+- A ⊆ B
+⊢ ∃x, x ∈ B
+
+[APPLY ∃ GOAL RULE USING a]
+
+Givens:
+- object a
+- a ∈ A
+- A ⊆ B
+⊢ a ∈ B
+
+[since a ∈ A and A ⊆ B, a ∈ B]
+
+Givens:
+- object a
+- a ∈ A
+- A ⊆ B
+- a ∈ B
+⊢ a ∈ B
+
+QED
+```
+
+## more on ∀ vs ∃ 
+
+- note the ymmetry between proof methods for ∀ and ∃ 
+
+    - to prove goal ∀ introduce a fresh arbitrary variable
+    - to use a given ∃ introduce a fresh arbitrary variable
+
+    - to use a given ∀ select a specific value to plug in
+    - to prove a goal ∃ select a specific value to plug in
+
+- it's important not to get them confused
+
+    - the best way to do that is to understand the intuition behind why each proof method works in the appropriate scenario and why it fails in the wrong scenario
+
+## conjunction 
+### as goal
+
+- to prove a goal P ∧ Q, separately prove P true and Q true
+
+```
+Givens:
+  ⋮
+⊢ P ∧ Q
+
+[APPLY ∧ GOAL RULE]
+
+Givens:
+  ⋮
+⊢ P
+⊢ Q
+```
+
+- why does this work? because P ∧ Q is true iff both P and Q are true
+
+### as given
+
+- to use a given P ∧ Q, treat it as two separate givens (one for P and one for Q)
+
+```
+Givens:
+- P ∧ Q
+⊢ …
+
+[APPLY ∧ GIVEN RULE]
+
+Givens:
+- P
+- Q
+⊢ …
+```
+
+- why does this work? because the only way P ∧ Q could be true is if both P and Q are true
+
+### EXAMPLE
+
+```
+Prove that A ∧ B → B ∧ A.
+
+Givens: none
+⊢ A ∧ B → B ∧ A
+
+[APPLY → GOAL RULE]
+
+Givens:
+- A ∧ B
+⊢ B ∧ A
+
+[APPLY ∧ GIVEN RULE]
+
+Givens:
+- A
+- B
+⊢ B ∧ A
+
+[APPLY ∧ GOAL RULE]
+
+Givens:
+- A
+- B
+⊢ B
+⊢ A
+
+QED
+
+=== PROSE PROOF ===
+
+suppose we have A ∧ B. then A is true and B is true. therefore, B ∧ A is true.
+```
+
+- notice that the proof example in the intro used the `∧ GIVEN` rule
+
+## biconditional
+
+- a biconditional P ↔ Q is the conjunction of two implications: P → Q ∧ Q → P
+
+- if a given or goal is a biconditional, rewrite it as a conjunction of implications and proceed using the ∧ and → rules
+
+```
+Givens:
+- A ↔ B
+⊢ C ↔ D
+
+[REWRITE BOTH GIVEN AND GOAL]
+
+Givens:
+- (A → B) ∧ (B → C)
+⊢ (C → D) ∧ (D → C)
+```
+
+- EXAMPLE (HTPI example 3.4.3)
+
+    - we will use the following facts:
+
+        - Even(x) = ∃k ∈ ℤ, x = 2k
+        - Odd(x) = ∃k ∈ ℤ, x = 2k + 1
+        - every integer is either even or odd, but not both (we don't have the tools yet to prove this fact, but we will later)
+
+```
+suppose x is an integer. prove that x is even iff x² is even.
+
+Symbolically:
+∀x ∈ ℤ, Even(x) ↔ Even(x²)
+
+Givens:
+- x ∈ ℤ 
+⊢ Even(x) ↔ Even(x²)
+
+[REWRITE GOAL]
+
+Givens:
+- x ∈ ℤ 
+⊢ (Even(x) → Even(x²)) ∧ (Even(x²) → Even(x))
+
+[APPLY ∧ GOAL RULE]
+
+Givens:
+- x ∈ ℤ 
+⊢ Even(x) → Even(x²)
+⊢ Even(x²) → Even(x)
+
+[PROVE FIRST GOAL]
+
+Givens:
+- x ∈ ℤ 
+⊢ Even(x) → Even(x²)
+
+[APPLY → GOAL RULE]
+
+Givens:
+- x ∈ ℤ 
+- Even(x)
+⊢ Even(x²)
+
+[REWRITE GOAL AND GIVEN]
+
+Givens:
+- x ∈ ℤ 
+- ∃k ∈ ℤ, x = 2k
+⊢ ∃k ∈ ℤ, x² = 2k
+
+[APPLY ∃ GIVEN RULE]
+
+Givens:
+- x ∈ ℤ 
+- k ∈ ℤ 
+- x = 2k
+⊢ ∃k ∈ ℤ, x² = 2k
+
+[note that the k in the goal is different from the k in the givens.]
+[if x = 2k, then x² = (2k)² = 4k² = 2(2k²)]
+[APPLY ∃ GOAL RULE USING 2k²]
+
+Givens:
+- x ∈ ℤ 
+- k ∈ ℤ 
+- x = 2k
+⊢ x² = 2(2k²)
+
+[SUBSTITUTE 2k FOR x AND SIMPLIFY]
+
+Givens:
+- x ∈ ℤ 
+- k ∈ ℤ 
+- x = 2k
+⊢ 4k² = 4k²
+
+[PROVE SECOND GOAL]
+
+Givens:
+- x ∈ ℤ 
+⊢ Even(x²) → Even(x)
+
+[CONTRAPOSTIVE OF GOAL]
+
+Givens:
+- x ∈ ℤ 
+⊢ ¬Even(x) → ¬Even(x²)
+
+[USE FACT THAT ¬EVEN MUST BE ODD]
+
+Givens:
+- x ∈ ℤ 
+⊢ Odd(x) → Odd(x²)
+
+[APPLY → GOAL RULE AND REWRITE GOAL AND GIVEN]
+
+Givens:
+- x ∈ ℤ 
+- ∃k ∈ ℤ, x = 2k + 1
+⊢ ∃k ∈ ℤ, x² = 2k + 1
+
+[APPLY ∃ GIVEN RULE]
+
+Givens:
+- x ∈ ℤ 
+- k ∈ ℤ 
+- x = 2k + 1
+⊢ ∃k ∈ ℤ, x² = 2k + 1
+
+[x² = (2k + 1)² = 4k² + 4k + 1 = 2(2k² + 2k) + 1]
+[APPLY ∃ GOAL RULE USING 2k² + 2k]
+
+Givens:
+- x ∈ ℤ 
+- k ∈ ℤ 
+- x = 2k + 1
+⊢ x² = 2(2k² + 2k) + 1
+
+[PLUG IN 2k + 1 FOR X AND SIMPLIFY]
+
+Givens:
+- x ∈ ℤ 
+- k ∈ ℤ 
+- x = 2k + 1
+⊢ 2(2k² + 2k) + 1 = 2(2k² + 2k) + 1
+
+QED
+
+=== PROSE PROOF ===
+
+Proof.
+
+(→) suppose x is even. then for some integer k, x = 2k. therefore, x² = 4k² = 
+2(2k²). since 2k² is an integer, x² is even.
+
+(←) we prove the contrapositive. suppose x is odd. then for some integer k, 
+x = 2k + 1. therefore, x² = 4k² + 4k + 1 = 2(2k² + 2k) + 1. since 2k² + 2k is
+an integer, x² is odd.
+```
+
+## disjunction
+### as goal
+
+- to prove a goal `P ∨ Q`, simply choose one or the other to prove
+
+```
+Givens:
+  ⋮
+⊢ P ∨ Q
+
+[APPLY ∨ GOAL RULE]
+
+Givens:
+  ⋮
+⊢ P
+```
+
+- why does this rule work? because we only need to prove one of them for the disjunction to be true
+
+- EXAMPLE
+
+```
+prove a ∈ A → a ∈ A ∪ B
+
+Givens: none
+⊢ a ∈ A → a ∈ A ∪ B
+
+[APPLY → GOAL RULE]
+
+Givens:
+- a ∈ A
+⊢ a ∈ A ∪ B
+
+[REWRITE GOAL]
+
+Givens:
+- a ∈ A
+⊢ a ∈ A ∨ a ∈ B
+
+[APPLY ∨ GOAL RULE]
+
+Givens:
+- a ∈ A
+⊢ a ∈ A
+
+QED
+```
+
+- it can be useful to go even further and assume that whichever one you are not proving is false
+
+```
+Givens:
+  ⋮
+⊢ P ∨ Q
+
+[APPLY ∨ GOAL RULE]
+
+Givens:
+  ⋮
+- ¬Q
+⊢ P
+```
+
+- why does this rule work? if Q is true then P ∨ Q is automatically true, so the only thing we really need to prove is that P is true when ¬Q
+
+- EXAMPLE (HTPI example 3.5.4)
+
+```
+prove that for every real number x, if x² ≥ x then either x ≤ 0 or x ≥ 1.
+
+Symbolically:
+∀x ∈ ℝ, x² ≥ x → (x ≤ 0 ∨ x ≥ 1)
+
+Givens: none
+⊢ ∀x ∈ ℝ, x² ≥ x → (x ≤ 0 ∨ x ≥ 1)
+
+[APPLY ∀ GOAL and → GOAL RULES]
+
+Givens:
+- x ∈ ℝ 
+- x² ≥ x
+⊢ x ≤ 0 ∨ x ≥ 1
+
+[APPLY ALT ∨ GOAL RULE]
+
+Givens:
+- x ∈ ℝ 
+- x² ≥ x
+- x > 0
+⊢ x ≥ 1
+
+[since x > 0 we can divide the inequality by x]
+
+Givens:
+- x ∈ ℝ 
+- x² ≥ x
+- x > 0
+- x ≥ 1
+⊢ x ≥ 1
+
+QED
+
+=== PROSE PROOF ===
+
+suppose x² ≥ x. if x ≤ 0 then clearly x ≤ 0 or x ≥ 1. now suppose x > 0. then we
+can divide both sides of the inequality x² ≥ x by x, yielding x ≥ 1.
+```
+
+### as a given (v1)
+
+- an easy way to use a given P ∨ Q is if you can derive ¬P, in which case you can immediately conclude Q (or vice-versa)
+
+```
+Givens:
+- P ∨ Q
+- ¬P
+⊢ …
+
+[APPLY ∨ GIVEN RULE 1]
+
+Givens:
+- P ∨ Q
+- ¬P
+- Q
+⊢ …
+```
+
+- why does this rule work? because at least one must be true, so if P is false then Q must be true (and vice-versa)
+
+- also notice that P ∨ Q is the same thing as ¬P → Q, so really this is just the → goal rule in disguise
+
+    - of course, P ∨ Q = Q ∨ P = ¬Q → P, so it works the other way around as well
+
+### as given (v2)
+
+- to use a given `P ∨ Q`, use "proof by cases"
+
+- consider the case where P is true and prove the goal, then separately consider the case where Q is true and prove the same goal
+
+```
+Givens:
+- P ∨ Q
+⊢ R
+
+[APPLY ∨ GIVEN RULE]
+
+Givens:
+- P
+⊢ R
+
+Givens:
+- Q
+⊢ R
+```
+
+- why does this rule work? because we know at least one of P or Q must be true (but we don't know which), so if we prove the goal using P and prove the goal using Q, then the goal must be true no matter which one is true
+
+- note that the cases must be _exhaustive_, i.e., they must cover all possibilities
+
+- EXAMPLE (HTPI example 3.5.1)
+
+```
+prove that if A ⊆ C and B ⊆ C then A ∪ B ⊆ C.
+
+Symbolic:
+A ⊆ C ∧ B ⊆ C → A ∪ B ⊆ C
+
+Givens: none
+⊢ A ⊆ C ∧ B ⊆ C → A ∪ B ⊆ C
+
+[APPLY → GOAL and ∧ GIVEN RULES]
+
+Givens:
+- A ⊆ C
+- B ⊆ C
+⊢ A ∪ B ⊆ C
+
+[REWRITE GOAL AND GIVENS]
+
+Givens:
+- ∀x, x ∈ A → x ∈ C
+- ∀x, x ∈ B → x ∈ C
+⊢ ∀x, x ∈ A ∪ B → x ∈ C
+
+[APPLY ∀ GOAL RULE]
+
+Givens:
+- ∀x, x ∈ A → x ∈ C
+- ∀x, x ∈ B → x ∈ C
+- object a
+⊢ a ∈ A ∪ B → a ∈ C
+
+[APPLY ∀ GIVEN RULE (twice)]
+
+Givens:
+- a ∈ A → a ∈ C
+- a ∈ B → a ∈ C
+- object a
+⊢ a ∈ A ∪ B → a ∈ C
+
+[APPLY → GOAL RULE]
+
+Givens:
+- a ∈ A → a ∈ C
+- a ∈ B → a ∈ C
+- object a
+- a ∈ A ∪ B
+⊢ a ∈ C
+
+[REWRITE GIVEN]
+
+Givens:
+- a ∈ A → a ∈ C
+- a ∈ B → a ∈ C
+- object a
+- a ∈ A ∨ a ∈ B
+⊢ a ∈ C
+
+[PROOF BY CASES]
+
+[CASE 1]
+
+Givens:
+- a ∈ A → a ∈ C
+- a ∈ B → a ∈ C
+- object a
+- a ∈ A
+⊢ a ∈ C
+
+[APPLY → GIVEN RULE]
+
+Givens:
+- a ∈ A → a ∈ C
+- a ∈ B → a ∈ C
+- object a
+- a ∈ A
+- a ∈ C
+⊢ a ∈ C
+
+QED FOR CASE 1
+
+[CASE 2]
+
+Givens:
+- a ∈ A → a ∈ C
+- a ∈ B → a ∈ C
+- object a
+- a ∈ B
+⊢ a ∈ C
+
+[APPLY → GIVEN RULE]
+
+Givens:
+- a ∈ A → a ∈ C
+- a ∈ B → a ∈ C
+- object a
+- a ∈ A
+- a ∈ C
+⊢ a ∈ C
+
+QED FOR CASE 2
+
+=== PROSE PROOF ===
+
+suppose A ⊆ C and B ⊆ C, and let x ∈ A ∪ B. then either x ∈ A or x ∈ B.
+
+case 1: x ∈ A. then since A ⊆ C, x ∈ C.
+case 2: x ∈ B. then since B ⊆ C, x ∈ C.
+
+x was an arbitrary element of A ∪ B, therefore A ∪ B ⊆ C.
+```
+
+## more on proof by cases
+
+- proof by cases doesn't require an explicit ∨ in the givens; any proof can be broken into cases as long as the cases exhaust all possibilities
+
+- EXAMPLE (HTPI example 3.5.3)
+
+```
+prove that for every integer x, the remainder of x² / 4 is either 0 or 1.
+
+Symbolically:
+∀x ∈ ℤ, x² % 4 = 0 ∨ x² % 4 = 1
+
+Givens:
+- x ∈ ℤ 
+⊢ x² % 4 = 0 ∨ x² % 4 = 1
+
+[it isn't clear how to proceed...let's write out some examples]
+
+x  | x² | ⌊x² / 4⌋ | x² % 4
+---+----+---------+-------
+1  | 1  | 0       | 1
+2  | 4  | 1       | 0
+3  | 9  | 2       | 1
+4  | 16 | 4       | 0
+5  | 25 | 6       | 1
+6  | 36 | 9       | 0
+
+[our intuition is that the remainder is 0 when x is even and 1 when x is odd;
+let's see if we can prove it using proof by cases]
+
+[CASE 1: x is even]
+
+Givens:
+- x ∈ ℤ 
+- ∃k ∈ ℤ, x = 2k
+⊢ x² % 4 = 0 ∨ x² % 4 = 1
+
+[APPLY ∨ GOAL RULE]
+
+Givens:
+- x ∈ ℤ 
+- ∃k ∈ ℤ, x = 2k
+⊢ x² % 4 = 0
+
+[APPLY ∃ GIVEN RULE]
+
+Givens:
+- x ∈ ℤ 
+- k ∈ ℤ 
+- x = 2k
+⊢ x² % 4 = 0
+
+[substitute 2k for x and simplify]
+
+Givens:
+- x ∈ ℤ 
+- k ∈ ℤ 
+- x = 2k
+⊢ 4k² % 4 = 0
+
+[CASE 2: x is odd]
+
+Givens:
+- x ∈ ℤ 
+- ∃k ∈ ℤ, x = 2k + 1
+⊢ x² % 4 = 0 ∨ x² % 4 = 1
+
+[SAME SERIES OF STEPS]
+
+Givens:
+- x ∈ ℤ
+- k ∈ ℤ 
+- x = 2k + 1
+⊢ (4k² + 4k + 1) % 4 = 1
+
+QED
+
+=== PROSE PROOF ===
+
+suppose x is an integer. we consider two cases.
+
+case 1: x is even. then x = 2k for some integer k, so x² = 4k². the remainder 
+of 4k² when divided by 4 must be 0.
+
+case 2: x is odd. then x = 2k+1 for some integer k, so x² = 4k² + 4k + 1. the
+remainder of 4k² + 4k + 1 must be 1.
+
+x must be even or odd, so these cases are exhaustive. therefore x² % 4 is either
+0 or 1.
+```
+
+## more proof examples TODO:
+
+- examples 3.3.4, 3.3.5, 3.3.7
+- examples 3.4.4, 3.4.5, 3.4.6, 3.4.7
+- examples 3.5.5
+- theorems 3.7.1, 3.7.2, 3.7.3
+- examples 3.7.4, 3.7.5
+
+# relations - TODO: (HTPI 4)
+
+# functions - TODO: (HTPI 5)
+
+# induction - TODO: (HTPI 6)
+
+# number theory - TODO: (HTPI 7)
+
+# infinite sets - TODO: (HTPI 8)
+
+# combinatorics - TODO: (LaP 20)
