@@ -812,11 +812,7 @@ COUNTER-EXAMPLE: x = 3 and y = 2
 
 - for each one i'll give example proofs that demonstrate how to apply these rules
 
-- the end goal is for you to be able to write your own proofs
-
-    - this only comes with practice
-
-    - for the next assignment and quiz you won't need to write proofs from scratch, but for all assignments/quizzes after that you may be required to
+- the end goal is for you to be able to write your own proofs; this only comes with practice
 
 ## implication
 ### as goal
