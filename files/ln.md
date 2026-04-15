@@ -1573,7 +1573,7 @@ QED
 
 ## more on ∀ vs ∃ 
 
-- note the ymmetry between proof methods for ∀ and ∃ 
+- note the symmetry between proof methods for ∀ and ∃ 
 
     - to prove goal ∀ introduce a fresh arbitrary variable
     - to use a given ∃ introduce a fresh arbitrary variable
