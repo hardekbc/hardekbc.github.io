@@ -1281,6 +1281,56 @@ contradiction. suppose x ̸∈ B. then x ∈ A \ B, and since A \ B ⊆ C then
 x ∈ C. but this contradicts the fact x ̸∈ C. therefore x ⁠∈ B.
 ```
 
+## STUDENT EXERCISES
+
+- EXERCISE (HTPI 3.2 exercise 4)
+
+```
+Suppose that x ∈ A and A \ B is disjoint from C. Prove that if x ∈ C then x ∈ B.
+
+[SOLN]
+
+Givens:
+- x ∈ A
+- A \ B ∩ C = ∅
+⊢ x ∈ C → x ∈ B
+
+We will prove the contrapositive, i.e., x ̸∈ B → x ̸∈ C. Suppose x ̸∈ B. Since
+x ∈ A, x ∈ A \ B. But A \ B ∩ C = ∅, therefore x ̸∈ C.
+```
+
+- EXERCISE (HTPI 3.2 exercise 5)
+
+```
+Prove that it cannot be the case that x ∈ A \ B and x ∈ B \ C.
+
+[SOLN]
+
+Givens: none
+⊢ ¬ (x ∈ A \ B ∧ x ∈ B \ C)
+
+We will prove by contradiction. Suppose x ∈ A \ B and x ∈ B \ C. Then x ∈ A and
+x ̸∈ B and x ∈ B and x ̸∈ C. But then x ̸∈ B and x ∈ B, which is a contradiction.
+Therefore it cannot be that x ∈ A \ B and x ∈ B \ C.
+```
+
+- EXERCISE (HTPI 3.2 exercise 10)
+
+```
+Suppose that x and y are real numbers. Prove that if x ≠ 0, then if y =
+(3x² + 2y)/(x² + 2) then y = 3.
+
+[SOLN]
+
+Givens:
+- x, y ∈ ℝ 
+⊢ x ≠ 0 → y = (3x² + 2y)/(x² + 2) → y = 3
+
+Suppose x ≠ 0 and y = (3x² + 2y)/(x² + 2). Then y(x² + 2) = 3x² + 2y, so
+yx² + 2y = 3x² + 2y. We can cancel 2y from both sides. Since x ≠ 0, we can
+divide both sides by x². Therefore y = 3.
+```
+
 ## ∀
 ### as goal
 
