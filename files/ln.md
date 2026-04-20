@@ -2236,7 +2236,7 @@ x must be even or odd, so these cases are exhaustive. therefore x² % 4 is eithe
 
 ## more proof examples TODO:
 
-FIXME: add some of these as student exercises above
+FIXME: add some of these as student exercises above? (maybe not, for time)
 
 - examples 3.3.4, 3.3.5, 3.3.7
 - examples 3.4.4, 3.4.5, 3.4.6, 3.4.7
