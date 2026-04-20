@@ -441,7 +441,7 @@
     - {1, 2, 3} = {3, 2, 1}
     - {blue, apple, willow} = {apple, willow, blue, willow}
 
-- sets can contain other sets: {1, {1}, {{1}}}
+- sets can contain other sets: {1, {1}, { {1} } }
 
 - sets can be finite or infinite (we'll talk a lot more about infinite sets later in the course)
 
@@ -2400,7 +2400,7 @@ case 3. A = B. then A × B = A × A = B × A
 - EXAMPLES: what are the ranges of the following relations?
 
     - A = {1, 2}, B = 𝒫(A), R ⊆ A × B = {(x, y) ∈ A × B | x ∈ y}?
-        - {{1}, {2}, {1,2}}
+        - { {1}, {2}, {1,2} }
         - NOT 𝒫(A)!
 
     - {(c, p) ∈ Courses × Professors | c is taught by p}?
