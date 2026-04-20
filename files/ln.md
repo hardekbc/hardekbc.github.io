@@ -2236,20 +2236,287 @@ x must be even or odd, so these cases are exhaustive. therefore x² % 4 is eithe
 
 ## more proof examples TODO:
 
+FIXME: add some of these as student exercises above
+
 - examples 3.3.4, 3.3.5, 3.3.7
 - examples 3.4.4, 3.4.5, 3.4.6, 3.4.7
 - examples 3.5.5
 - theorems 3.7.1, 3.7.2, 3.7.3
 - examples 3.7.4, 3.7.5
 
-# relations - TODO: (HTPI 4)
+# relations
+## cartesian product
+
+- we will now build on top of sets to create other useful mathematical objects, specifically _relations_
+
+- first we introduce pairs and tuples
+
+    - `(a, b)` is a 2-tuple (i.e., pair) whose first element is `a` and whose second element is `b`
+
+    - `(a, b, c, d)` is a 4-tuple
+
+    - order and repetition matter, unlike sets
+
+        - `(a, b)` is different from `(b, a)` and from `(a, a, b)`
+
+        - `{a, b}` and `(a, b)` are two entirely different things
+
+    - tuples are like structs in C/C++, they group data together
+
+- examples of tuples
+
+    - coordinates: the coordinate of a point on a 2D grid is a pair; the coordinate of a point on a 3D cube is a triple; etc
+
+    - truth sets for multvariate predicates: the elements of the truth set of `P(x, y)` are pairs `(a, b)` such that setting `x = a` and `y = b` make the predicate true
+
+        - let `P(x, y)` = `x` and `y` are integers and `x < y`; its truth set = `{(-1, 0), (42, 100), ...}`
+
+- what does this have to do with sets? we can use sets to describe the domain of a tuple, i.e., what objects can be used for which elements
+
+- DEF: the _cartesian product_ of two sets A and B is denoted A × B, and its elements are all pairs whose first element is from A and whose second element is from B
+
+    - i.e., `A × B` = `{(a, b) | a ∈ A ∧ b ∈ B}`
+
+    - `A = {1, 2}`, `B = {a, b}`, `A × B = {(1,a), (1,b), (2,a), (2,b)}`
+
+    - to get `n`-ary tuples just use `n` cartesian products, e.g., A × B × C
+
+- here are some theorems about cartesian product:
+
+    1. `A × (B ∩ C)` = `(A × B) ∩ (A × C)`
+    2. `A × (B ∪ C)` = `(A × B) ∪ (A × C)`
+    3. `(A × B) ∩ (C × D)` = `(A ∩ C) × (B ∩ B)`
+    4. `(A × B) ∪ (C × D)` ⊆ `(A ∪ C) × (B ∪ D)`
+    5. `A × ∅` = `∅ × A` = `∅`
+
+- PROOF OF THEOREM 1
+
+```
+let (a, d) ∈ A × (B ∩ C). then a ∈ A, d ∈ B, and d ∈ C. since a ∈ A and d ∈ B,
+(a, d) ∈ A × B. since a ∈ A and d ∈ C, (a, d) ∈ A × C. therefore (a, d) ∈ 
+(A × B) ∩ (A × C).
+```
+
+- we may ask you to do proofs for the other theorems in assignments, quizzes, or the final
+
+- we know that order matters, so that in general A × B ≠ B × A...are there any circumstances when A × B = B × A?
+
+- CONJECTURE: A × B = B × A ↔ A = B
+
+- INCORRECT PROOF
+
+```
+the first coordinates of A × B comes from A, and the first coordinates of B × A 
+comes from B. but if A × B = B × A, then the first coordinates for both sides
+must be the same, so A = B.
+```
+
+- the reasoning may look plausible, but it doesn't follow the rules for reasoning that we've established for doing proofs
+
+- this is a good example of why following the proper rules of inference is important; let's try again using those rules
+
+- MORE FORMAL VERSION OF INCORRECT PROOF
+
+```
+(→) suppose A × B = B × A. let x be arbitrary. to prove A = B, we must prove that
+x ∈ A ↔ x ∈ B. first we prove the → direction: suppose x ∈ A. then we need to find
+some y ∈ B such that (x, y) ∈ A × B, which since A × B = B × A would mean that 
+(y, x) ∈ A × B, which would mean that x ∈ B. 
+
+BUT: how do we find y? we have no information about B other than A × B = B × A.
+if we assume there is a y ∈ B then we're making an assumption that isn't justified
+by our givens. in fact, B could be the empty set! then it's impossible to choose
+y ∈ B, and the proof fails.
+```
+
+- in fact, the conjecture is wrong: what if A or B is ∅?
+
+- CORRECTED CONJECTURE: A × B = B × A ↔ A = B ∨ A = ∅ ∨ B = ∅
+
+- this is a good example of how mathematics usually works:
+
+    - we come up with a reasonable conjecture
+    - we try to prove it correct, but fail
+    - we tweak the conjecture to correct the failure
+    - we try to prove it again
+
+- EXERCISE: prove the corrected conjecture
+
+```SOLN
+(→) suppose A × B = B × A. if either A = ∅ or B = ∅ then both A × B and B × A are
+∅ and the proof is done. otherwise, A ≠ ∅ and B ≠ ∅. then we can choose arbitrary
+x ∈ A and y ∈ B. then (x, y) ∈ A × B and, since A × B = B × A, (x, y) ∈ B × A.
+then x ∈ B. since x was arbitrary, A = B.
+
+(←) we proceed by cases:
+case 1: A = ∅. then A × B = ∅ × B = B × ∅ = B × A
+case 2: B = ∅. similar to case 1
+case 3. A = B. then A × B = A × A = B × A
+```
+
+## relations
+
+- DEF: a set R ⊆ A × B is a _relation_ from A to B
+
+    - intuitively we can think of A × B as the domain of the truth set for some binary predicate, e.g., the predicate P(x, y) defines a relation according to the truth set of P(x, y)
+
+    - however, our definition doesn't depend on the idea of truth sets: any set meeting the definition is a relation
+
+    - specifically this is a _binary relation_; relations can also be n-ary, e.g., R ⊆ A × B × C × D
+
+- EXAMPLES
+
+    - A = {1, 2, 3}, B = {a, b, c}, R ⊆ A × B = {(1,a), (2,b), (3,c)}
+    - {(x, y) ∈ ℝ × ℝ | x > y}
+    - A = {1, 2}, B = 𝒫(A), R ⊆ A × B = {(x, y) ∈ A × B | x ∈ y}
+        - R = {(1, {1}), (1, {1,2}), (2, {2}), (2, {1, 2})}
+    - {(s, d) ∈ Students × Dorms | s lives in d}
+    - {(s, c) ∈ Students × Courses | s is enrolled in c}
+    - {(c, p) ∈ Courses × Professors | c is taught by p}
+
+- some important definitions; in each case R is a relation from A to B
+
+    - the _domain_ of R is `dom(R) = {a ∈ A | ∃b ∈ B, (a,b) ∈ R}`
+    - the _range_ of R is `ran(R) = {b ∈ B | ∃a ∈ A, (a,b) ∈ R}`
+    - the _inverse_ of R is `R⁻¹ = {(b, a) ∈ B × A | (a, b) ∈ R}`
+    - suppose S ⊆ B × C, then the _composition_ of S and R is
+        `S ∘ R = {(a, c) ∈ A × C | ∃b ∈ B, (a,b) ∈ R ∧ (b,c) ∈ S}`
+
+- for composition:
+
+    - notice that S ⊆ B × C, R ⊆ A × B, and S ∘ R ⊆ A × C, i.e., we compute the composition from right to left
+
+    - this is exactly the database `join` operation...database tables are relations, and joins, projections, etc are operations on relations
+
+- EXAMPLES: what are the domains of the following relations?
+
+    - {(x, y) ∈ ℝ × ℝ | x > y}?
+        - SOLN: ℝ 
+
+    - {(s, d) ∈ Students × Dorms | s lives in d}?
+        - SOLN: {s ∈ Students | ∃d ∈ Dorms, s lives in d}
+        - NOT Students!
+
+- EXAMPLES: what are the ranges of the following relations?
+
+    - A = {1, 2}, B = 𝒫(A), R ⊆ A × B = {(x, y) ∈ A × B | x ∈ y}?
+        - {{1}, {2}, {1,2}}
+        - NOT 𝒫(A)!
+
+    - {(c, p) ∈ Courses × Professors | c is taught by p}?
+        - {p ∈ Professors | ∃c ∈ Courses, p teaches c }
+        - NOT Professors!
+
+- EXAMPLES: what is the composition of T = {(c, p) ∈ Courses × Professors | c is taught by p} and E = {(s, c) ∈ Students × Courses | s is enrolled in c}?
+
+    - note that E ⊆ Students × Courses and T ⊆ Courses × Professors, so T ∘ E ⊆ Students × Professors
+
+    - {(s, p) ∈ Students × Professors | s is enrolled in a course taught by p}
+
+    - the fact that E ∘ T seems backward can trip you up, you just need to remember the proper order (why it's "backwards" will make more sense later)
+
+- EXERCISE
+
+    - let L = {(s, d) ∈ Students × Dorms | s lives in d}
+          E = {(s, c) ∈ Students × Courses | s is enrolled in c}
+          T = {(c, p) ∈ Courses × Professors | c is taught by p}
+
+    - describe the following relations using set comprehensions, where the predicate is in English
+
+        1. E⁻¹
+        2. E ∘ L⁻¹
+        3. E⁻¹ ∘ E
+        4. E ∘ E⁻¹
+        5. T ∘ (E ∘ L⁻¹)
+        6. (T ∘ E) ∘ L⁻¹
+
+    - SOLUTIONS
+
+        - {(c,s) ∈ Courses × Students | s is enrolled in c}
+        - {(d,c) ∈ Dorms × Courses | some student living in d is enrolled in c}
+        - {(s1,s2) ∈ Students × Students | there is some course that s1 and s2 are both enrolled in}
+        - {(c1,c2) ∈ Courses × Courses | there is some student enrolled in both c1 and c2}
+        - {(d,p) ∈ Dorms × Professors | some student lives in d is enrolled in a course taught by p}
+        - same as above
+
+    - notice that (3) and (4) are different, showing that composition is _not_ commutative, but (5) and (6) are the same, indicating that composition _might_ be associative (we have an example, not a proof)
+
+- theorems about domain, range, inverse, and composition; let R ⊆ A × B, S ⊆ B × C, and T ⊆ C × D
+
+    1. (R⁻¹)⁻¹ = R
+    2. dom(R⁻¹) = ran(R)
+    3. ran(R⁻¹) = dom(R)
+    4. T ∘ (S ∘ R) = (T ∘ S) ∘ R
+    5. (S ∘ R)⁻¹ = R⁻¹ ∘ S⁻¹
+
+- proof of theorem (4)
+
+```
+clearly T ∘ (S ∘ R) and (T ∘ S) ∘ R are both relations from A to D. let (a,d) be 
+an arbitrary element of A × D.
+
+direction 1: suppose (a,d) ∈ T ∘ (S ∘ R). by definition, there is some c ∈ C s.t.
+(a,c) ∈ S ∘ R and (c,d) ∈ T. since (a,c) ∈ S ∘ R, again by definition there is
+some b s.t. (a,b) ∈ R and (b,c) ∈ S. since (b,c) ∈ S and (c,d) ∈ T, (b,d) ∈ T ∘ S.
+since (a,b) ∈ R and (b,d) ∈ T ∘ S, (a,d) ∈ (T ∘ S) ∘ R.
+
+direction 2: suppose (a,d) ∈ (T ∘ S) ∘ R. a similar argument shows that (a,d) ∈ 
+T ∘ (S ∘ R).
+
+therefore, T ∘ (S ∘ R) = (T ∘ S) ∘ R.
+```
+
+- note the hand-waving going on for direction 2 of the proof...this is common, but somewhat dangerous
+
+## properties of relations
+
+% [4.3] more about relations
+% - infix notation for relations
+% - graphs
+% - reflexive, symmetric, transitive
+% - theorems about reflexive, symmetric, transitive 
+
+## equivalence relations
+
+% [4.5] equivalence relations
+% - def of equivalence relation
+% - equivalence classes
+% - partition
+% - theorems about equivalence classes
+% - intro to modular arithmetic
 
 # functions - TODO: (HTPI 5)
 
+% [5.1] functions
+%
+% [5.2] injection, surjection
+%
+% [5.3] inverses, bijection
+
 # induction - TODO: (HTPI 6)
+
+% [6.1] induction
+%
+% [6.2] more examples of induction
+%
+% [6.4] strong induction
+%
+% [XXX] structural induction
 
 # number theory - TODO: (HTPI 7)
 
+% [7.1] gcd
+%
+% [7.3] modular arithmetic
+
 # infinite sets - TODO: (HTPI 8)
 
+% [8.1] cardinality, equinumerous
+%
+% [MAYBE MOVE COMBINATORICS HERE?]
+% 
+% [8.2] countable and uncountable sets
+
 # combinatorics - TODO: (LaP 20)
+
+% [LaPch20] combinatorics
