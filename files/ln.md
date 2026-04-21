@@ -2374,6 +2374,11 @@ case 3. A = B. then A × B = A × A = B × A
     - {(s, c) ∈ Students × Courses | s is enrolled in c}
     - {(c, p) ∈ Courses × Professors | c is taught by p}
 
+- notation: for `(x,y) ∈ R`, we can also write `x R y`
+
+    - EXAMPLE: instead of `(1,a) ∈ R` we can write `1 R a`
+    - EXAMPLE: instead of `(1,3) ∈ ≤` we write `1 ≤ 3`
+
 - some important definitions; in each case R is a relation from A to B
 
     - the _domain_ of R is `dom(R) = {a ∈ A | ∃b ∈ B, (a,b) ∈ R}`
@@ -2468,13 +2473,66 @@ therefore, T ∘ (S ∘ R) = (T ∘ S) ∘ R.
 
 - note the hand-waving going on for direction 2 of the proof...this is common, but somewhat dangerous
 
-## properties of relations
+## binary relations and graphs
 
-% [4.3] more about relations
-% - infix notation for relations
-% - graphs
-% - reflexive, symmetric, transitive
-% - theorems about reflexive, symmetric, transitive 
+- a binary relation R ⊆ A × A can also be called "a relation on A"
+
+- EXAMPLES
+
+    - A = {1,2}, B = 𝒫(A), and S = {(x,y) ∈ B × B | x ⊆ y}
+        - S is a relation on B
+
+    - for some set A, I = {(x, y) ∈ A × A | x = y}
+        - I is a relation on A
+
+    - for some positive real number r, D_r = {(x,y) ∈ ℝ × ℝ | |x-y| < r}
+        - D_r is a relation on ℝ 
+
+- for a relation R on some set A, another way to represent it is as a _graph_
+
+    - nodes (or vertices): the elements of A
+    - edge from x to y: represents xRy
+
+- EXAMPLE: the graph for S from the examples above
+
+- graphs are huge in computer science, they are used everywhere
+
+    - modeling digital networks, social networks, and many other things
+    - there are tons of algorithms solving graph-related problems
+    - you'll see a lot more of them in 130A/B
+
+- some definitions about binary relations R ⊆ A × A
+
+    - R is _reflexive_ if ∀x ∈ A, xRx
+    - R is _symmetric_ if ∀x,y ∈ A, xRy → yRx
+    - R is _transitive_ if ∀x,y,z ∈ A, xRy ∧ yRz → xRz
+
+- EXAMPLE: the example graph for S above is reflexive and transitive, but not symmetric
+
+- EXERCISES: identify whether the following relations are reflexive, symmetric, and/or transitive
+
+    1. = on integers [RST]
+    2. < on integers [T]
+    3. ⊆ on sets     [RT]
+    4. {(1,2), (1,3), (2,1), (2,2), (3,1), (3,3)} [S]
+
+- theorems about binary relations
+
+    1. R is symmetric iff R = R⁻¹
+    2. R is transitive iff R ∘ R ⊆ R
+
+- proof of theorem (1)
+
+```
+(→) suppose R ⊆ A × A is symmetric. let x,y be arbitrary elements of A and xRy.
+then since R is symmetric, yRx. since yRx, xR⁻¹y. because x and y were arbitrary, 
+it follows that R ⊆ R⁻¹. now suppose xR⁻¹y. by definition of the inverse, yRx. 
+since R is symmetric, xRy. because x and y were arbitrary, it follows that 
+R⁻¹ ⊆ R. therefore R = R⁻¹.
+
+(←) suppose R = R⁻¹, and let x,y be arbitrary elements of A. suppose xRy. since
+R = R⁻¹, xR⁻¹y. by definition of the inverse, yRx. therefore, R is symmetric.
+```
 
 ## equivalence relations
 
