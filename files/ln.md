@@ -2536,12 +2536,80 @@ R = R⁻¹, xR⁻¹y. by definition of the inverse, yRx. therefore, R is symmetr
 
 ## equivalence relations
 
-% [4.5] equivalence relations
-% - def of equivalence relation
-% - equivalence classes
-% - partition
-% - theorems about equivalence classes
-% - intro to modular arithmetic
+- relations that are reflexive, symmetric, and transitive are called _equivalence relations_
+
+    - EXAMPLES: equals, has-the-same-birthday
+    - [explain how each is RST]
+
+- equivalence relations group objects based on some property, so that all objects with the same property are related to each other
+
+    - the objects that are all related to each other are called an _equivalence class_
+
+    - equals groups things that are equal, so there is only one object in each equivalence class
+
+    - has-same-birthday groups people with the same birthday into the same equivalence class
+
+- equivalence classes _partition_ a set into disjoint subsets
+
+    - each partition is an equivalence class
+    - all objects must be in some partition
+    - no object can be in more than one partition
+    - [draw example with has-same-birthday]
+
+- notation: [x]_R is the equivalence class from R that contains x
+
+    - EXAMPLE: [bob]_has-same-birthday = {x | x has the same birthday as bob}
+    - we can omit the _R if it is obvious from context, e.g., [bob]
+
+- equivalence relations are very useful, because if we only care about the equivalence relation property then we can pick one element from each equivalence class as a representative and forget about the rest
+
+    - the elements in a given equivalence class may be different from each other in many other ways, but in terms of the equivalence relation they are identical
+
+- defining things more formally:
+
+    - let A be a set and E be some equivalence relation on A
+
+    - the set of equivalence classes A/E ("A modulo E") is
+        - `{X ⊆ A | ∃x ∈ A, X = {y ∈ A | xEy}}`
+        - note that A/E is a set of subsets of A, i.e., A/E ⊆ 𝒫(A)
+
+    - P ⊆ 𝒫(A) is a partition of A if:
+        - ⋃P = A
+        - P is _pairwise disjoint_ (every pair of distinct elements in P are disjoint)
+        - ∀X ∈ P, X ≠ ∅
+
+    - then C is a partition of A
+    - also any partition of A defines an equivalence relation
+
+- EXAMPLE: S = {(x,y) ∈ ℝ × ℝ | x - y ∈ ℤ}
+
+    - for any x ∈ ℝ, x - x = 0 ∈ ℤ ==> reflexive
+    - suppose (x,y) ∈ S; then x-y ∈ ℤ. but then -(x-y) = y-x ∈ ℤ ==> symmetric
+    - suppose (x,y) ∈ S and (y,z) ∈ S; then x-y ∈ ℤ and y-z ∈ ℤ. x-y + y-z = x-z ∈ ℤ ==> transitive
+    - therefore S is an equivalence relation 
+    - [r ∈ ℝ] = {..., r-2, r-1, r, r+1, r+2, ...}
+
+- theorems about equivalence relations; let R be an equivalence relation on A:
+
+    1. ∀x ∈ A, x ∈ [x]
+        - easy to prove using reflexivity of R
+
+    2. ∀x,y ∈ A, y ∈ [x] iff [y] = [x]
+        - easy to prove using symmetry and transitivity of R
+
+    3. A/R is a partition of A
+
+    4. let P be a parition of A; then there is an equivalence relation R on A such that A/R = P
+
+- proof of theorem (3)
+
+```
+TODO: [HTPI thm 4.5.4]
+```
+
+# intro to modular arithmatic
+
+- TODO:
 
 # functions - TODO: (HTPI 5)
 
