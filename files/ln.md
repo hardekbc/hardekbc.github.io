@@ -2607,9 +2607,9 @@ R = R⁻¹, xR⁻¹y. by definition of the inverse, yRx. therefore, R is symmetr
 TODO: [HTPI thm 4.5.4]
 ```
 
-# intro to modular arithmatic
+## intro to modular arithmatic
 
-- TODO:
+- TODO: [HTPI pg 329...]
 
 # functions - TODO: (HTPI 5)
 
