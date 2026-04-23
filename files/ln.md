@@ -2234,15 +2234,80 @@ x must be even or odd, so these cases are exhaustive. therefore x² % 4 is eithe
 0 or 1.
 ```
 
-## more proof examples TODO:
+## STUDENT EXERCISES
 
-FIXME: add some of these as student exercises above? (maybe not, for time)
+- DEF: "x divides y" (x | y) if ∃k ∈ ℤ, y = kx
 
-- examples 3.3.4, 3.3.5, 3.3.7
-- examples 3.4.4, 3.4.5, 3.4.6, 3.4.7
-- examples 3.5.5
-- theorems 3.7.1, 3.7.2, 3.7.3
-- examples 3.7.4, 3.7.5
+- EXERCISE (HTPI thm 3.3.7)
+
+```
+for all integers a, b, and c, if a|b and b|c then a|c
+
+SOLN
+
+⊢ ∀a,b,c ∈ ℤ, a|b ∧ b|c → a | c
+
+givens:
+- a,b,c ∈ ℤ 
+- a|b ==> ∃k ∈ ℤ, b = ka
+- b|c ==> ∃k ∈ ℤ, c = kb
+⊢ a|c ==> ∃k ∈ ℤ, c = ka
+
+let a,b,c be arbitrary integers and suppose a|b and b|c. since a|b, there is some
+integer k s.t. b = ka. since b|c there is some integer j s.t. c = jb. since 
+b = ka, c = jka. jk is an integer, therefore a|c.
+```
+
+- EXERCISE (HTPI thm 3.4.7)
+
+```
+for every integer n, 6|n iff 2|n and 3|n.
+
+SOLN
+
+⊢ ∀n ∈ ℤ, 6|n ↔ 2|n ∧ 3|n
+
+givens:
+- n ∈ ℤ 
+⊢ 6|n → 2|n ∧ 3|n
+⊢ 2|n ∧ 3|n → 6|n
+
+(->) suppose 6|n. then there exists some integer k s.t. n = 6k = 2(3k) = 3(2k).
+2k and 3k are integers, therefore 2|n and 3|n.
+
+(<-) suppose 2|n and 3|n. then there exists integers k,j s.t. n = 2j and n = 3k.
+then j-k is an integer and 6(j - k) = 6j - 6k = 3(2j) - 2(3k) = 3n - 2n = n, 
+therefore 6|n.
+```
+
+- EXERCISE (HTPI thm 3.5.5)
+
+[remember Even(x) = ∃k ∈ ℤ, x = 2k, Odd(x) = ∃k ∈ ℤ, x = 2k + 1, and a number must be either Even or Odd (but not both)]
+
+```
+suppose m and n are integers. if mn is even, then either m is even or n is even.
+
+⊢ ∀m,n ∈ ℤ, Even(mn) → Even(m) ∨ Even(n)
+
+givens:
+- m,n ∈ ℤ 
+- Even(mn) ==> ∃k ∈ ℤ, mn = 2k
+⊢ Even(m) ∨ Even(n) ==> (∃k ∈ ℤ, m = 2k) ∨ (∃k ∈ ℤ, n = 2k)
+
+givens:
+- m,n ∈ ℤ 
+- Even(mn) ==> ∃k ∈ ℤ, mn = 2k
+- Even(m) ∨ Odd(m)
+⊢ Even(m) ∨ Even(n) ==> (∃k ∈ ℤ, m = 2k) ∨ (∃k ∈ ℤ, n = 2k)
+
+suppose mn is even. we proceed by cases:
+
+case 1: m is even. then there is nothing more to prove.
+
+case 2: m is odd. then there is some integer k s.t. m = 2k + 1. since mn is even,
+there is some integer j s.t. mn = 2j. so (2k + 1)n = 2j, and by rewriting we get
+that n = 2j - 2kn = 2(j - kn). since j - kn is an integer, n is even.
+```
 
 # relations
 ## cartesian product
