@@ -2604,12 +2604,58 @@ R = R⁻¹, xR⁻¹y. by definition of the inverse, yRx. therefore, R is symmetr
 - proof of theorem (3)
 
 ```
-TODO: [HTPI thm 4.5.4]
+we must prove the following:
+
+1. ⋃ A/R = A. since every equivalence class in A/R is a subset of A, ⋃ A/R ⊆ A.
+now we must prove that A ⊆ A/R. suppose x ∈ A. then since (by theorem 1) x ∈ [x],
+and since [x] ∈ A/R, x ∈ ⋃ A/R and thus A ⊆ ⋃ A/R. since ⋃ A/R ⊆ A and A ⊆ ⋃ A/R,
+⋃ A/R = A.
+
+2. A/R is pairwise disjoint. suppose X, Y ∈ A/R and X ∩ Y ≠ ∅. X and Y are
+equivalence classes (by definition), so for some x,y ∈ A, X = [x] and Y = [y].
+since X ∩ Y ≠ ∅, we can choose some z ∈ X ∩ Y = [x] ∩ [y]. thus, z ∈ [x]
+and z ∈ [y]. by theorem 2 [z] = [x] = [y], thus X = Y. therefore if X ≠ Y then
+X ∩ Y = ∅, so A/R is pairwise disjoint.
+
+3. ∀X ∈ A/R, X ≠ ∅. suppose X ∈ A/R. then there is some x s.t. X = [x]. by
+theorem 2, x ∈ [x] and so x ∈ X. therefore X ≠ ∅.
 ```
 
-## intro to modular arithmatic
+## intro to modular arithmetic
 
-- TODO: [HTPI pg 329...]
+- we can define a very useful family of equivalence relations as follows
+
+- DEF: suppose m ∈ ℤ⁺. for any x,y ∈ ℤ, we say that "x is congruent to y modulo m" if ∃k ∈ ℤ, x - y = km. in other words, m divides (x - y).
+
+    - we will use the notation `x ≡ y (mod m)`
+
+    - EXAMPLE: 12 ≡ 27 (mod 5), because 12 - 27 = -15 and 5 divides -3.
+
+- for any m ∈ ℤ⁺, define the relation {(x, y) ∈ ℤ × ℤ | x ≡ y (mod m)}
+
+    - we will call this relation `≡ₘ`
+    - i.e., `x ≡ₘ y` = `x ≡ y (mod m)`
+
+- theorem: for every m ∈ ℤ⁺, ≡ₘ is an equivalence relation (i.e., ≡ₘ is reflexive, symmetric, and transitive)
+
+    - proof left as an exercise
+
+- these relations give us _modular arithmetic_, which is heavily used in many places (e.g., crypto)
+
+- what is it doing? suppose we are using ≡₄
+
+    - 0, 1,  2,  3
+    - 4, 5,  6,  7
+    - 8, 9, 10, 11
+    - ...
+
+    - each column is an equivalence class
+
+    - addition "wraps around", e.g., 6 + 7 = 2 + 3 = 1
+
+- in fact, when you use unsigned integers in C/C++, you are operating on ≡_(2^64)
+
+- we'll talk more about modular arithmetic later in the course
 
 # functions - TODO: (HTPI 5)
 
