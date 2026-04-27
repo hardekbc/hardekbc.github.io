@@ -2540,17 +2540,17 @@ therefore, T ∘ (S ∘ R) = (T ∘ S) ∘ R.
 
 ## binary relations and graphs
 
-- a binary relation R ⊆ A × A can also be called "a relation on A"
+- a binary relation R ⊆ A × A can also be called "a relation on A", and can also be written as A²
 
 - EXAMPLES
 
-    - A = {1,2}, B = 𝒫(A), and S = {(x,y) ∈ B × B | x ⊆ y}
+    - A = {1,2}, B = 𝒫(A), and S = {(x,y) ∈ B² | x ⊆ y}
         - S is a relation on B
 
-    - for some set A, I = {(x, y) ∈ A × A | x = y}
+    - for some set A, I = {(x, y) ∈ A² | x = y}
         - I is a relation on A
 
-    - for some positive real number r, D_r = {(x,y) ∈ ℝ × ℝ | |x-y| < r}
+    - for some positive real number r, D_r = {(x,y) ∈ ℝ² | |x-y| < r}
         - D_r is a relation on ℝ 
 
 - for a relation R on some set A, another way to represent it is as a _graph_
@@ -2601,7 +2601,7 @@ R = R⁻¹, xR⁻¹y. by definition of the inverse, yRx. therefore, R is symmetr
 
 ## equivalence relations
 
-- relations that are reflexive, symmetric, and transitive are called _equivalence relations_
+- binary relations that are reflexive, symmetric, and transitive are called _equivalence relations_
 
     - EXAMPLES: equals, has-the-same-birthday
     - [explain how each is RST]
@@ -2646,7 +2646,7 @@ R = R⁻¹, xR⁻¹y. by definition of the inverse, yRx. therefore, R is symmetr
     - then C is a partition of A
     - also any partition of A defines an equivalence relation
 
-- EXAMPLE: S = {(x,y) ∈ ℝ × ℝ | x - y ∈ ℤ}
+- EXAMPLE: S = {(x,y) ∈ ℝ² | x - y ∈ ℤ}
 
     - for any x ∈ ℝ, x - x = 0 ∈ ℤ ==> reflexive
     - suppose (x,y) ∈ S; then x-y ∈ ℤ. but then -(x-y) = y-x ∈ ℤ ==> symmetric
@@ -2686,7 +2686,7 @@ X ∩ Y = ∅, so A/R is pairwise disjoint.
 theorem 2, x ∈ [x] and so x ∈ X. therefore X ≠ ∅.
 ```
 
-## intro to modular arithmetic
+## intro to modular arithmetic [WAIT UNTIL NUMBER THEORY? CHECK EXERCISES]
 
 - we can define a very useful family of equivalence relations as follows
 
