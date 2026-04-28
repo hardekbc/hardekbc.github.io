@@ -2314,6 +2314,8 @@ that n = 2j - 2kn = 2(j - kn). since j - kn is an integer, n is even.
 
 - we will now build on top of sets to create other useful mathematical objects, specifically _relations_
 
+    - relations underly many important concepts in CS, e.g., databases are all about relations---the database courses will talk a lot about how to efficiently implement and query relations
+
 - first we introduce pairs and tuples
 
     - `(a, b)` is a 2-tuple (i.e., pair) whose first element is `a` and whose second element is `b`
@@ -2322,7 +2324,7 @@ that n = 2j - 2kn = 2(j - kn). since j - kn is an integer, n is even.
 
     - order and repetition matter, unlike sets
 
-        - `(a, b)` is different from `(b, a)` and from `(a, a, b)`
+        - `(a, b)` ≠ `(b, a)` ≠ `(b, b, a)`
 
         - `{a, b}` and `(a, b)` are two entirely different things
 
@@ -2334,7 +2336,7 @@ that n = 2j - 2kn = 2(j - kn). since j - kn is an integer, n is even.
 
     - truth sets for multvariate predicates: the elements of the truth set of `P(x, y)` are pairs `(a, b)` such that setting `x = a` and `y = b` make the predicate true
 
-        - let `P(x, y)` = `x` and `y` are integers and `x < y`; its truth set = `{(-1, 0), (42, 100), ...}`
+        - let `P(x, y)` = `x` and `y` are integers and `x < y`; its truth set = `{..., (-1, 0), ..., (42, 100), ...}`
 
 - what does this have to do with sets? we can use sets to describe the domain of a tuple, i.e., what objects can be used for which elements
 
@@ -2405,7 +2407,7 @@ y ∈ B, and the proof fails.
     - we tweak the conjecture to correct the failure
     - we try to prove it again
 
-- EXERCISE: prove the corrected conjecture
+- EXERCISE: prove the corrected conjecture [MAYBE SKIP FOR TIME?]
 
 ```SOLN
 (→) suppose A × B = B × A. if either A = ∅ or B = ∅ then both A × B and B × A are
@@ -2423,17 +2425,15 @@ case 3. A = B. then A × B = A × A = B × A
 
 - DEF: a set R ⊆ A × B is a _relation_ from A to B
 
-    - intuitively we can think of A × B as the domain of the truth set for some binary predicate, e.g., the predicate P(x, y) defines a relation according to the truth set of P(x, y)
-
-    - however, our definition doesn't depend on the idea of truth sets: any set meeting the definition is a relation
-
     - specifically this is a _binary relation_; relations can also be n-ary, e.g., R ⊆ A × B × C × D
 
 - EXAMPLES
 
-    - A = {1, 2, 3}, B = {a, b, c}, R ⊆ A × B = {(1,a), (2,b), (3,c)}
+    - A = {1, 2, 3}, B = {a, b, c}, 
+        - R ⊆ A × B = {(1,a), (2,b), (3,c)}
     - {(x, y) ∈ ℝ × ℝ | x > y}
-    - A = {1, 2}, B = 𝒫(A), R ⊆ A × B = {(x, y) ∈ A × B | x ∈ y}
+    - A = {1, 2}, B = 𝒫(A)
+        - R ⊆ A × B = {(x, y) ∈ A × B | x ∈ y}
         - R = {(1, {1}), (1, {1,2}), (2, {2}), (2, {1, 2})}
     - {(s, d) ∈ Students × Dorms | s lives in d}
     - {(s, c) ∈ Students × Courses | s is enrolled in c}
@@ -2454,42 +2454,46 @@ case 3. A = B. then A × B = A × A = B × A
 
 - for composition:
 
-    - notice that S ⊆ B × C, R ⊆ A × B, and S ∘ R ⊆ A × C, i.e., we compute the composition from right to left
+    - notice that if S ⊆ B × C and R ⊆ A × B then S ∘ R ⊆ A × C
+    
+    - i.e., we compute the composition from right to left
 
     - this is exactly the database `join` operation...database tables are relations, and joins, projections, etc are operations on relations
 
 - EXAMPLES: what are the domains of the following relations?
 
-    - {(x, y) ∈ ℝ × ℝ | x > y}?
-        - SOLN: ℝ 
+    - `{(x, y) ∈ ℝ² | x > y}?`
+        - SOLN: `ℝ`
 
-    - {(s, d) ∈ Students × Dorms | s lives in d}?
-        - SOLN: {s ∈ Students | ∃d ∈ Dorms, s lives in d}
+    - `{(s, d) ∈ Students × Dorms | s lives in d}`?
+        - SOLN: `{s ∈ Students | ∃d ∈ Dorms, s lives in d}`
         - NOT Students!
 
 - EXAMPLES: what are the ranges of the following relations?
 
-    - A = {1, 2}, B = 𝒫(A), R ⊆ A × B = {(x, y) ∈ A × B | x ∈ y}?
-        - { {1}, {2}, {1,2} }
+    - `A = {1, 2}`, `B = 𝒫(A)`, `R ⊆ A × B = {(x, y) ∈ A × B | x ∈ y}`?
+        - `{ {1}, {2}, {1,2} }`
         - NOT 𝒫(A)!
 
-    - {(c, p) ∈ Courses × Professors | c is taught by p}?
-        - {p ∈ Professors | ∃c ∈ Courses, p teaches c }
+    - `{(c, p) ∈ Courses × Professors | c is taught by p}`?
+        - `{p ∈ Professors | ∃c ∈ Courses, p teaches c }`
         - NOT Professors!
 
-- EXAMPLES: what is the composition of T = {(c, p) ∈ Courses × Professors | c is taught by p} and E = {(s, c) ∈ Students × Courses | s is enrolled in c}?
+- EXAMPLES: what is the composition of:
+    `T = {(c, p) ∈ Courses × Professors | c is taught by p}` and 
+    `E = {(s, c) ∈ Students × Courses | s is enrolled in c}`?
 
     - note that E ⊆ Students × Courses and T ⊆ Courses × Professors, so T ∘ E ⊆ Students × Professors
 
     - {(s, p) ∈ Students × Professors | s is enrolled in a course taught by p}
 
-    - the fact that E ∘ T seems backward can trip you up, you just need to remember the proper order (why it's "backwards" will make more sense later)
+    - the fact that T ∘ E seems backward can trip you up, you just need to remember the proper order (why it's "backwards" will make more sense later)
 
 - EXERCISE
 
-    - let L = {(s, d) ∈ Students × Dorms | s lives in d}
-          E = {(s, c) ∈ Students × Courses | s is enrolled in c}
-          T = {(c, p) ∈ Courses × Professors | c is taught by p}
+    - let `L = {(s, d) ∈ Students × Dorms | s lives in d}`
+          `E = {(s, c) ∈ Students × Courses | s is enrolled in c}`
+          `T = {(c, p) ∈ Courses × Professors | c is taught by p}`
 
     - describe the following relations using set comprehensions, where the predicate is in English
 
@@ -2502,12 +2506,12 @@ case 3. A = B. then A × B = A × A = B × A
 
     - SOLUTIONS
 
-        - {(c,s) ∈ Courses × Students | s is enrolled in c}
-        - {(d,c) ∈ Dorms × Courses | some student living in d is enrolled in c}
-        - {(s1,s2) ∈ Students × Students | there is some course that s1 and s2 are both enrolled in}
-        - {(c1,c2) ∈ Courses × Courses | there is some student enrolled in both c1 and c2}
-        - {(d,p) ∈ Dorms × Professors | some student lives in d is enrolled in a course taught by p}
-        - same as above
+        1. {(c,s) ∈ Courses × Students | s is enrolled in c}
+        2. {(d,c) ∈ Dorms × Courses | some student living in d is enrolled in c}
+        3. {(s1,s2) ∈ Students × Students | there is some course that s1 and s2 are both enrolled in}
+        4. {(c1,c2) ∈ Courses × Courses | there is some student enrolled in both c1 and c2}
+        5. {(d,p) ∈ Dorms × Professors | some student lives in d is enrolled in a course taught by p}
+        6. same as above
 
     - notice that (3) and (4) are different, showing that composition is _not_ commutative, but (5) and (6) are the same, indicating that composition _might_ be associative (we have an example, not a proof)
 
@@ -2540,17 +2544,17 @@ therefore, T ∘ (S ∘ R) = (T ∘ S) ∘ R.
 
 ## binary relations and graphs
 
-- a binary relation R ⊆ A × A can also be called "a relation on A", and can also be written as A²
+- a binary relation R ⊆ A × A can also be called "a relation on A" (instead of "a relation from A to A"), and can also be written as A²
 
 - EXAMPLES
 
-    - A = {1,2}, B = 𝒫(A), and S = {(x,y) ∈ B² | x ⊆ y}
-        - S is a relation on B
+    - `A = 𝒫({1,2})`, and `S = {(x,y) ∈ A² | x ⊆ y}`
+        - S is a relation on A
 
-    - for some set A, I = {(x, y) ∈ A² | x = y}
+    - for some set A, `I = {(x, y) ∈ A² | x = y}`
         - I is a relation on A
 
-    - for some positive real number r, D_r = {(x,y) ∈ ℝ² | |x-y| < r}
+    - for some positive real number r, `D_r = {(x,y) ∈ ℝ² | |x-y| < r}`
         - D_r is a relation on ℝ 
 
 - for a relation R on some set A, another way to represent it is as a _graph_
@@ -2574,7 +2578,7 @@ therefore, T ∘ (S ∘ R) = (T ∘ S) ∘ R.
 
 - EXAMPLE: the example graph for S above is reflexive and transitive, but not symmetric
 
-- EXERCISES: identify whether the following relations are reflexive, symmetric, and/or transitive
+- EXERCISE [MAYBE EXAMPLE INSTEAD?]: identify whether the following relations are reflexive, symmetric, and/or transitive
 
     1. = on integers [RST]
     2. < on integers [T]
@@ -2621,7 +2625,7 @@ R = R⁻¹, xR⁻¹y. by definition of the inverse, yRx. therefore, R is symmetr
     - no object can be in more than one partition
     - [draw example with has-same-birthday]
 
-- notation: [x]_R is the equivalence class from R that contains x
+- notation: `[x]_R` is the equivalence class from R that contains x
 
     - EXAMPLE: [bob]_has-same-birthday = {x | x has the same birthday as bob}
     - we can omit the _R if it is obvious from context, e.g., [bob]
@@ -2686,7 +2690,7 @@ X ∩ Y = ∅, so A/R is pairwise disjoint.
 theorem 2, x ∈ [x] and so x ∈ X. therefore X ≠ ∅.
 ```
 
-## intro to modular arithmetic [WAIT UNTIL NUMBER THEORY? CHECK EXERCISES]
+## intro to modular arithmetic [WAIT UNTIL NUMBER THEORY? CHECK TIME]
 
 - we can define a very useful family of equivalence relations as follows
 
@@ -2722,10 +2726,84 @@ theorem 2, x ∈ [x] and so x ∈ X. therefore X ≠ ∅.
 
 - we'll talk more about modular arithmetic later in the course
 
-# functions - TODO: (HTPI 5)
+# functions
 
-% [5.1] functions
-%
+- building on top of relations, we define the notion of "functions"
+
+    - you've encountered functions in math and in programming, but the exact meaning has been hand-waved...now we can define them exactly
+
+- DEF: suppose F ⊆ A × B. then F is a function from A to B if for every a ∈ A, there is exactly one b ∈ B s.t. (a,b) ∈ F
+
+    - in other words, F is a function if
+    
+        1. every element of A is mapped to some element of B (a relation with this property is called `total`)
+        
+        2. no element of A is mapped to two different elements of B (i.e., the result is deterministic)
+
+    - notation: `F : A → B`
+
+- EXAMPLES: determine for each of the following whether F is a function
+
+    1. A = {1,2,3}; B = {4,5,6}; F = {(1,5), (2,4), (3,5)}
+    2. A = {1,2,3}; B = {4,5,6}; F = {(1,5), (2,4), (1,6)}
+    3. F = {(c,n) ∈ Cities × Countries | c is located in n}
+    4. F = {(p,q) ∈ People × People | p is the parent of q}
+    5. F = {(p,cs) ∈ People × 𝒫(People) | cs are the children of p}
+    6. F = {(a,a) | a ∈ A}
+    7. F = {(x,y) ∈ ℝ² | y = x²}
+
+    [SOLUTIONS]
+
+    1. yes
+    2. no (not total, 1 mapped to two different elements)
+    3. yes
+    4. no (not everyone is a parent, some are parents of multiple children)
+    5. yes
+    6. yes
+    7. yes
+
+- terminology (let `f : A → B`):
+
+    - for `a ∈ A`, `f(a)` is "the value of f at a" (or "the image of a under f", or "f of a")
+
+    - `f(a) = b` iff `(a,b) ∈ f`
+
+    - `A` is the domain of F; `B` is the codomain of F
+
+    - note the different between the codomain of a function and the range of a relation, exemplified by example (1) above: the range of F is {4,5}, but the codomain of F is {4,5,6}
+
+- as we've seen in the examples above, we can define a function either by explicitly defining its members or by defining a rule that maps an input to an output
+
+    - when defining a function using a rule, we'll often use notation like the following, using examples 6 and 7: `F(a) = a`; `F(x) = x²`
+
+- the domain and codomain are important characteristics of a function
+
+    - let g : ℤ → ℝ be defined as g(x) = 2x + 1
+    - let h : ℝ → ℝ be defined as h(x) = 2x + 1
+
+    - g and h are two distinct functions, even though they have the same definition, because their domains are different
+
+    - e.g., h(π) = 2π + 1, but g is not defined for π 
+
+- two functions f and g are equal iff:
+
+    - they have the same domain and codomain
+    - ∀x ∈ Domain, f(x) = g(x)
+
+- note that because functions are relations, everything we talked about for relations also applies to functions
+
+    - for instance, we can compose functions, and in fact the composition of two functions is itself a function
+
+    - (HTPI Thm 5.1.5): suppose f : A → B and g : B → C. then g ∘ f : A → C, and for any a ∈ A, (g ∘ f)(a) = g(f(a)).
+
+```
+TODO:
+```
+
+- notice that function composition is the motivation for the way we defined composition: we read g ∘ f from right-to-left because we apply f first, then we apply g
+
+% TODO: add a note about math functions vs lambda calculus vs C/C++ functions vs functional PL
+
 % [5.2] injection, surjection
 %
 % [5.3] inverses, bijection
