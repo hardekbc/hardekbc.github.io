@@ -2595,7 +2595,11 @@ therefore, T ∘ (S ∘ R) = (T ∘ S) ∘ R.
 - proof of theorem (1)
 
 ```
-(→) suppose R ⊆ A × A is symmetric. let x,y be arbitrary elements of A and xRy.
+suppose R ⊆ A × A is empty. then R is vacuously symmetric. by definition, R⁻¹ is 
+also empty and so R = R⁻¹. Now suppose for the following that that R is non-empty,
+and hence A is also non-empty.
+
+(→) suppose R is symmetric. let x,y be arbitrary elements of A and xRy.
 then since R is symmetric, yRx. since yRx, xR⁻¹y. because x and y were arbitrary, 
 it follows that R ⊆ R⁻¹. now suppose xR⁻¹y. by definition of the inverse, yRx. 
 since R is symmetric, xRy. because x and y were arbitrary, it follows that 
@@ -2606,6 +2610,8 @@ R = R⁻¹, xR⁻¹y. by definition of the inverse, yRx. therefore, R is symmetr
 ```
 
 - the key to proofs about symmetry, reflexivity, and transitivity is to refer to their definitions
+
+- also note that according to their definitions, an empty relation is vacuously reflexive, symmetric, and transitive.
 
 ## equivalence relations
 
