@@ -2359,9 +2359,11 @@ that n = 2j - 2kn = 2(j - kn). since j - kn is an integer, n is even.
 - PROOF OF THEOREM 1
 
 ```
-let (a, d) ∈ A × (B ∩ C). then a ∈ A, d ∈ B, and d ∈ C. since a ∈ A and d ∈ B,
+(->) let (a, d) ∈ A × (B ∩ C). then a ∈ A, d ∈ B, and d ∈ C. since a ∈ A and d ∈ B,
 (a, d) ∈ A × B. since a ∈ A and d ∈ C, (a, d) ∈ A × C. therefore (a, d) ∈ 
 (A × B) ∩ (A × C).
+
+(<-) left as an exercise for the reader
 ```
 
 - we may ask you to do proofs for the other theorems in assignments, quizzes, or the final
@@ -2542,7 +2544,7 @@ therefore, T ∘ (S ∘ R) = (T ∘ S) ∘ R.
 
 - note the hand-waving going on for direction 2 of the proof...this is common, but somewhat dangerous
 
-## binary relations and graphs
+## relations on a set (and graphs)
 
 - a binary relation R ⊆ A × A can also be called "a relation on A" (instead of "a relation from A to A"), and can also be written as A²
 
@@ -2578,7 +2580,7 @@ therefore, T ∘ (S ∘ R) = (T ∘ S) ∘ R.
 
 - EXAMPLE: the example graph for S above is reflexive and transitive, but not symmetric
 
-- EXERCISE [MAYBE EXAMPLE INSTEAD?]: identify whether the following relations are reflexive, symmetric, and/or transitive
+- EXERCISE: identify whether the following relations are reflexive, symmetric, and/or transitive
 
     1. = on integers [RST]
     2. < on integers [T]
@@ -2602,6 +2604,8 @@ R⁻¹ ⊆ R. therefore R = R⁻¹.
 (←) suppose R = R⁻¹, and let x,y be arbitrary elements of A. suppose xRy. since
 R = R⁻¹, xR⁻¹y. by definition of the inverse, yRx. therefore, R is symmetric.
 ```
+
+- the key to proofs about symmetry, reflexivity, and transitivity is to refer to their definitions
 
 ## equivalence relations
 
@@ -2690,7 +2694,7 @@ X ∩ Y = ∅, so A/R is pairwise disjoint.
 theorem 2, x ∈ [x] and so x ∈ X. therefore X ≠ ∅.
 ```
 
-## intro to modular arithmetic [WAIT UNTIL NUMBER THEORY? CHECK TIME]
+## intro to modular arithmetic
 
 - we can define a very useful family of equivalence relations as follows
 
@@ -2762,6 +2766,9 @@ theorem 2, x ∈ [x] and so x ∈ X. therefore X ≠ ∅.
     6. yes
     7. yes
 
+
+% TODO: add a note about math functions vs lambda calculus vs C/C++ functions vs functional PL
+
 - terminology (let `f : A → B`):
 
     - for `a ∈ A`, `f(a)` is "the value of f at a" (or "the image of a under f", or "f of a")
@@ -2797,13 +2804,25 @@ theorem 2, x ∈ [x] and so x ∈ X. therefore X ≠ ∅.
     - (HTPI Thm 5.1.5): suppose f : A → B and g : B → C. then g ∘ f : A → C, and for any a ∈ A, (g ∘ f)(a) = g(f(a)).
 
 ```
-TODO:
+proof that g ∘ f : A → C: let a ∈ A. we must show that there is a unique c ∈ C 
+s.t. (a,c) ∈ g ∘ f.
+
+existence: let b = f(a) ∈ B and c = g(b) ∈ C. then (a,b) ∈ f and (b,c) ∈ g, so by
+the definition of composition, (a,c) ∈ g ∘ f.
+
+uniqueness: suppose (a,c1) ∈ g ∘ f and (a, c2) ∈ g ∘ f. by the definition of
+composition, we can choose some b1 ∈ B s.t. (a,b1) ∈ f and (b1,c1) ∈ g, and we
+can choose some b2 ∈ B s.t. (a,b2) ∈ f and (b2,c2) ∈ g. since f is a function,
+b1 = b2. then since g is a function, c1 = c2.
+
+proof that (g ∘ f)(a) = g(f(a)): shown in the existence part of the proof by 
+letting b = f(a) and c = g(b); thus (g ∘ f)(a) = g(f(a)).
 ```
 
 - notice that function composition is the motivation for the way we defined composition: we read g ∘ f from right-to-left because we apply f first, then we apply g
 
-% TODO: add a note about math functions vs lambda calculus vs C/C++ functions vs functional PL
-
+% TODO:
+%
 % [5.2] injection, surjection
 %
 % [5.3] inverses, bijection
