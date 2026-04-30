@@ -2544,9 +2544,9 @@ therefore, T ∘ (S ∘ R) = (T ∘ S) ∘ R.
 
 - note the hand-waving going on for direction 2 of the proof...this is common, but somewhat dangerous
 
-## relations on a set (and graphs)
+## binary self-relations (and graphs)
 
-- a binary relation R ⊆ A × A can also be called "a relation on A" (instead of "a relation from A to A"), and can also be written as A²
+- a binary self-relation R ⊆ A × A can also be called "a relation on A" (instead of "a relation from A to A"), and can also be written as A²
 
 - EXAMPLES
 
@@ -2587,7 +2587,7 @@ therefore, T ∘ (S ∘ R) = (T ∘ S) ∘ R.
     3. ⊆ on sets     [RT]
     4. {(1,2), (1,3), (2,1), (2,2), (3,1), (3,3)} [S]
 
-- theorems about binary relations
+- theorems about binary self-relations
 
     1. R is symmetric iff R = R⁻¹
     2. R is transitive iff R ∘ R ⊆ R
@@ -2609,7 +2609,7 @@ R⁻¹ ⊆ R. therefore R = R⁻¹.
 R = R⁻¹, xR⁻¹y. by definition of the inverse, yRx. therefore, R is symmetric.
 ```
 
-- the key to proofs about symmetry, reflexivity, and transitivity is to refer to their definitions
+- the key to proofs about symmetry, reflexivity, and transitivity is to refer to their definitions (and any known theorems about them, such as the above)
 
 - also note that according to their definitions, an empty relation is vacuously reflexive, symmetric, and transitive.
 
