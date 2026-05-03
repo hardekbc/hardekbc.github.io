@@ -4,9 +4,15 @@
 
 - i think it's a mistake to rely entirely on lectures; what i should have done is assigned reading, then reviewed important points in lecture (and given examples and exercises)
 
+    - this is maybe where clickers would come in handy: quiz the students to get an idea of their comprehension
+
 - think about whether it would be better to have weekly or semi-weekly assignments, in terms of how much material we can cover and interaction with quizzes
 
-- think about whether a series of in-class quizzes is the right thing to do
+- think about whether a series of in-class quizzes is the right thing to do (as opposed to a midterm)
+
+    - pros: it helps the students keep track of their progress over time; students don't have to cram for a midterm; the material is fresh in their heads; can maybe be more comprehensive compared to a midterm
+
+    - cons: makes the assignment schedule weird if we want students to have assignment solutions before the relevant quiz; lots of extra hassle to prepare and grade
 
 - assignment 1 
 
@@ -2737,6 +2743,7 @@ theorem 2, x ∈ [x] and so x ∈ X. therefore X ≠ ∅.
 - we'll talk more about modular arithmetic later in the course
 
 # functions
+## intro
 
 - building on top of relations, we define the notion of "functions"
 
@@ -2761,19 +2768,26 @@ theorem 2, x ∈ [x] and so x ∈ X. therefore X ≠ ∅.
     5. F = {(p,cs) ∈ People × 𝒫(People) | cs are the children of p}
     6. F = {(a,a) | a ∈ A}
     7. F = {(x,y) ∈ ℝ² | y = x²}
+    7. F = {(x,y) ∈ ℝ² | x = y²}
 
     [SOLUTIONS]
 
     1. yes
-    2. no (not total, 1 mapped to two different elements)
+    2. no (not total; 1 mapped to two different elements)
     3. yes
     4. no (not everyone is a parent, some are parents of multiple children)
     5. yes
     6. yes
     7. yes
+    8. no (not total; numbers mapped to two different elements)
 
+- the lambda calculus is a fundemantal model of computation (equivalent to turing machines), and it is entirely based on mathematical functions
 
-% TODO: add a note about math functions vs lambda calculus vs C/C++ functions vs functional PL
+    - [show λ-calculus syntax]
+
+    - functional languages are just syntactic sugar on top of the lambda calculus
+
+    - sometimes we call things in languages like C/C++ functions that are _not_ really functions...this is unfortunate terminology, they should be called procedures
 
 - terminology (let `f : A → B`):
 
@@ -2784,6 +2798,8 @@ theorem 2, x ∈ [x] and so x ∈ X. therefore X ≠ ∅.
     - `A` is the domain of F; `B` is the codomain of F
 
     - note the different between the codomain of a function and the range of a relation, exemplified by example (1) above: the range of F is {4,5}, but the codomain of F is {4,5,6}
+
+    - domain means the same thing as with relations, but because functions are total the domain will always be the entire set, not a subset
 
 - as we've seen in the examples above, we can define a function either by explicitly defining its members or by defining a rule that maps an input to an output
 
@@ -2827,11 +2843,122 @@ letting b = f(a) and c = g(b); thus (g ∘ f)(a) = g(f(a)).
 
 - notice that function composition is the motivation for the way we defined composition: we read g ∘ f from right-to-left because we apply f first, then we apply g
 
-% TODO:
-%
-% [5.2] injection, surjection
-%
-% [5.3] inverses, bijection
+## injection, surjection, bijection
+
+- there are several interesting potential properties of functions, i.e., things that that may be true of a particular function
+
+- DEF: suppose f : A → B. f is _one-to-one_ (or an _injection_) if no two elements of the domain map to the same element of the codomain
+
+    - ∀x,y ∈ A, x ≠ y → f(x) ≠ f(y)
+    - ∀x,y ∈ A, f(x) = f(y) → x = y [without negatives]
+    - there are no duplicate mappings
+
+- DEF: suppose f : A → B. f is _onto_ (or a _surjection_) if every element of the codomain is mapped to by some element of the domain
+
+    - ∀b ∈ B, ∃a ∈ A, f(a) = b
+    - or: ran(f) = B
+    - there are no left-out elements of the codomain (the dual of "total")
+
+- EXAMPLES: are the following functions injections and/or surjections?
+
+    1. A = {1,2,3}; B = {4,5,6}; F = {(1,5), (2,4), (3,5)}
+    3. F = {(c,n) ∈ Cities × Countries | c is located in n}
+    6. F = {(a,a) | a ∈ A}
+    7. F = {(x,y) ∈ ℝ² | y = x²}
+
+    [SOLUTIONS]
+
+    1. neither
+    3. surjection (assuming every country has at least one city)
+    6. injection and surjection
+    7. injection
+
+- EXAMPLE: let A = ℝ ∖ {-1} and f : A → ℝ be f(a) = 2a/(a+1). prove that f is one-to-one but not onto
+
+```
+part 1: f is one-to-one. then ∀x,y ∈ A, f(x) = f(y) → x = y. let x, y ∈ A be 
+arbitrary and f(x) = f(y). then:
+  2x/(x+1) = 2y/(y+1)
+  2x(y+1) = 2y(x+1)
+  2xy + 2x = 2yx + 2y
+  2x = 2y
+  x = y
+therefore f is one-to-one.
+
+part 2: f is not onto. then ∃r ∈ ℝ, ∀a ∈ A, f(a) ≠ r. let r = 2 and a ∈ A, then
+we will prove f(a) ≠ 2 by contradiction. suppose f(a) = 2. then:
+  2a/(a+1) = 2
+  2a = 2(a+1)
+  2a = 2a + 1
+  0 = 1
+this is a contradiction, so f(a) ≠ 2. since a was arbitrary, ∀a ∈ A, f(a) ≠ 2.
+therefore f is not onto.
+
+how did we know to pick r = 2? let's try to prove that f _is_ onto; then
+∀x ∈ ℝ, ∃a ∈ A, f(a) = x. let x ∈ ℝ, then we need some a ∈ A s.t. f(a) = x.
+by the definition of f, 2a/(a+1) = x; solving for a we get a = x(2 - x). this
+clearly doesn't work is a = 2, which gives is our hint for what r needs to be.
+```
+
+- suppose f : A → B and g : B → C, thus (from a previous theorem) g ∘ f : A → C.
+
+    - Thm (1): if f and g are one-to-one, then g ∘ f is one-to-one
+    - Thm (2): if f and g are onto, then g ∘ f is onto
+
+- EXERCISE
+
+    - prove Thm (1)
+    - prove Thm (2)
+
+```
+Thm (1): suppose f and g are one-to-one. g ∘ f is one-to-one iff ∀x,y ∈ A,
+(g ∘ f)(x) = (g ∘ f)(y) → x = y. let x,y ∈ A and (g ∘ f)(x) = (g ∘ f)(y). by
+our previous theorem about function composition, g(f(x)) = g(f(y)). since g
+is one-to-one, f(x) = f(y). since f is one-to-one, x = y. therefore g ∘ f is 
+one-to-one.
+```
+
+```
+Thm (2): suppose f and g are onto. g ∘ f is onto iff ∀c ∈ C, ∃a ∈ A, f(a) = c.
+let c ∈ C. since g is onto, there is some b ∈ B s.t. g(b) = c. since f is onto,
+there is some a ∈ A s.t. f(a) = b. by definition of composition, (g ∘ f)(a) = c.
+since c was arbitrary, ∀c ∈ C, ∃a ∈ A, f(a) = c. therefore g ∘ f is onto.
+```
+
+- a function that is both one-to-one and onto (i.e., an injection and a surjection) is called a _bijection_
+
+    - bijections turn out to be important in a number of ways, which we'll explore later in this course
+
+- EXAMPLE: let f : ℤ⁺ → ℤ be defined as f(n) = n/2 if n is even, (1-n)/2 otherwise. f is a bijection.
+
+```
+1. f is one-to-one. let x,y ∈ ℕ and f(x) = f(y). if f(x) = f(y) > 0 then x and y
+must both be even, thus x/2 = y/2, thus x = 2. if f(x) = f(y) ≤ 0 then then x and
+y must be odd, thus (1-x)/2 = (1-y)/2, thus x = y. these cover all possible cases, 
+therefore f is one-to-one.
+
+2. f is onto. let x ∈ ℕ. if x > 0, let n = 2x; if x ≤ 0, let n = 1 - 2x. in either
+case, f(n) = x. therefore f is onto.
+```
+
+- remember that functions are relations, so we can invert them (i.e., reverse the mapping)...is the inverse of a function also a function?
+
+- theorem: the inverse of a function f : A → B is a function f⁻¹ : B → A iff f is a bijection
+
+```
+suppose f : A → B is one-to-one and onto. to show f⁻¹ is a function, we must show
+that it maps every element of B to a unique element of A. let b ∈ B.
+
+existence: since f is onto, there is some a ∈ A s.t. f(a) = b, which means that
+(a,b) ∈ f, so (b,a) ∈ f⁻¹. therefore f⁻¹ is total.
+
+uniqueness: suppose (b, a1) ∈ f⁻¹ and (b, a2) ∈ f⁻¹ for some a1,a2 ∈ A. then
+(a1, b) ∈ f and (a2, b) ∈ f, i.e., f(a1) = b and f(a2) = b. since f is one-to-one,
+a1 = a2.
+
+f⁻¹ is total and maps every element of B to a unique element of A, therefore 
+f⁻¹ : B → A.
+```
 
 # induction - TODO: (HTPI 6)
 
