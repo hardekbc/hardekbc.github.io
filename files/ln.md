@@ -2706,42 +2706,6 @@ X ∩ Y = ∅, so A/R is pairwise disjoint.
 theorem 2, x ∈ [x] and so x ∈ X. therefore X ≠ ∅.
 ```
 
-## intro to modular arithmetic
-
-- we can define a very useful family of equivalence relations as follows
-
-- DEF: suppose m ∈ ℤ⁺. for any x,y ∈ ℤ, we say that "x is congruent to y modulo m" if ∃k ∈ ℤ, x - y = km. in other words, m divides (x - y).
-
-    - we will use the notation `x ≡ y (mod m)`
-
-    - EXAMPLE: 12 ≡ 27 (mod 5), because 12 - 27 = -15 and 5 divides -3.
-
-- for any m ∈ ℤ⁺, define the relation {(x, y) ∈ ℤ × ℤ | x ≡ y (mod m)}
-
-    - we will call this relation `≡ₘ`
-    - i.e., `x ≡ₘ y` = `x ≡ y (mod m)`
-
-- theorem: for every m ∈ ℤ⁺, ≡ₘ is an equivalence relation (i.e., ≡ₘ is reflexive, symmetric, and transitive)
-
-    - proof left as an exercise
-
-- these relations give us _modular arithmetic_, which is heavily used in many places (e.g., crypto)
-
-- what is it doing? suppose we are using ≡₄
-
-    - 0, 1,  2,  3
-    - 4, 5,  6,  7
-    - 8, 9, 10, 11
-    - ...
-
-    - each column is an equivalence class
-
-    - addition "wraps around", e.g., 6 + 7 = 2 + 3 = 1
-
-- in fact, when you use unsigned integers in C/C++, you are operating on ≡_(2^64)
-
-- we'll talk more about modular arithmetic later in the course
-
 # functions
 ## intro
 
@@ -2968,13 +2932,46 @@ f⁻¹ : B → A.
 %
 % [6.4] strong induction
 %
-% [XXX] structural induction
+% [XXX] structural induction (see ccs2 notes)
 
 # number theory - TODO: (HTPI 7)
 
-% [7.1] gcd
-%
-% [7.3] modular arithmetic
+## gcd
+
+## modular arithmetic
+### intro to modular arithmetic (HTPI 4.5)
+
+- we can define a very useful family of equivalence relations as follows
+
+- DEF: suppose m ∈ ℤ⁺. for any x,y ∈ ℤ, we say that "x is congruent to y modulo m" if ∃k ∈ ℤ, x - y = km. in other words, m divides (x - y).
+
+    - we will use the notation `x ≡ y (mod m)`
+
+    - EXAMPLE: 12 ≡ 27 (mod 5), because 12 - 27 = -15 and 5 divides -3.
+
+- for any m ∈ ℤ⁺, define the relation {(x, y) ∈ ℤ × ℤ | x ≡ y (mod m)}
+
+    - we will call this relation `≡ₘ`
+    - i.e., `x ≡ₘ y` = `x ≡ y (mod m)`
+
+- theorem: for every m ∈ ℤ⁺, ≡ₘ is an equivalence relation (i.e., ≡ₘ is reflexive, symmetric, and transitive)
+
+    - proof left as an exercise
+
+- these relations give us _modular arithmetic_, which is heavily used in many places (e.g., crypto)
+
+- what is it doing? suppose we are using ≡₄
+
+    - 0, 1,  2,  3
+    - 4, 5,  6,  7
+    - 8, 9, 10, 11
+    - ...
+
+    - each column is an equivalence class
+
+    - addition "wraps around", e.g., 6 + 7 = 2 + 3 = 1
+
+- in fact, when you use unsigned integers in C/C++, you are operating on ≡_(2^64)
 
 # infinite sets - TODO: (HTPI 8)
 
