@@ -2663,7 +2663,7 @@ R = R⁻¹, xR⁻¹y. by definition of the inverse, yRx. therefore, R is symmetr
         - P is _pairwise disjoint_ (every pair of distinct elements in P are disjoint)
         - ∀X ∈ P, X ≠ ∅
 
-    - then C is a partition of A
+    - then A/E is a partition of A
     - also any partition of A defines an equivalence relation
 
 - EXAMPLE: S = {(x,y) ∈ ℝ² | x - y ∈ ℤ}
@@ -2725,29 +2725,43 @@ theorem 2, x ∈ [x] and so x ∈ X. therefore X ≠ ∅.
 
 - EXAMPLES: determine for each of the following whether F is a function
 
-    1. A = {1,2,3}; B = {4,5,6}; F = {(1,5), (2,4), (3,5)}
-    2. A = {1,2,3}; B = {4,5,6}; F = {(1,5), (2,4), (1,6)}
+    1. A = {1,2,3}; B = {4,5,6}; F ⊆ A × B = {(1,5), (2,4), (3,5)}
+    2. A = {1,2,3}; B = {4,5,6}; F ⊆ A × B = {(1,5), (2,4), (1,6)}
     3. F = {(c,n) ∈ Cities × Countries | c is located in n}
-    4. F = {(p,q) ∈ People × People | p is the parent of q}
-    5. F = {(p,cs) ∈ People × 𝒫(People) | cs are the children of p}
+    4. F = {(p,cs) ∈ People × 𝒫(People) | cs are the children of p}
+    5. F = {(p,q) ∈ People × People | p is the parent of q}
     6. F = {(a,a) | a ∈ A}
     7. F = {(x,y) ∈ ℝ² | y = x²}
-    7. F = {(x,y) ∈ ℝ² | x = y²}
+    8. F = {(x,y) ∈ ℝ² | x = y²}
 
     [SOLUTIONS]
 
     1. yes
     2. no (not total; 1 mapped to two different elements)
     3. yes
-    4. no (not everyone is a parent, some are parents of multiple children)
-    5. yes
+    4. yes
+    5. no (not everyone is a parent, some are parents of multiple children)
+    6. yes
+    7. yes
+    8. no (not total; numbers mapped to two different elements)
+
+- EXERCISE: determine for each of the following whether F is a function
+
+    5. F = {(p,q) ∈ People × People | p is the parent of q}
+    6. F = {(a,a) | a ∈ A}
+    7. F = {(x,y) ∈ ℝ² | y = x²}
+    8. F = {(x,y) ∈ ℝ² | x = y²}
+
+    [SOLUTIONS]
+
+    5. no (not everyone is a parent, some are parents of multiple children)
     6. yes
     7. yes
     8. no (not total; numbers mapped to two different elements)
 
 - the lambda calculus is a fundemantal model of computation (equivalent to turing machines), and it is entirely based on mathematical functions
 
-    - [show λ-calculus syntax]
+    - lambda calculus has syntax for defining functions and calling functions, and that's it: no numbers, arithmetic, assignments, loops, conditionals, etc---all are definable just using functions
 
     - functional languages are just syntactic sugar on top of the lambda calculus
 
