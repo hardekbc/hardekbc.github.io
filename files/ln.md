@@ -2924,7 +2924,14 @@ case, f(n) = x. therefore f is onto.
 - theorem: the inverse of a function f : A → B is a function f⁻¹ : B → A iff f is a bijection
 
 ```
-(->) TODO:
+(->) suppose f⁻¹ : B → A. we must show that f is one-to-one and onto.
+
+one-to-one: let x,y ∈ A s.t. f(x) = f(y). then there is some z ∈ B s.t. (x,z) ∈ f
+and (y,z) ∈ f, and so (z,x) ∈ f⁻¹ and (z,y) ∈ f⁻¹. but f⁻¹ is a function, so x = y.
+therefore f is one-to-one.
+
+onto: let b ∈ B. then there must be some a ∈ A s.t. f(a) = b. let a = f⁻¹(b). since
+(b,a) ∈ f⁻¹, then (a,b) ∈ f. therefore f is onto.
 
 (<-) suppose f : A → B is one-to-one and onto. to show f⁻¹ is a function, we must 
 show that it maps every element of B to a unique element of A. let b ∈ B.
