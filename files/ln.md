@@ -14,6 +14,8 @@
 
     - cons: makes the assignment schedule weird if we want students to have assignment solutions before the relevant quiz; lots of extra hassle to prepare and grade
 
+- when giving theorems in lecture i should name them so that students can refer to them in assignments, quizzes, and exams
+
 - assignment 1 
 
     - Q1(c) could be read as an imperative or a proposition (maybe add !)
@@ -2947,14 +2949,116 @@ f⁻¹ is total and maps every element of B to a unique element of A, therefore
 f⁻¹ : B → A.
 ```
 
-# induction - TODO: (HTPI 6)
+# induction
+## intro
 
-% [6.1] induction
-%
-% [6.2] more examples of induction
-%
-% [6.4] strong induction
-%
+- we have been using a variety of proof techniques and have put them into practice proving interesting things about sets, numbers, relations, and functions...but we are missing a very important proof technique called "induction"
+
+- induction is a critical proof technique, especially for CS, and will allow us to prove things that we could not before
+
+    - for example, we are currently unable to prove that numbers are either even or odd, but not both
+
+    - you'll see induction again in cs130A/B, e.g., to prove properties of various algorithms and data structures
+
+- we will begin with the most basic form of induction, using it on natural numbers
+
+    - we will see that even that can be used to prove things that aren't specifically about natural numbers
+
+    - later we will generalize induction to make it even more powerful
+
+## induction on natural numbers
+
+- suppose we want to prove that all natural numbers have some property P, i.e., `∀n ∈ ℕ, P(n)`
+
+- we already have a proof technique for ∀, but it isn't always helpful: assuming an arbitrary `n` doesn't necessarily give us enough information to prove what we're trying to prove
+
+- proof by induction: to prove `∀n ∈ ℕ, P(n)` it is sufficient to do the following:
+
+    1. prove `P(0)` [the base case]
+    2. prove `∀n ∈ ℕ, P(n) → P(n+1)` [the inductive step]
+
+- the intuition is that if `P(0)` is true and `∀n ∈ ℕ, P(n) → P(n+1)`, then it follows that `P(1)` is true, and if `P(1)` is true it follows that `P(2)` is true, and so on for all possible natural numbers
+
+- EXAMPLE 1: prove that `∀n ∈ ℕ, Σ(i = 0..n) 2ⁱ = 2ⁿ⁺¹ - 1`
+
+```
+we will use by induction on n.
+
+base case: 2⁰ = 1 = 2¹ - 1
+
+inductive step: let n ∈ ℕ and P(n), i.e., Σ(i = 0..n) 2ⁱ = 2ⁿ⁺¹ - 1. rewriting the 
+left-hand side and using P(n) we get (Σ(i = 0..n) 2ⁱ) + 2ⁿ⁺¹ = (2ⁿ⁺¹ - 1) + 2ⁿ⁺¹ =
+2⬝2ⁿ⁺¹ - 1 = 2ⁿ⁺² - 1.
+```
+
+- we didn't explicitly write for the inductive step that we must prove Σ(i = 0..n+1) 2ⁱ⁺¹ = 2ⁿ⁺² - 1; this goal is implied by the fact we're using induction
+
+- note that the inductive step is using the same proof techniques for ∀ and → that we've been using all quarter: we assume an arbitrary element `n ∈ ℕ`, then assume the antecedent `P(n)`, then try to prove `P(n+1)`
+
+    - students often get confused because it seems like we're assuming the thing that we're trying to prove...but we aren't: we're assuming that it's true _for an arbitrary n_, and proving that _if_ it's true for `n` _then_ it must be true for `n+1`
+
+    - sometimes people call the assumption `P(n)` the "inductive hypothesis", but there isn't anything really special about it...it's the same thing that we've been doing before
+
+- EXAMPLE 2: prove that `∀n ∈ ℕ, 3 | (n³ - n)`
+
+```
+we will use induction on n.
+
+base case: n = 0, so n³ - n = 0³ - 0 = 0 = 3⋅0, therefore 3 | (n³ - n)
+
+inductive step: let n ∈ ℕ and suppose 3 | (n³ - n). then there is some k ∈ ℤ s.t.
+3k = (n³ - n). so: 
+  (n + 1)³ - (n + 1) = n³ + 3n² + 3n + 1 - n - 1
+                     = (n³ - n) + 3n² + 3n
+                     = 3k + 3n² + 3n
+                     = 3(k + n² + n)
+therefore 3 | ((n + 1)³ - (n + 1))
+```
+
+- EXERCISE (HTPI 6.1 exercise 1): prove that `∀n ∈ ℕ, Σ(i = 0..n) i = n(n+1)/2`
+
+```SOLN
+base case: 0 = 0(0+1)/2
+
+inductive step: let n ∈ ℕ and suppose Σ(i = 0..n) i = n(n+1)/2. then
+  Σ(i = 0..n+1) i = (Σ(i = 0..n) i) + (n+1)
+                  = n(n+1)/2 + (n+1)
+                  = (n(n+1) + 2(n+1))/2
+                  = (n² + 3n + 2)/2
+                  = (n+1)(n+2)/2
+```
+
+## variations on induction over natural numbers
+
+- the basic induction over natural numbers always starts with 0, but it should be clear that we can start with any natural number we want
+
+- EXAMPLE: prove that `∀n ∈ ℕ ≥ 5, 2ⁿ > n²`
+
+```
+we will prove by induction on n starting from 5.
+
+base case: since n = 5, 2ⁿ = 32 > 25 = n²
+
+inductive step: let n ∈ ℕ ≥ 5 and suppose 2ⁿ > n². then:
+  2ⁿ⁺¹ = 2 ⋅ 2ⁿ
+       > 2n² (since 2ⁿ > n²)
+       = n² + n²
+       ≥ n² + 5n (since n ≥ 5)
+       = n² + 2n + 3n
+       > n² + 2n + 1
+       = (n + 1)²
+```
+
+%% induction on the size of a set or list, maybe another exercise
+
+## why induction works (and when it doesn't)
+
+## strong induction
+
+% [6.4] strong induction (see ccs2 notes)
+
+## structural induction
+
 % [XXX] structural induction (see ccs2 notes)
 
 # number theory - TODO: (HTPI 7)
