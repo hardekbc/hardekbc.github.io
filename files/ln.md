@@ -2876,8 +2876,9 @@ therefore f is not onto.
 
 how did we know to pick r = 2? let's try to prove that f _is_ onto; then
 ∀x ∈ ℝ, ∃a ∈ A, f(a) = x. let x ∈ ℝ, then we need some a ∈ A s.t. f(a) = x.
-by the definition of f, 2a/(a+1) = x; solving for a we get a = x(2 - x). this
-clearly doesn't work is a = 2, which gives is our hint for what r needs to be.
+by the definition of f, 2a/(a+1) = x; solving for a we get 2a = ax + x, so
+a(2-x) = x, so a = x/(2 - x). this clearly doesn't work if a = 2, which gives 
+us our hint for what r needs to be.
 ```
 
 - suppose f : A → B and g : B → C, thus (from a previous theorem) g ∘ f : A → C.
@@ -2999,6 +3000,8 @@ left-hand side and using P(n) we get (Σ(i = 0..n) 2ⁱ) + 2ⁿ⁺¹ = (2ⁿ⁺�
 
     - sometimes people call the assumption `P(n)` the "inductive hypothesis", but there isn't anything really special about it...it's the same thing that we've been doing before
 
+- usually the base case is straightforward, but the inductive step can take some thought
+
 - EXAMPLE 2: prove that `∀n ∈ ℕ, 3 | (n³ - n)`
 
 ```
@@ -3049,9 +3052,76 @@ inductive step: let n ∈ ℕ ≥ 5 and suppose 2ⁿ > n². then:
        = (n + 1)²
 ```
 
-%% induction on the size of a set or list, maybe another exercise
+- EXAMPLE: suppose A is a set of elements with a total ordering ≤. prove that every finite non-empty set B ⊆ A has a smallest element according to ≤.
 
-## why induction works (and when it doesn't)
+    - the elements could be numbers, or strings (where ≤ is lexicographic ordering), or anything else that has some way to order them
+
+    - notice that at first this theorem doesn't seem to have anything to do with natural numbers...how can we use induction?
+
+    - the key is to realize that "finite non-empty set" means that the set has some number of elements n ≥ 1
+
+    - we can rephrase the theorem logically as `∀n ≥ 1, ∀B ⊆ A, |B| = n → B has a smallest element
+
+```
+base case: n = 1. suppose B ⊆ A and |B| = 1. then B = {b} for some b ∈ A. clearly 
+b ≤ b and there are no other elements, therefore b is the smallest element.
+
+inductive step: suppose n ≥ 1 and every subset of A with n elements has a smallest
+element. let B be a subset of A with n+1 elements, b ∈ B, and B' = B \ {b}. since
+B' has n elements, it has a smallest element; let c ∈ B' be its smallest element.
+then b ≤ c or c ≤ b; we proceed by cases.
+
+case 1: b ≤ c. then we will prove that b is the smallest element of B by 
+contradiction. suppose b is not the smallest element of B; then there is some 
+d ∈ B' s.t. d < b. since b ≤ c, then d < c. but c is the smallest element of B',
+which is a contradiction. therefore b is the smallest element of B.
+
+case 2: c ≤ b. then we will prove that c is the smallest element of B by
+contradiction. suppose c is not the smallest element of B; then there is some
+d ∈ B s.t. d < c. since c is the smallest element of B', d ̸∈ B', so d = b. but
+then b < c, which is a contradiction. therefore c is the smallest element of B.
+```
+
+- the trick with induction is to figure what what exactly to to the induction on. when we're given a formula over natural numbers it's easy, but as in the example above sometimes it takes some thought and insight
+
+- EXERCISE: prove that for any set S, |𝒫(S)| = 2^|S|
+
+```
+we will prove by induction on the size of S. let |S| = n.
+
+base case: n = 0. Then S = {} and 𝒫(S) = {∅}, and 1 = 2^0.
+
+inductive case. suppose n ≥ 0 and for any set X of size n, |𝒫(X)| = 2^n. let S be
+a set of size n+1, a ∈ S, and S' = S \ {a}. then |S'| = n and |𝒫(S')| = 2^n. for
+each X ∈ 𝒫(S'), we can create a new subset of S as X ∪ {a}. this is all of the
+subsets of S, so |𝒫(S)| = 2 ⬝ |𝒫(S')| = 2 ⋅ 2^n = 2^{n+1}.
+```
+
+- warning: we have to be careful when using induction...just because it follows the format doesn't mean it's correct
+
+- EXAMPLE (incorrect proof): all horses are the same color
+
+```
+we will prove by induction on the number of horses.
+
+base case: n = 1. there is only one horse, and it must be the same color as itself.
+
+inductive step: suppose for any set of n horses, all of the horses are the same 
+color. consider a set of n+1 horses. number the horses 1, 2, ..., n, n+1. the first
+n horses must have the same color, and the last n horses must have the same color.
+since the first n horses and last n horses overlap, all n+1 horses must have the 
+same color.
+```
+
+- what's wrong with the proof?
+
+    - everything is actually correct _except_ the claim that the first n horses and last n horses must overlap
+
+    - that's true for every value of n+1 _except_ 2
+
+## recursion
+
+% [6.3] recursion (maybe just factorial example + exercise)
 
 ## strong induction
 
@@ -3060,6 +3130,8 @@ inductive step: let n ∈ ℕ ≥ 5 and suppose 2ⁿ > n². then:
 ## structural induction
 
 % [XXX] structural induction (see ccs2 notes)
+% mention need for well-founded set (i.e., base cases)
+% maybe mention need for bijection with natural numbers
 
 # number theory - TODO: (HTPI 7)
 
