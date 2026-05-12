@@ -3121,11 +3121,98 @@ same color.
 
 ## recursion
 
-% [6.3] recursion (maybe just factorial example + exercise)
+- you're all familiar with writing recursive functions; it is interesting to note that recursion and induction are duals of each other
+
+- let's take the factorial function as an example
+
+    - `for n ∈ ℕ, fact(n) = 1 if n ≤ 1, n * fact(n-1) otherwise`
+
+    - if we call `fact(3)` we get:
+        `fact(3)`
+        `3 * fact(2)`
+        `3 * 2 * fact(1)`
+        `3 * 2 * 1`
+
+    - we start with a number and it becomes smaller and smaller until we reach a base case (and we _always_ have to have a base case)
+
+- with induction, we start with a base case and then prove a property for larger and larger numbers
+
+- if a function (or data structure) is recursive and we want to prove something about it, we're probably going to use induction
+
+- EXAMPLE: prove that ∀n∈ℕ, fact(n) = n!
+
+```
+base case: n = 0 or 1. then fact(n) = 1 = 0! = 1!
+
+inductive step: suppose n ≥ 1 and fact(n) = n!. then fact(n+1) = (n+1) * fact(n) =
+(n+1) * n! = (n+1)!
+```
+
+- EXERCISE
+
+    - let `fact` be defined as above
+    - let `exp(n) = 1 if n = 0, 2 ⬝ exp(n-1) otherwise` (i.e., 2^n)
+    - prove that `∀n ≥ 4, fact(n) > exp(n)`
+
+```SOLN
+base case: n = 4. then fact(4) = 24 > 16 = exp(4)
+
+inductive step: suppose n ≥ 4 and fact(n) > exp(n). then:
+  fact(n+1) = (n+1) ⬝ fact(n) 
+            > (n+1) ⬝ exp(n)
+            > 2 ⬝ exp(n)
+            = exp(n+1)
+```
+
+- this is one reason why functional programming is easier to reason about than imperative programming
+
+    - we can still reason about imperative programs and use induction, it's just messier and more complicated
 
 ## strong induction
 
-% [6.4] strong induction (see ccs2 notes)
+- regular induction allows us to assume P(n) to prove P(n+1), but sometimes this is too limiting---sometimes we need P(k) for some k < n
+
+- strong induction modifies regular induction in the following way:
+
+    - ∀n ∈ ℕ, (∀k ∈ ℕ ≤ n, P(k)) → P(n+1)
+
+    - that is, we assume the proposition is true for all values less than n as well as n itself
+
+    - this makes intuitive sense, because to prove P(n) we would have had to prove P(k) for all k < n anyway
+
+- technically we don't need a base case, it's wrapped inside the inductive step already...but sometimes we'll have them anyway to make the proof more convenient
+
+- EXAMPLE: prove that every amount of postage of 12 cents or more can be formed using just 4-cent and 5-cent stamps
+
+```
+we will prove it by strong induction. let P(n) = postage of n cents can be formed
+from 4-cent and 5-cent stamps.
+
+base case: by inspection we can see that P(12), P(13), P(14), P(15) are true.
+
+inductive step: suppose n ≥ 15 and ∀k∈ℕ, 12 ≤ k ≤ n → P(k). we must show that
+P(n+1) is true. note that n+1 = n-3+4 and that n-3 ≥ 12. by the inductive
+hypothesis P(k-3) is true. to prove P(n+1) we take the stamps required for P(k-3)
+and add a 4-cent stamp.
+```
+
+- notice that that we needed P(k-3), which regular induction would not have allowed us to use
+
+- note that technically strong induction isn't any more powerful than regular induction, that is, anything we can prove with strong induction we can prove with regular induction
+
+    - however, the strong induction proof can be much shorter and simpler than the regular induction proof
+
+- EXERCISE (HTPI theorem 6.4.2) prove that every integer n > 1 is either prime or can be written as the product of primes
+
+    - hint: we don't need a base case for this proof
+
+```SOLN
+we use strong induction. suppose n > 1 and for every integer k, if 1 < k < n then 
+k is either prime or the product of primes. if n is prime then there is nothing 
+left to prove, so suppose n is not prime. then n = ab where 1 < a,b < n. by the
+inductive hypothesis a and b are either prime or the product of primes, therefore
+since n = ab then n is the product of primes.
+```
 
 ## structural induction
 
