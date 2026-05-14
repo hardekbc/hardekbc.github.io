@@ -3216,9 +3216,107 @@ since n = ab then n is the product of primes.
 
 ## structural induction
 
-% [XXX] structural induction (see ccs2 notes)
-% mention need for well-founded set (i.e., base cases)
-% maybe mention need for bijection with natural numbers
+- let's take a closer look at what natural numbers actually represent: we can define them as a _data structure_
+
+```
+type Nat
+  | Zero
+  | Succ(Nat)
+
+Zero                     0
+Succ(Zero)               1
+Succ(Succ(Zero))         2
+Succ(Succ(Succ(Zero)))   3
+⋮
+```
+
+- in a functional language we can define data structures just like this (they are called "algebraic datatypes"); in C++ we might define an abstract base class "Nat" with child classes "Zero" and "Succ"
+
+- the Nat type has one base case (Zero) and one inductive case (Succ); it is no accident that induction on natural numbers requires one base case and one inductive step
+
+```
+base case: n = Zero
+inductive step: assume P(n), prove P(Succ(n))
+```
+
+- we can generalize induction to work on any inductively defined data structure, not just natural numbers; this is called _structural induction_
+
+- to prove P(x) for some inductively-defined x, we must prove the base case(s) and an inductive step for each non-base constructor
+
+- EXAMPLE: Tree
+
+```
+type Tree
+  | Leaf
+  | Node(n, Tree, Tree)
+
+Node(1, Node(2, Leaf, Node(3, Leaf, Leaf)), Node(4, Leaf, Leaf))
+```
+
+```
+num_leaves(t) = match t with
+  | Leaf => 1
+  | Node(n, left, right) => num_leaves(left) + num_leaves(right)
+
+num_nodes(t) = match t with
+  | Leaf => 0
+  | Node(n, left, right) => 1 + num_nodes(left) + num_nodes(right)
+```
+
+- theorem: ∀t ∈ Tree, num_leaves(t) = num_nodes(t) + 1
+
+    - note that we will have _two_ inductive hypotheses in the inductive step: one for the left subtree and one for the right subtree
+
+```
+base case: t = Leaf. then num_leaves(Leaf) = 1 and num_nodes(Leaf) = 0 + 1 = 1.
+
+inductive step: let t1,t2 ∈ Tree and suppose num_leaves(t1) = num_nodes(t1) + 1 and
+num_leaves(t2) = num_nodes(t2) + 1. then:
+    num_leaves(Node(_, t1, t2)) = num_leaves(t1) + num_leaves(t2) 
+                                = num_nodes(t1) + 1 + num_nodes(t2) + 1
+                                = 1 + 1 + num_nodes(t1) + num_nodes(t2)
+                                = 1 + num_nodes(Node(_, t1, t2))
+```
+
+- note that we have _two_ inductive hypotheses because the Node constructor uses two instances of Tree
+
+- EXERCISE: List
+
+```
+type List
+  | Empty
+  | Cons(n, List)
+
+Cons(1, Cons(2, Cons(3, Empty))) ==> [1, 2, 3]
+```
+
+```
+append(ℓ₁, ℓ₂) = match ℓ₁ with
+  | Empty => ℓ₂
+  | Cons(n, ℓ') => Cons(n, append(ℓ', ℓ₂))
+```
+
+```
+len(ℓ) = match ℓ with
+  | Empty => 0
+  | Cons(n, ℓ') => 1 + len(ℓ')
+```
+
+- theorem: ∀ℓ₁,ℓ₂ ∈ List, len(append(ℓ₁,ℓ₂)) = len(ℓ₁) + len(ℓ₂)
+
+```SOLN
+we'll use induction on ℓ₁.
+
+base case: ℓ₁ = Empty. then len(append(ℓ₁,ℓ₂)) = len(append(Empty,ℓ₂)) = len(ℓ₂) =
+0 + len(ℓ₂) = len(ℓ₁) + len(ℓ₂).
+
+inductive step: let ℓ₁ ∈ List and suppose len(append(ℓ₁,ℓ₂)) = len(ℓ₁) + len(ℓ₂).
+let n ∈ ℤ. then:
+  len(append(Cons(n, ℓ₁),ℓ₂)) = len(Cons(n, append(ℓ₁,ℓ₂)))
+                              = 1 + len(append(ℓ₁,ℓ₂))
+                              = 1 + len(ℓ₁) + len(ℓ₂)
+                              = len(Cons(n, ℓ₁)) + len(ℓ₂)
+```
 
 # number theory - TODO: (HTPI 7)
 
