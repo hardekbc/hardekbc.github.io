@@ -2,6 +2,8 @@
 
 - cs40 won't be taught again, so these notes are more for applying to cs42 in the future
 
+- i think for (especially the earlier) assignments and quizzes the problems aren't worth enough points, so that even a few points off is a big deal
+
 - i think it's a mistake to rely entirely on lectures; what i should have done is assigned reading, then reviewed important points in lecture (and given examples and exercises)
 
     - this is maybe where clickers would come in handy: quiz the students to get an idea of their comprehension
@@ -22,6 +24,8 @@
     - Q3(c) is missing parentheses to disambiguate between the ∨ and ∧ 
 
 - can/should i make the assignments completely online with gradescope?
+
+- skipped greatest common divisor for time
 
 # SECOND LECTURE ANNOUNCEMENTS
 
@@ -3318,44 +3322,94 @@ let n ∈ ℤ. then:
                               = len(Cons(n, ℓ₁)) + len(ℓ₂)
 ```
 
-# number theory - TODO: (HTPI 7)
-
-## gcd
-
-## modular arithmetic
-### intro to modular arithmetic (HTPI 4.5)
+# modular arithmetic
 
 - we can define a very useful family of equivalence relations as follows
 
-- DEF: suppose m ∈ ℤ⁺. for any x,y ∈ ℤ, we say that "x is congruent to y modulo m" if ∃k ∈ ℤ, x - y = km. in other words, m divides (x - y).
+- DEF: suppose m ∈ ℤ⁺. for any x,y ∈ ℤ, we say that "x is congruent to y modulo m" if `m | (x - y)`, i.e., `∃k ∈ ℤ, x - y = km`
 
     - we will use the notation `x ≡ y (mod m)`
 
     - EXAMPLE: 12 ≡ 27 (mod 5), because 12 - 27 = -15 and 5 divides -3.
 
-- for any m ∈ ℤ⁺, define the relation {(x, y) ∈ ℤ × ℤ | x ≡ y (mod m)}
+- for any m ∈ ℤ⁺, define the relation {(x, y) ∈ ℤ² | x ≡ y (mod m)}
 
     - we will call this relation `≡ₘ`
-    - i.e., `x ≡ₘ y` = `x ≡ y (mod m)`
+    - i.e., `x ≡ₘ y` iff `x ≡ y (mod m)`
 
 - theorem: for every m ∈ ℤ⁺, ≡ₘ is an equivalence relation (i.e., ≡ₘ is reflexive, symmetric, and transitive)
 
-    - proof left as an exercise
+    - proof left as an exercise (this is something you may be asked to prove at some point)
 
-- these relations give us _modular arithmetic_, which is heavily used in many places (e.g., crypto)
+- since ≡ₘ is an equivalence relation, we have the usual equivalence classes and partitionings
 
-- what is it doing? suppose we are using ≡₄
+    - [n]ₘ = {b ∈ ℤ | b ≡ n (mod m)}
+    - ℤ/≡ₘ = {[n]ₘ | n ∈ ℤ}
 
-    - 0, 1,  2,  3
-    - 4, 5,  6,  7
-    - 8, 9, 10, 11
-    - ...
+- EXAMPLES
 
-    - each column is an equivalence class
+    - [0]₃ = {..., -9, -6, -3, 0, 3, 6, 9, ...}
+    - [1]₃ = {..., -8, -5, -2, 1, 4, 7, 10, ...}
+    - [2]₃ = {..., -7, -4, -1, 2, 5, 8, 11, ...}
 
-    - addition "wraps around", e.g., 6 + 7 = 2 + 3 = 1
+- or another way of writing it down, where each column is an equivalence class:
 
-- in fact, when you use unsigned integers in C/C++, you are operating on ≡_(2^64)
+```
+ 0  1  2
+ 3  4  5
+ 6  7  8
+ 9 10 11
+⋮
+```
+
+- some useful properties of these congruence classes:
+
+    - addition "wraps around": 6 + 7 = 0 + 1 = 1
+    - so does multiplication: 4 * 8 = 1 * 2 = 2
+
+- we can put these observations on formal ground via some theorems
+
+    - ∀X,Y ∈ ℤ/≡ₘ, there is a unique S ∈ ℤ/≡ₘ s.t. ∀x ∈ X, ∀y ∈ Y, x + y ∈ S
+    - ∀X,Y ∈ ℤ/≡ₘ, there is a unique S ∈ ℤ/≡ₘ s.t. ∀x ∈ X, ∀y ∈ Y, xy ∈ S
+
+- if we define addition and multiplication on modulo equivalence classes as returning the (unique) equivalence class of the result, it follows that:
+
+    - [a]ₘ + [b]ₘ = [a + b]ₘ
+    - [a]ₘ ⋅ [b]ₘ = [ab]ₘ
+
+- proofs omitted for time
+
+- as a consequence, when doing arithmetic on these equivalence classes we can just pick a distinguished element of each class (e.g., the smallest element of each class) and do the arithmetic on those
+
+    - this can be very helpful when working with extremely large numbers or when confined to a specific range of values
+
+- these observations give us _modular arithmetic_, which has many of the same properties as normal arithmetic. consider m ∈ ℤ⁺ and X,Y,Z ∈ ℤ/≡ₘ; then:
+
+    - X + Y = Y + X
+    - (X + Y) + Z = X + (Y + Z)
+    - X + [0]ₘ = X
+    - ∃X⁻¹ ∈ ℤ/≡ₘ s.t. X + X⁻¹ = [0]ₘ
+    - XY = YX
+    - (XY)Z = X(YZ)
+    - X ⋅ [1]ₘ = X
+    - X ⋅ [0]ₘ = [0]ₘ
+    - X(Y + Z) = XY + XZ
+
+- proofs are straightforward based on the earlier theorems
+
+- modular arithmetic is heavily used in many places, for example: crypto, checksums, and error-correcting codes
+
+    - in fact, when you use unsigned integers in C/C++, you are operating on ≡_(2^64)
+
+- programming languages usually have a mod operator (sometime using notation `%`) s.t. `x % n` = the remainder of x divided by n (where n must be positive)
+
+    - this is related to congruence mod n, but it's an operation instead of a relation
+
+    - the operator returns a value 0..(n-1), it isn't a proposition
+        
+    - two numbers are congruent mod n iff the operator returns the same remainder for both: x ≡ₙ y ↔ x % n = y % n
+    
+    - languages disagree on whether the remainder from dividing into a negative number should be positive or negative
 
 # infinite sets - TODO: (HTPI 8)
 
