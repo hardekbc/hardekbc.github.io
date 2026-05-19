@@ -3411,14 +3411,66 @@ let n ∈ ℤ. then:
     
     - languages disagree on whether the remainder from dividing into a negative number should be positive or negative
 
-# infinite sets - TODO: (HTPI 8)
+# finite sets (combinatorics) [logic and proof ch20]
+## intro
 
-% [8.1] cardinality, equinumerous
-%
-% [MAYBE MOVE COMBINATORICS HERE?]
-% 
-% [8.2] countable and uncountable sets
+- if a set is finite then, intuitively, we should be able to count how many elements it has
 
-# combinatorics - TODO: (LaP 20)
+- however, remember that set descriptions can be arbitrarily complex, and the sets can be arbitrarily large...it often isn't as simple as listing every element and counting them that way
 
-% [LaPch20] combinatorics
+- _combinatorics_ is the study of "counting without counting", i.e., coming up with principles and formulas that allow us to compute the size of a set without actually counting the elements directly
+
+- it will be helpful to associate with each n ∈ ℕ a canonical set of elements of size n
+
+- we choose this to be the set Sₙ = {m ∈ ℕ | m < n}
+
+- a set A is _finite_ iff there is a bijection between A and Sₙ for some n ∈ ℕ 
+
+    - we say the _cardinality_ of A is n
+    - we write |A| = n
+
+## pigeonhole principle
+
+- theorem: for m,n ∈ ℕ s.t. m > n, there is no one-to-one function from Sₘ to Sₙ
+
+```
+we will use proof by contradiction. suppose there is a one-to-one function
+f : Sₘ → Sₙ. then every element of Sₙ is mapped to by at most one element of
+Sₘ. Sₙ has n elements, and so dom(f) must have at most n elements. but Sₘ has 
+m elements where m > n, and so f is not total, thus it cannot be a function. 
+therefore there is no one-to-one function f : Sₘ → Sₙ.
+```
+
+- this theorem is called the "pigeonhole principle"
+
+    - suppose there are n pigeonholes and m pigeons where m > n
+    - then at least one pigeonhole must contain more than one pigeon
+
+- the pigeonhole principle is useful in a number of ways that may not be immediately obvious
+
+- EXAMPLE: how many people must be in a group to guarantee that at least two of them have the same birthday?
+
+```SOLN: 
+367, because there are only 366 possible birthdays (including leap days), and
+so by the pigeonhole principle at least two people must have the same birthday.
+```
+
+- EXAMPLE: prove that any subset of 6 elements from the set S = {n ∈ ℕ | n < 10} must have two elements that sum to 10
+
+```SOLN
+organize S into the following sets: {1,9} {2,8} {3,7} {4,6} {5}. note that the two-
+elements sets each sum to 10 and there are 5 total sets. pick any 6-element subset 
+of S and place its members into the above sets. by the pigeonhole principle, at
+least one of the two-element sets must have two members placed in it.
+```
+
+- notice that the first example is fairly obvious, but the second example is more subtle: we had to define the "pigeonholes" and "pigeons" ourselves in order to apply the principle
+
+## counting principles
+
+
+
+# infinite sets - TODO:
+
+% [HTPI 8.1] 
+% [HTPI 8.2]
