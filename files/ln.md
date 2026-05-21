@@ -3436,7 +3436,7 @@ let n ∈ ℤ. then:
 - theorem: for m,n ∈ ℕ s.t. m > n, there is no one-to-one function from Sₘ to Sₙ
 
 ```
-we will use proof by contradiction. suppose there is a one-to-one function
+we will use proof by contradiction. suppose there is a one-to-one function 
 f : Sₘ → Sₙ. then every element of Sₙ is mapped to by at most one element of
 Sₘ. Sₙ has n elements, and so dom(f) must have at most n elements. but Sₘ has 
 m elements where m > n, and so f is not total, thus it cannot be a function. 
@@ -3460,10 +3460,10 @@ so by the pigeonhole principle at least two people must have the same birthday.
 - EXAMPLE: prove that any subset of 6 elements from the set N = {n ∈ ℕ | n < 10} must have two elements that sum to 10
 
 ```SOLN
-organize N into the following groupings: {1,9} {2,8} {3,7} {4,6} {5}. note that the two-
-element groupings each sum to 10 and there are 5 total groups. pick any 6-element subset 
-of N and place its members into the above sets. by the pigeonhole principle, at
-least one of the two-element groups must have two members placed in it.
+organize N into the following groupings: {1,9} {2,8} {3,7} {4,6} {5}. note that
+the two-element groupings each sum to 10 and there are 5 total groups. pick any
+6-element subset of N and place its members into the above sets. by the pigeonhole
+principle, at least one of the two-element groups must have two members in it.
 ```
 
 - notice that the first example is fairly obvious, but the second example is more subtle: we had to define the "pigeonholes" and "pigeons" ourselves in order to apply the principle
@@ -3478,14 +3478,13 @@ least one of the two-element groups must have two members placed in it.
 suppose f : Sₘ → A and g : Sₙ → B are bijections. define h : Sₘ₊ₙ → A ∪ B as
 h(i) = f(i) if i < m, g(i-m) if m ≤ i < m+n
 
-h is one-to-one: suppose x,y ∈ A ∪ B and h(x) = h(y). if h(x) ∈ A then 
-h(y) ∈ A, h(i) = f(i), and h(y) = f(y). hence f(x) = f(y) and, since
-f is one-to-one, x = y. if h(x) ∈ B then h(y) ∈ B, h(x) = g(x-m), and
-h(y) = g(y-m). hence g(x-m) = g(y-m) and, since g is one-to-one,
-x-m = y-m and so x = y.
+h is one-to-one: suppose x,y ∈ A ∪ B and h(x) = h(y). if h(x) ∈ A then h(y) ∈ A, 
+h(i) = f(i), and h(y) = f(y). hence f(x) = f(y) and, since f is one-to-one, x = y. 
+if h(x) ∈ B then h(y) ∈ B, h(x) = g(x-m), and h(y) = g(y-m). hence g(x-m) = g(y-m)
+and, since g is one-to-one, x-m = y-m and so x = y.
 
-h is onto: suppose k ∈ A ∪ B. if k ∈ A then there is some i ∈ Sₘ s.t. 
-k = f(i) = h(i). if k ∈ B then there is some i ∈ Sₙ s.t. k = h(i) = h(m+i).
+h is onto: suppose k ∈ A ∪ B. if k ∈ A then there is some i ∈ Sₘ s.t. k = f(i) = 
+h(i). if k ∈ B then there is some i ∈ Sₙ s.t. k = h(i) = h(m+i).
 ```
 
 - theorem: let A,B be finite sets; then |A × B| = |A|⋅|B|
