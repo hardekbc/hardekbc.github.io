@@ -3198,7 +3198,7 @@ base case: by inspection we can see that P(12), P(13), P(14), P(15) are true.
 
 inductive step: suppose n ≥ 15 and ∀k∈ℕ, 12 ≤ k ≤ n → P(k). we must show that
 P(n+1) is true. note that n+1 = n-3+4 and that n-3 ≥ 12. by the inductive
-hypothesis P(k-3) is true. to prove P(n+1) we take the stamps required for P(k-3)
+hypothesis P(n-3) is true. to prove P(n+1) we take the stamps required for P(n-3)
 and add a 4-cent stamp.
 ```
 
