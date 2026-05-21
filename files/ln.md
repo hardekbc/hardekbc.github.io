@@ -23,6 +23,8 @@
     - Q1(c) could be read as an imperative or a proposition (maybe add !)
     - Q3(c) is missing parentheses to disambiguate between the ∨ and ∧ 
 
+- assignment 7: i think Q6 can be proven without using induction at all by appealing to the pigeonhole principle...and some students are sort of figuring that out by using induction, but their inductive step uses the pigeonhole principle without appealing to the inductive hypothesis
+
 - can/should i make the assignments completely online with gradescope?
 
 - skipped greatest common divisor for time
@@ -3362,12 +3364,7 @@ let n ∈ ℤ. then:
 ⋮
 ```
 
-- some useful properties of these congruence classes:
-
-    - addition "wraps around": 6 + 7 = 0 + 1 = 1
-    - so does multiplication: 4 * 8 = 1 * 2 = 2
-
-- we can put these observations on formal ground via some theorems
+- we can put things on formal ground via some theorems
 
     - ∀X,Y ∈ ℤ/≡ₘ, there is a unique S ∈ ℤ/≡ₘ s.t. ∀x ∈ X, ∀y ∈ Y, x + y ∈ S
     - ∀X,Y ∈ ℤ/≡ₘ, there is a unique S ∈ ℤ/≡ₘ s.t. ∀x ∈ X, ∀y ∈ Y, xy ∈ S
@@ -3379,23 +3376,31 @@ let n ∈ ℤ. then:
 
 - proofs omitted for time
 
+- this imples some useful properties:
+
+    - addition "wraps around": 6 + 7 (mod 3) = 0 + 1 (mod 3) = 1 (mod 3)
+    - so does multiplication: 4 * 8 (mod 3) = 1 * 2 (mod 3) = 2 (mod 3)
+
 - as a consequence, when doing arithmetic on these equivalence classes we can just pick a distinguished element of each class (e.g., the smallest element of each class) and do the arithmetic on those
 
     - this can be very helpful when working with extremely large numbers or when confined to a specific range of values
 
-- these observations give us _modular arithmetic_, which has many of the same properties as normal arithmetic. consider m ∈ ℤ⁺ and X,Y,Z ∈ ℤ/≡ₘ; then:
+- these observations give us _modular arithmetic_, which has many of the same properties as normal arithmetic. consider m ∈ ℤ⁺ and x,y,z ∈ ℤ; then:
 
-    - X + Y = Y + X
-    - (X + Y) + Z = X + (Y + Z)
-    - X + [0]ₘ = X
-    - ∃X⁻¹ ∈ ℤ/≡ₘ s.t. X + X⁻¹ = [0]ₘ
-    - XY = YX
-    - (XY)Z = X(YZ)
-    - X ⋅ [1]ₘ = X
-    - X ⋅ [0]ₘ = [0]ₘ
-    - X(Y + Z) = XY + XZ
+    - [x] + [y] = [y] + [x]                   : addition is commutative
+    - ([x] + [y]) + [z] = [x] + ([y] + [z])   : addition is associative
+    - [x] + [0]ₘ = [x]                        : addition has an identity element
+    - ∃x' ∈ ℤ s.t. [x] + [x'] = [0]ₘ          : addition has an inverse
+    - [x]⋅[y] = [y]⋅[x]                        : multiplication is commutative
+    - ([x]⋅[y])⋅[z] = [x]⋅([y]⋅[z])             : multiplication is associative
+    - [x] ⋅ [1]ₘ = [x]                         : multiplication has an identity element
+    - [x] ⋅ [0]ₘ = [0]ₘ                        : multiplication has an annihilator element
+    - [x]⋅([y] + [z]) = [x]⋅[y] + [x]⋅[z]      : multiplication distributes over addition
 
-- proofs are straightforward based on the earlier theorems
+    - notice that multiplication does not necessarily have an inverse
+    - proofs are straightforward based on the earlier theorems (and you may be asked to do them)
+
+- essentially, modular arithmetic allows us to do traditional arithmetic in a finite space
 
 - modular arithmetic is heavily used in many places, for example: crypto, checksums, and error-correcting codes
 
@@ -3404,11 +3409,8 @@ let n ∈ ℤ. then:
 - programming languages usually have a mod operator (sometime using notation `%`) s.t. `x % n` = the remainder of x divided by n (where n must be positive)
 
     - this is related to congruence mod n, but it's an operation instead of a relation
-
     - the operator returns a value 0..(n-1), it isn't a proposition
-        
-    - two numbers are congruent mod n iff the operator returns the same remainder for both: x ≡ₙ y ↔ x % n = y % n
-    
+    - two numbers are congruent mod n iff the operator returns the same remainder for both: `x ≡ₙ y ↔ x % n = y % n`
     - languages disagree on whether the remainder from dividing into a negative number should be positive or negative
 
 # finite sets (combinatorics) [logic and proof ch20]
@@ -3455,18 +3457,59 @@ therefore there is no one-to-one function f : Sₘ → Sₙ.
 so by the pigeonhole principle at least two people must have the same birthday.
 ```
 
-- EXAMPLE: prove that any subset of 6 elements from the set S = {n ∈ ℕ | n < 10} must have two elements that sum to 10
+- EXAMPLE: prove that any subset of 6 elements from the set N = {n ∈ ℕ | n < 10} must have two elements that sum to 10
 
 ```SOLN
-organize S into the following sets: {1,9} {2,8} {3,7} {4,6} {5}. note that the two-
-elements sets each sum to 10 and there are 5 total sets. pick any 6-element subset 
-of S and place its members into the above sets. by the pigeonhole principle, at
-least one of the two-element sets must have two members placed in it.
+organize N into the following groupings: {1,9} {2,8} {3,7} {4,6} {5}. note that the two-
+element groupings each sum to 10 and there are 5 total groups. pick any 6-element subset 
+of N and place its members into the above sets. by the pigeonhole principle, at
+least one of the two-element groups must have two members placed in it.
 ```
 
 - notice that the first example is fairly obvious, but the second example is more subtle: we had to define the "pigeonholes" and "pigeons" ourselves in order to apply the principle
 
 ## counting principles
+
+- theorem: let A,B be disjoint finite sets; then |A ∪ B| = |A| + |B|
+
+    - remember that a set being a certain size means there is a bijection from Sₙ for some n ∈ ℕ 
+
+```
+suppose f : Sₘ → A and g : Sₙ → B are bijections. define h : Sₘ₊ₙ → A ∪ B as
+h(i) = f(i) if i < m, g(i-m) if m ≤ i < m+n
+
+h is one-to-one: suppose x,y ∈ A ∪ B and h(x) = h(y). if h(x) ∈ A then 
+h(y) ∈ A, h(i) = f(i), and h(y) = f(y). hence f(x) = f(y) and, since
+f is one-to-one, x = y. if h(x) ∈ B then h(y) ∈ B, h(x) = g(x-m), and
+h(y) = g(y-m). hence g(x-m) = g(y-m) and, since g is one-to-one,
+x-m = y-m and so x = y.
+
+h is onto: suppose k ∈ A ∪ B. if k ∈ A then there is some i ∈ Sₘ s.t. 
+k = f(i) = h(i). if k ∈ B then there is some i ∈ Sₙ s.t. k = h(i) = h(m+i).
+```
+
+- theorem: let A,B be finite sets; then |A × B| = |A|⋅|B|
+
+    - proof left as an exercise (2 possible strategies, one the same as the previous theorem and one that uses the previous theorem plus induction)
+
+- we can generalize these theorems to more than two sets; suppose S is a finite set of finite sets
+
+    - if S is pairwise disjoint, then |⋃S| = Σ_{X ∈ S} |X|
+    - |ΠS| = Π_{X ∈ S} |X|
+    - proofs are by induction on the size of S using the previous theorems
+
+- also note that if A is finite and there is a bijection from A to B, then B is finite and |A| = |B|
+
+    - sometimes it's easier to count a set by counting a different set and then showing there is a bijection
+
+- EXAMPLES:
+
+    - we can choose between 3 kinds of pie, 2 kinds of ice-cream, and 4 kinds of cake; how many dessert choices are there? 3 + 2 + 4 = 9
+    - how many cards are in a standard deck of playing cards? 4 suits, each suit has 13 cards = 4 * 13 = 52 cards
+    - how many n-bit binary numbers are there? n bits, two choices per bit = 2ⁿ numbers
+    - what is |𝒫(Sₙ)|? there is a bijection from 𝒫(Sₙ) to n-bit binary numbers (the i'th bit is 1 iff i is in the subset), and we've already computed that there are 2ⁿ n-bit binary numbers
+
+## ordered selection
 
 
 
