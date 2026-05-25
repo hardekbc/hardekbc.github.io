@@ -29,6 +29,8 @@
 
 - skipped greatest common divisor for time
 
+- should have moved modular arithmetic to right after equivalence relations
+
 # SECOND LECTURE ANNOUNCEMENTS
 
 - i miscounted, there are 9 weekly assignments not 8
@@ -3341,7 +3343,7 @@ let n ∈ ℤ. then:
 
 - theorem: for every m ∈ ℤ⁺, ≡ₘ is an equivalence relation (i.e., ≡ₘ is reflexive, symmetric, and transitive)
 
-    - proof left as an exercise (this is something you may be asked to prove at some point)
+    - proof left as an exercise (this is something you may be asked to prove at some point) (NOTE: POSSIBLE HW/FINAL)
 
 - since ≡ₘ is an equivalence relation, we have the usual equivalence classes and partitionings
 
@@ -3366,8 +3368,8 @@ let n ∈ ℤ. then:
 
 - we can put things on formal ground via some theorems
 
-    - ∀X,Y ∈ ℤ/≡ₘ, there is a unique S ∈ ℤ/≡ₘ s.t. ∀x ∈ X, ∀y ∈ Y, x + y ∈ S
-    - ∀X,Y ∈ ℤ/≡ₘ, there is a unique S ∈ ℤ/≡ₘ s.t. ∀x ∈ X, ∀y ∈ Y, xy ∈ S
+    - ∀x,y ∈ ℤ, there is a unique S ∈ ℤ/≡ₘ s.t. ∀a ∈ [x], ∀b ∈ [y], a + b ∈ S
+    - ∀x,y ∈ ℤ, there is a unique S ∈ ℤ/≡ₘ s.t. ∀a ∈ [x], ∀b ∈ [y], ab ∈ S
 
 - if we define addition and multiplication on modulo equivalence classes as returning the (unique) equivalence class of the result, it follows that:
 
@@ -3387,15 +3389,15 @@ let n ∈ ℤ. then:
 
 - these observations give us _modular arithmetic_, which has many of the same properties as normal arithmetic. consider m ∈ ℤ⁺ and x,y,z ∈ ℤ; then:
 
-    - [x] + [y] = [y] + [x]                   : addition is commutative
-    - ([x] + [y]) + [z] = [x] + ([y] + [z])   : addition is associative
-    - [x] + [0]ₘ = [x]                        : addition has an identity element
-    - ∃x' ∈ ℤ s.t. [x] + [x'] = [0]ₘ          : addition has an inverse
-    - [x]⋅[y] = [y]⋅[x]                        : multiplication is commutative
-    - ([x]⋅[y])⋅[z] = [x]⋅([y]⋅[z])             : multiplication is associative
-    - [x] ⋅ [1]ₘ = [x]                         : multiplication has an identity element
-    - [x] ⋅ [0]ₘ = [0]ₘ                        : multiplication has an annihilator element
-    - [x]⋅([y] + [z]) = [x]⋅[y] + [x]⋅[z]      : multiplication distributes over addition
+    - .[x] + [y] = [y] + [x]                   : addition is commutative
+    - .([x] + [y]) + [z] = [x] + ([y] + [z])   : addition is associative
+    - .[x] + [0]ₘ = [x]                        : addition has an identity element
+    - .∃x' ∈ ℤ s.t. [x] + [x'] = [0]ₘ          : addition has an inverse
+    - .[x]⋅[y] = [y]⋅[x]                        : multiplication is commutative
+    - .([x]⋅[y])⋅[z] = [x]⋅([y]⋅[z])             : multiplication is associative
+    - .[x] ⋅ [1]ₘ = [x]                         : multiplication has an identity element
+    - .[x] ⋅ [0]ₘ = [0]ₘ                        : multiplication has an annihilator element
+    - .[x]⋅([y] + [z]) = [x]⋅[y] + [x]⋅[z]      : multiplication distributes over addition
 
     - notice that multiplication does not necessarily have an inverse
     - proofs are straightforward based on the earlier theorems (and you may be asked to do them)
@@ -3453,8 +3455,8 @@ therefore there is no one-to-one function f : Sₘ → Sₙ.
 - EXAMPLE: how many people must be in a group to guarantee that at least two of them have the same birthday?
 
 ```SOLN: 
-367, because there are only 366 possible birthdays (including leap days), and
-so by the pigeonhole principle at least two people must have the same birthday.
+n = number of people; k = number of birthdays = 366 (including leap days)
+we need n > k, therefore n > 366
 ```
 
 - EXAMPLE: prove that any subset of 6 elements from the set N = {n ∈ ℕ | n < 10} must have two elements that sum to 10
@@ -3467,6 +3469,79 @@ principle, at least one of the two-element groups must have two members in it.
 ```
 
 - notice that the first example is fairly obvious, but the second example is more subtle: we had to define the "pigeonholes" and "pigeons" ourselves in order to apply the principle
+
+- the basic pigeonhole principle only tells us that at least one pigeonhole has more than one pigeon; we can make a stronger statement
+
+    - if there are n pigeons and k pigeonholes, then at least one pigeonhole must have ceil(n/k) pigeons
+
+- EXAMPLE: If there are 100 students, how many students possibly share same birth month?
+
+```SOLN
+n = number of students = 100; k = number of months = 12
+ceil(100/12) = at least 9 students must share the same birth month
+```
+
+- EXERCISE:
+
+    1. If you have 10 black socks and 12 blue socks mixed in a drawer, how many socks must you pick to guarantee a matching pair? 
+
+    2. A store sells left and right shoes in 3 different types: sneakers, boots, and sandals. How many shoes must be selected to guarantee at least one matching pair?  
+
+    3. In a group of 1001 people, show that there are at least two people with the same number of friends within the group.
+
+```SOLN
+1.
+n = number of socks picked; k = number of colors = 2
+we need n > k, therefore n > 2
+
+2.
+n = number of shoes picked; k = number of shoe types = 2*3 = 6
+therefore n > 6
+
+3.
+n = number of people = 1001; k = number of possible friends = 1000 (each person
+can have 0--1000 friends = 1001, but there can't be one person with 0 friends and
+one person with 1000 friends, so actually 1000 possible friends). 1001 people but
+only 1000 possible number of friends means at least two people have the same number
+of friends.
+```
+
+- application: the limits of data compression
+
+    - explain lossy vs lossless compression (lossy often used for images and videos; lossless often used for text)
+
+        - lossless example: huffman encoding, based on frequency of characters
+
+    - we will prove that there cannot exist a perfect lossless compression algorithm
+
+    - preliminary fact: suppose f : A → B for finite sets A and B s.t. |A| > |B|. then by the pigeonhole principle f cannot be one-to-one
+
+    - let's assume we're compressing binary data, so the input and output are both binary strings
+    
+        - 𝔹ⁿ: binary strings of length n
+        - 𝔹^{<n}: binary strings of length < n
+        - 𝔹^*: binary strings of any length
+
+    - for lossless compression we need two functions:
+
+        - compression   C : 𝔹^* → 𝔹^*
+        - decompression D : 𝔹^* → 𝔹^*
+
+    - these functions must be inverses of each other, i.e., D = C⁻¹
+
+    - since C has an inverse, it must be a bijection
+
+    - a compression algorithm is perfect if it always results in a string smaller than its input
+
+        - then C : 𝔹ⁿ → 𝔹^{<n}
+        - size of 𝔹ⁿ = 2ⁿ
+        - size of 𝔹^{<n} = 2⁰ + 2¹ + ... + 2ⁿ⁻¹ = 2ⁿ - 1
+
+    - since |𝔹ⁿ| > |𝔹^{< n}|, C cannot be one-to-one, so it cannot be a bijection, which is a contradiction
+
+    - therefore a perfect compression algorithm cannot exist
+
+- we can use similar (but more complicated) reasoning to prove limits on, e.g., the minimum number of comparisons required to sort an array, and other such algorithms
 
 ## counting principles
 
@@ -3487,9 +3562,9 @@ h is onto: suppose k ∈ A ∪ B. if k ∈ A then there is some i ∈ Sₘ s.t. 
 h(i). if k ∈ B then there is some i ∈ Sₙ s.t. k = h(i) = h(m+i).
 ```
 
-- theorem: let A,B be finite sets; then |A × B| = |A|⋅|B|
+- theorem: let A,B be finite sets (not necessarily disjoint); then |A × B| = |A|⋅|B|
 
-    - proof left as an exercise (2 possible strategies, one the same as the previous theorem and one that uses the previous theorem plus induction)
+    - proof left as an exercise (NOTE: POSSIBLE HW/FINAL)
 
 - we can generalize these theorems to more than two sets; suppose S is a finite set of finite sets
 
@@ -3504,15 +3579,188 @@ h(i). if k ∈ B then there is some i ∈ Sₙ s.t. k = h(i) = h(m+i).
 - EXAMPLES:
 
     - we can choose between 3 kinds of pie, 2 kinds of ice-cream, and 4 kinds of cake; how many dessert choices are there? 3 + 2 + 4 = 9
+
     - how many cards are in a standard deck of playing cards? 4 suits, each suit has 13 cards = 4 * 13 = 52 cards
+
     - how many n-bit binary numbers are there? n bits, two choices per bit = 2ⁿ numbers
+
     - what is |𝒫(Sₙ)|? there is a bijection from 𝒫(Sₙ) to n-bit binary numbers (the i'th bit is 1 iff i is in the subset), and we've already computed that there are 2ⁿ n-bit binary numbers
+
+- inclusion-exclusion principle: we have established that if A and B are disjoint, |A ∪ B| = |A| + |B|; what if they are not disjoint?
+
+    - intuitively, then |A| + |B| would double-count some elements
+    - how many? |A ∩ B|, the set of elements in both
+    - so for any sets A and B, |A ∪ B| = |A| + |B| - |A ∩ B|
+
+- things get more complicated if we generalize to more sets
+
+- suppose we have A, B, and C; what is |A ∪ B ∪ C|? we can apply a similar strategy, but we have to be careful not to overcompensate
+
+    - |A| + |B| + |C| - |A ∩ B| - |A ∩ C| - |B ∩ C| + |A ∩ B ∩ C|
+    - the last operand is because we've substract those elements three times but we should have only subtracted them twice
+    - [show venn diagram to illustrate]
+
+- we can generalize to any number of sets, say: A₀, A₁, A₂, ...
+
+```
+|⋃_{i < n}Aᵢ| = Σ_{I ⊆ Sₙ ≠ ∅} (-1)^{|I|+1} ⋅ |⋂_{i ∈ I}Aᵢ|
+```
+
+- EXAMPLE: among a group of students, 30 are taking Logic, 25 are taking History, and 20 are taking French. 11 are taking both Logic and History, 10 are taking Logic and French, 7 are taking History and French, and 3 are taking all three. how many students are taking at least one of the classes?
+
+```
+L = 30
+H = 25
+F = 20
+
+|L ∪ H ∪ F| = 30 + 25 + 20 - 11 - 10 - 7 + 3 = 50
+```
 
 ## ordered selection
 
+- now we will consider selecting elements from a set
 
+- two variants: with or without repetition
+
+- EXAMPLES:
+
+    - select 3 scoops of ice cream from 32 flavors (chocolate, chocolate, vanilla)
+    - select 3 cards from a standard 52-card deck (2H, 4S, 9C)
+
+- suppose we select k items from a set A of n items, with repetition; how many different selections can we make?
+
+    - we are selecting a k-tuple from Aᵏ
+    - A × A × A × ... (k times)
+    - from our counting principles, we know there are nᵏ elements in Aᵏ
+    - therefore there are nᵏ possible selections
+
+- EXAMPLE:
+
+    - select 3 scoops of ice cream from 32 flavors
+    - k = 3
+    - |A| = n = 32
+    - there are 32³ = 32,768 possible selections
+
+- suppose we select k items from a set A of n items, without repetition; how many different selections can we make?
+
+    - still a k-tuple, but we have one less option each time we make a choice
+    - we select from n options, then n-1 options, then n-2, etc
+    - A × (A \ {x}) × (A \ {x,y}) × (A \ {x,y,z}) × ...
+    - therefore there are Π_{i = 0}^{k-1} (n-k) possible selections
+
+- EXAMPLE:
+
+    - select 3 cards from a standard 52-card deck
+    - k = 3
+    - |A| = n = 52
+    - there are 52 ⋅ 51 ⋅ 50 = 132,600 possible selections
+
+- EXERCISES
+
+    1. how many 3-letter strings can be created from a set of 4 letters?
+        SOLN: 4³ = 64
+
+    2. if we have a pile of 10 toys and we let 3 children each take one toy in turn, how many different toy selections are possible?
+        SOLN: 10 ⋅ 9 ⋅ 8 = 720
+
+- if set A is finite, a bijection from A to A is called a _permutation_
+
+    - we can think of a permutation as different orderings of A
+    - EXAMPLE: {1,2,3} ==> (1,2,3), (1,3,2), (2,1,3), (2,3,1), (3,1,2), (3,2,1)
+
+- notice that a permutation is selecting |A| = n elements from A without repetition, therefore we can use the previous formula to compute the number of permutations
+
+    - the result is n ⋅ (n-1) ⋅ (n-2) ⋅ ... ⋅ 2 ⋅ 1
+    - there is special notation for this computation: n!
+    - factorial grows even more quickly than exponential
+
+- we can rewrite the general formula in terms of factorial: selecting k things from n items without repetition = P(n,k) = n!/(n-k)! possible selections
+
+    - this is efficient to write, but extremely inefficient to compute
+
+## combinations
+
+- previously we distinguished between different selection orders: (a,b,c) counts as a different selection than (c,b,a)
+
+- what if the order does not matter, so the same elements in any order should count as the same selection, but still without repetition? these are called _combinations_, as opposed to _permutations_
+
+- if we use the general formula, choosing k things from n elements when order matters is `n!/(n-k)!`
+
+    - this overcounts, because the same elements in different orders are counted separately
+
+    - how many ways are there to order the same k elements? `k!`
+
+- `C(n,k) = n!/k!(n-k)!` [also show special notation for "n choose k"]
+
+- EXAMPLE: someone wants to choose 3 outfits from 10 possible outfits to pack for a trip; how many selections are possible?
+    - SOLN: 10!/3!⋅7! = 10⋅9⋅8/3⋅2⋅1 = 120
+
+- a useful tip: sometimes it's helpful to break a problem into sub-parts and then combine to get the final answer (this can work with permutations too)
+
+- EXAMPLE: given S = {a,b,c,d}, how many ways can we create a 2-element subset of S s.t. the elements are not alphabetically adjacent?
+
+```SOLN
+number of 2-element subsets = C(4,2) = 6
+number of invalid 2-element subsets = 4 - 1 = 3
+final answer = 6 - 3 = 3
+```
+
+- theorem: `C(n,k) = C(n,n-k)`
+
+```
+C(n,n-k) = n!/(n-k)!(n - (n-k))!
+         = n!/(n-k)!⋅k!
+         = n!/k!(n-k)!
+         = C(n,k)
+```
+
+- that is, the number of ways to choose what to select is equal to the number of ways to choose what _not_ to select
+
+- theorem: if `k+1 ≤ n` then `C(n+1,k+1) = C(n,k+1) + C(n,k)`
+
+    - this can be proven using a similar algebraic argument
+
+- consider the binomial coefficients
+
+    - `(x + y)ⁿ = Σ_{k=0}^n C(n,k)⋅xⁿ⋅yⁿ⁻ᵏ` [the binomial theorem]
+    - the coefficients can be arranged in the so-called "Pascal's triangle"
+
+```
+1
+1 1
+1 2 1
+1 3 3 1
+1 4 6 4 1
+⋮
+```
+
+- EXAMPLE
+
+```
+(x + y)⁰ = 1                      : C(0,0)
+(x + y)¹ = x + y                  : C(1,0)x + C(1,1)y
+(x + y)² = x² + 2xy + y²          : C(2,0)x² + C(2,1)xy + C(2,2)y²
+(x + y)³ = x³ + 3x²y + 3xy² + y³  : C(3,0)x³ + C(3,1)x²y + C(3,2)xy² + C(3,3)y³
+⋮
+```
+
+- the `k`th element of the `n`th row of Pascal's triangle is `C(n,k)`
+
+- the second theorem gives an efficient way to compute the rows of Pascal's triangle using a recursive algorithm
+
+- all of the above was if we do not allow repetition; what if we do?
+
+- the number of ways to choose `k` items from `n` options allowing repetition is `C(n+k-1, k)`
+
+    - proof left as an exercise (NOTE: POSSIBLE HW/FINAL)
 
 # infinite sets - TODO:
 
 % [HTPI 8.1] 
 % [HTPI 8.2]
+
+# time fillers
+
+- lean
+- lambda calculus
+- ???
