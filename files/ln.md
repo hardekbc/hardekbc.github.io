@@ -3705,6 +3705,22 @@ number of invalid 2-element subsets = 4 - 1 = 3
 final answer = 6 - 3 = 3
 ```
 
+- EXERCISES
+
+    1. How many ways are there to choose a team of 4 from a group of 9?
+
+    2. Suppose we have an office of 5 managers and 6 engineers and we have to select a committee of 4 people. In how many ways can we select 2 managers and 2 engineers?
+
+```SOLN
+1. 
+n = 9, k = 4
+C(10,3) = 9!/4!⋅5! = 9⋅8⋅7⋅6/4⋅3⋅2⋅1 = 126
+
+2.
+two sub-problems
+C(5,2) * C(6,2) = 10 * 15 = 150
+```
+
 - theorem: `C(n,k) = C(n,n-k)`
 
 ```
