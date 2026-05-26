@@ -3856,7 +3856,54 @@ and c ∈ C s.t. f(a) = b and f(c) = d. then h(a,c) = (f(a), g(c)) = (b,d).
     - _countable_ if A is finite or countably infinite
     - _uncountable_ otherwise
 
+- theorem: suppose A is a set. then A is countable iff
 
+    - A = ∅ or ∃f : ℕ → A, f is onto
+    - ∃f : A → ℕ, f is one-to-one
+
+    - remember that countable includes finite or countably infinite; these theorems state that |A| is at most |ℕ|
+
+- theorems: suppose A and B are countable sets. then:
+
+    - A × B is countable
+    - A ∪ B is countable
+    - [proofs are straightforward]
+
+- so far we have only seen countable sets; how can we get an uncountable set? here are a couple of ways that seem like they might give us uncountable sets, but in fact they still give us countable sets
+
+- theorem: the union of countably many countable sets is countable
+
+```
+suppose ∅ ̸∈ F. if F = ∅ then ⋃F = ∅, which is countable. suppose F ≠ ∅. then we
+can number each element of F as {A₁, A₂, ...}, and number each element of Aᵢ as
+{aⁱ₁, aⁱ₂, ...}. now define the function f : ℕ × ℕ → ⋃F as f(i,j) = aⁱⱼ.
+
+f is onto. for any element aⁱⱼ ∈ ⋃F, f(i,j) = aⁱⱼ. we know that ℕ × ℕ ~ ℕ, so 
+there is some bijective function g : ℕ → ℕ × ℕ. then f ∘ g : ℕ → ⋃F is onto, so
+⋃F is countable.
+
+suppose ∅ ∈ F. let F' = F \ {∅}. then ⋃F' is countable by the above argument,
+and since ⋃F = ⋃F', F is also countable.
+```
+
+- theorem: suppose A is a countable set. the set of all finite sequences of elements of A is countable
+
+    - e.g., the set of all sentences formed from the set of ASCII characters
+    - this set is very relevant to computability theory, as CS 138 shows
+    - proof omitted for time
+
+- so far |ℕ| has been the largest cardinality we can create, even if we're trying to get a bigger one...so are there any uncountable sets at all? it turns out, yes there are many
+
+- cantor's theorem: 𝒫(ℕ) is uncountable
+
+```
+TODO:
+```
+
+%% TODO:
+%% the reals are uncountable
+%% the continuum hypothesis
+%% ∀A, |A| < |𝒫(A)|, meaning there are infinite sizes of infinity
 
 # time fillers
 
