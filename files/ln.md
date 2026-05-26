@@ -3770,10 +3770,93 @@ C(n,n-k) = n!/(n-k)!(n - (n-k))!
 
     - proof left as an exercise (NOTE: POSSIBLE HW/FINAL)
 
-# infinite sets - TODO:
+# infinite sets
 
-% [HTPI 8.1] 
-% [HTPI 8.2]
+- we said that a set A is finite if there is a bijective function between A and Sₙ for some n ∈ ℕ 
+
+    - then |A| = n
+    - as a corollary, if two finite sets A and B have a bijective function between them, then |A| = |B|
+    - we'll write A ~ B to say that the sets have the same cardinality
+
+- what about an infinite set A? by definition there is no n ∈ N s.t. there is a bijective function from Sₙ to A
+
+- it turns out that we can still talk about cardinalities of infinite sets in a meaningful way, and we'll see that there are infinite sets that are "larger" than other infinite sets
+
+- consider ℕ and ℤ; here is a bijective function ℕ → ℤ
+
+    - f(n) = n/2 if n even, (1-n)/2 - 1 if n odd
+    - we can prove that this function is bijective
+
+```
+f is one-to-one. suppose x,y ∈ ℕ and f(x) = f(y). we proceed by cases.
+case 1: x,y are even. then f(x) = x/2 = y/2 = f(y), so x = y.
+case 2: x,y are odd. then f(x) = (1-x)/2 - 1 = (1-y)/2 - 1 = f(y), so x = y.
+
+f is onto. suppose x ∈ ℤ. we proceed by cases.
+case 1: x ≥ 0. then 2x ∈ ℕ and f(2x) = x.
+case 2: x < 0. then -2x - 1 ∈ ℕ and f(-2x-1) = x.
+```
+
+- this means that even though ℕ ⊂ ℤ, ℕ ~ ℤ 
+
+    - this result is _not_ true for finite sets; there are no finite sets where some proper subset is the same cardinality as the original set (we can use the pigeonhole principle to prove this)
+
+    - note that we only need to show there exists at least one bijective function; there are many functions ℕ → ℤ that are not bijective, but we've shown there is one that is
+
+- we can also show the surprising result that ℕ × ℕ ~ ℕ 
+
+    - again this result is _not_ true for finite sets
+    - there are actually many possible bijective functions, we'll show only one
+
+```
+define f(x,y) = (x+y)(x+y+1)/2 + y [due to cantor]
+
+to prove that f is a bijection, we derive the inverse function (details not shown,
+they are complicated):
+
+def g(z) = (z - w(w+1)/2, w(w+3)/2 - z) s.t. w = floor((sqrt(1+8z) - 1)/2)
+
+then f and g are inverses and hence f is bijective.
+```
+
+- note that ℕ × ℕ can be seen as representing the positive rational numbers ℚ⁺, so we've shown that ℕ and ℚ⁺ are "the same size"
+
+    - we can easily extend this argument to show that ℕ ~ ℚ in a similar way as we showed that ℕ ~ ℤ 
+
+- we can see that once we start reasoning about infinite sets, intuition isn't very helpful...we need precise definitions to guide us
+
+- theorem: if A ~ B and C ~ D then A × C ~ B × D
+
+    - this is clearly true for finite sets (use the fact that for finite sets |A × C| = |A|⋅|C|) but we need to think more carefully about whether it's true for infinite sets
+
+```
+since A ~ B there is some bijective f : A → B. since C ~ D there is some bijective
+g : C → D. define h : A × C → B × D as h(a,c) = (f(a), g(c)).
+
+h is one-to-one. suppose (a1,c1), (a2,c2) ∈ A × C and h(a1,c1) = h(a2,c2). then
+(f(a1), g(c1)) = (f(a2), g(c2)), so f(a1) = f(a2) and g(c1) = g(c2). since f and
+g are one-to-one, a1 = a2 and c1 = c2.
+
+h is onto. suppose (b,d) ∈  B × D. then since f and g are onto, we can choose a ∈ A
+and c ∈ C s.t. f(a) = b and f(c) = d. then h(a,c) = (f(a), g(c)) = (b,d).
+```
+
+- ~ is an equivalence relation: for sets A, B, C
+
+    - A ~ A
+    - A ~ B → B ~ A
+    - A ~ B ∧ B ~ C → A ~ C
+    - [proofs left as exercises] [NOTE: POSSIBLE HW/FINAL]
+
+- we can use these properties to make some proofs easier, e.g., we have shown that ℕ ~ ℚ⁺ and that ℕ ~ ℤ, so it follows that ℚ⁺ ~ ℤ 
+
+- terminology: a set A is 
+
+    - _denumerable_ or _countably infinite_ if A ~ ℕ 
+    - _countable_ if A is finite or countably infinite
+    - _uncountable_ otherwise
+
+
 
 # time fillers
 
