@@ -3485,7 +3485,7 @@ ceil(100/12) = at least 9 students must share the same birth month
 
     1. If you have 10 black socks and 12 blue socks mixed in a drawer, how many socks must you pick to guarantee a matching pair? 
 
-    2. A store sells left and right shoes in 3 different types: sneakers, boots, and sandals. How many shoes must be selected to guarantee at least one matching pair?  
+    2. A box contains left and right shoes in 3 different types: sneakers, boots, and sandals. How many shoes must be selected to guarantee at least one matching pair (e.g., 2 left sneakers)?  
 
     3. In a group of 1001 people, show that there are at least two people with the same number of friends within the group.
 
@@ -3721,6 +3721,8 @@ two sub-problems
 C(5,2) * C(6,2) = 10 * 15 = 150
 ```
 
+### binomials and pascal's triangle [SKIP FOR TIME?]
+
 - theorem: `C(n,k) = C(n,n-k)`
 
 ```
@@ -3825,7 +3827,7 @@ then f and g are inverses and hence f is bijective.
 
 - we can see that once we start reasoning about infinite sets, intuition isn't very helpful...we need precise definitions to guide us
 
-- theorem: if A ~ B and C ~ D then A × C ~ B × D
+- [NOTE: SKIP FOR TIME?] theorem: if A ~ B and C ~ D then A × C ~ B × D
 
     - this is clearly true for finite sets (use the fact that for finite sets |A × C| = |A|⋅|C|) but we need to think more carefully about whether it's true for infinite sets
 
@@ -3869,6 +3871,8 @@ and c ∈ C s.t. f(a) = b and f(c) = d. then h(a,c) = (f(a), g(c)) = (b,d).
     - A ∪ B is countable
     - [proofs are straightforward]
 
+- NOTE: SKIP THE NEXT TWO THEOREMS FOR TIME?
+
 - so far we have only seen countable sets; how can we get an uncountable set? here are a couple of ways that seem like they might give us uncountable sets, but in fact they still give us countable sets
 
 - theorem: the union of countably many countable sets is countable
@@ -3897,16 +3901,55 @@ and since ⋃F = ⋃F', F is also countable.
 - cantor's theorem: 𝒫(ℕ) is uncountable
 
 ```
-TODO:
+if 𝒫(ℕ) is countable, there exists a bijective function f : ℕ → 𝒫(ℕ). we will
+prove that f is not onto, hence cannot be a bijection.
+
+if f is not onto then ∃D ∈ 𝒫(ℕ) s.t. ∀n ∈ ℕ, f(n) ≠ D. all we need to do is find
+D, but this is the part that takes some cleverness.
+
+let D = {n ∈ ℕ | n ̸∈ f(n)}. then D ∈ 𝒫(ℕ) and by construction there is no n ∈ ℕ
+s.t. f(n) = D.
+
+INUTUITION BEHIND DEFINITION OF D
+
+an table for a hypothetical function f
+- boolean entries: is n ∈ f(m)?
+ 
+m,n-> |
+↓     |  1  2  3  4  5 ⋯
+------+------------------
+    1 | [T] F  F  T  T ⋯
+    2 |  T [T] F  F  T ⋯
+    3 |  F  F [F] T  F ⋯
+    4 |  T  T  F [T] F ⋯
+    5 |  F  T  T  F [F]
+    ⋮ |  ⋮   ⋮   ⋮  ⋮  ⋮
+------+------------------
+n ∈ D?|  F  F  T  F  T
 ```
 
-%% TODO:
-%% the reals are uncountable
-%% the continuum hypothesis
-%% ∀A, |A| < |𝒫(A)|, meaning there are infinite sizes of infinity
+- this style of proof is called _diagonalization_, and it is extremely powerful...for example, we can use it to prove that a given computational problem is not computable
 
-# time fillers
+- now we can easily prove that ℝ is uncountable. we could use a diagonalization argument, but since we know 𝒫(ℕ) is uncountable all we need to do is define a one-to-one function f : 𝒫(ℕ) → ℝ. since f is one-to-one and 𝒫(ℕ) is uncountable, ℝ must be uncountable
 
-- lean
-- lambda calculus
-- ???
+```
+let f : 𝒫(ℕ) → ℝ be defined as f(A) = 0.d₁d₂... s.t. dₙ = 3 if n ̸∈ A, else 7.
+e.g., if A is the set of all even natural numbers, f(A) = 0.37373737...
+
+f is one-to-one. suppose A,B ∈ 𝒫(ℕ) and A ≠ B. then there is some n ∈ ℕ s.t.
+either n ∈ A and n ̸∈ B or vice versa. but then f(A) and f(B) cannot be equal,
+because they differ in the nth digit.
+```
+
+- some more advanced theorems that we will not prove:
+
+    - ∀A, |A| < |𝒫(A)| which implies there are infinite sizes of infinity
+    - |𝒫(ℕ)| = |ℝ|
+
+- we end with an interesting question: is there any size of infinity _in-between_ |ℕ| and |ℝ|?
+
+    - it turns out that we cannot prove this is true or false...the math is consistent either way
+
+    - so we can choose whether we want it to be true or not, and we get two different mathematical worlds that are both valid
+
+# lean examples [IF TIME] TODO:
