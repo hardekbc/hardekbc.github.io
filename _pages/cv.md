@@ -38,8 +38,10 @@ redirect_from:
 
 |                  Dates | Venue                                                                              |
 |-----------------------:|------------------------------------------------------------------------------------|
+| 2015, 2021, 2024, 2026 | Programming Language Design and Implementation (PLDI)                              |
+|                   2026 | International Symposium on Software Testing and Analysis (ISSTA)
+|                   2025 | Systems, Programming, Languages, and Applications: Software for Humanity (SPLASH/OOPSLA)
 | 2013, 2016, 2019, 2022 | Code Generation and Optimization (CGO)                                             |
-|       2015, 2021, 2024 | Programming Language Design and Implementation (PLDI)                              |
 |                   2021 | International Conference on Code Quality (ICCQ)                                    |
 |                   2019 | Static Analysis Symposium (SAS)                                                    |
 |                   2018 | LLVM Student Research Competition                                                  |
@@ -54,7 +56,7 @@ redirect_from:
 
 |            Dates | Venue                                                                          |
 |-----------------:|--------------------------------------------------------------------------------|
-|             2023 | Architectural Support for Programming Languages and Operating Systems (ASPLOS) |
+|       2023, 2025 | Architectural Support for Programming Languages and Operating Systems (ASPLOS) |
 |             2020 | Object-Oriented Programming, Systems, Languages, and Applications (OOPSLA)     |
 |             2016 | European Conference on Object-Oriented Programming (ECOOP)                     |
 | 2010, 2012, 2014 | Programming Language Design and Implementation (PLDI)                          |
@@ -66,10 +68,11 @@ redirect_from:
 |             Student | Graduated |
 |--------------------:|-----------|
 |       Peter Boyland |           |
-|          Zach Sisco |           |
-|      Harlan Kringen |           |
 |     Hitomi Nakayama |           |
 |         Jingtao Xia |           |
+|   Sarah Canto Hyatt |           |
+|      Harlan Kringen | 2026      |
+|          Zach Sisco | 2025      |
 |         Mehmet Emre | 2022      |
 | Michael Christensen | 2021      |
 |      Lawton Nichols | 2019      |
@@ -81,6 +84,8 @@ redirect_from:
 
 |        Student | Graduated |
 |---------------:|-----------|
+|   Yiu-Shing Li |
+|   Steven Jiang | 2026      |
 |    Henry Zhang | 2023      |
 |       Bryan Xu | 2023      |
 | Jacqueline Mai | 2021      |
@@ -91,6 +96,11 @@ redirect_from:
 
 ### Undergraduate Research Students
 
+- Kathleen Chen
+- Hauke Rehwald
+- Anish Jaiswal
+- Erica Wang
+- Qinrui Zhou
 - Mike Wang
 - Ethan Mader
 - Aesha Parekh
@@ -133,6 +143,7 @@ redirect_from:
 
 |      Dates | Activity                                         |
 |-----------:|--------------------------------------------------|
+| 2026--2027 | Committee and Diversity and Equity (chair)       |
 | 2023--2024 | Undergraduate Council (chair)                    |
 | 2023--2024 | Executive Council (member)                       |
 | 2023--2024 | Faculty Legislature (member)                     |
@@ -186,4 +197,4 @@ redirect_from:
 | 2009--2011 | Undergraduate Curriculum Committee                              |
 
 ---
-Last Updated: February 2024
+Last Updated: November 2026
